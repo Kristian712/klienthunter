@@ -1,0 +1,77 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  password      String
+  name          String?
+  plan          Plan      @default(FREE)
+  stripeCustomerId String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  searches      Search[]
+  savedResults  SavedResult[]
+}
+
+enum Plan {
+  FREE
+  PRO
+  BUSINESS
+}
+
+model Search {
+  id         String    @id @default(cuid())
+  userId     String
+  query      String
+  region     String
+  industry   String?
+  createdAt  DateTime  @default(now())
+
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  results    BusinessResult[]
+}
+
+model BusinessResult {
+  id              String    @id @default(cuid())
+  searchId        String
+  placeId         String
+  name            String
+  phone           String?
+  email           String?
+  address         String?
+  website         String?
+  hasWebsite      Boolean   @default(false)
+  hasFacebook     Boolean   @default(false)
+  hasInstagram    Boolean   @default(false)
+  hasLinkedIn     Boolean   @default(false)
+  reviewCount     Int       @default(0)
+  rating          Float?
+  googleMapsUrl   String?
+  category        String?
+  rawData         Json?
+  createdAt       DateTime  @default(now())
+
+  search          Search    @relation(fields: [searchId], references: [id], onDelete: Cascade)
+  savedBy         SavedResult[]
+}
+
+model SavedResult {
+  id               String         @id @default(cuid())
+  userId           String
+  businessResultId String
+  note             String?
+  createdAt        DateTime       @default(now())
+
+  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  businessResult   BusinessResult @relation(fields: [businessResultId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, businessResultId])
+}
