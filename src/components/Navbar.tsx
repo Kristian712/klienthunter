@@ -4,14 +4,9 @@ import { useTranslations, useLocale } from 'next-intl';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
-import { Menu, X, Globe2, Target } from 'lucide-react';
+import { Menu, X, Globe2, Target, ChevronDown } from 'lucide-react';
 
-interface User {
-  id: string;
-  email: string;
-  name?: string;
-  plan: string;
-}
+interface User { id: string; email: string; name?: string; plan: string }
 
 export function Navbar() {
   const t = useTranslations('nav');
@@ -19,12 +14,17 @@ export function Navbar() {
   const router = useRouter();
   const pathname = usePathname();
   const [user, setUser] = useState<User | null>(null);
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const [mobile, setMobile] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
-    fetch('/api/auth/me')
-      .then((r) => r.json())
-      .then((d) => setUser(d.user));
+    fetch('/api/auth/me').then(r => r.json()).then(d => setUser(d.user));
+  }, []);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 12);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
   const handleLogout = async () => {
@@ -34,61 +34,77 @@ export function Navbar() {
   };
 
   const switchLocale = () => {
-    const newLocale = locale === 'cs' ? 'en' : 'cs';
-    const newPath = pathname.replace(`/${locale}`, `/${newLocale}`);
-    router.push(newPath);
+    const next = locale === 'cs' ? 'en' : 'cs';
+    router.push(pathname.replace(`/${locale}`, `/${next}`));
   };
 
   const links = [
-    { href: `/${locale}/search`, label: t('search') },
+    { href: `/${locale}/search`,  label: t('search') },
     { href: `/${locale}/pricing`, label: t('pricing') },
     ...(user ? [{ href: `/${locale}/dashboard`, label: t('dashboard') }] : []),
   ];
 
   return (
-    <nav className="bg-white border-b border-gray-100 sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 flex items-center justify-between h-16">
+    <header
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+        scrolled
+          ? 'bg-white/90 backdrop-blur-xl shadow-card border-b border-ink/5'
+          : 'bg-transparent'
+      }`}
+    >
+      <nav className="max-w-6xl mx-auto px-4 flex items-center h-16 gap-8">
+
         {/* Logo */}
-        <Link href={`/${locale}`} className="flex items-center gap-2 font-bold text-xl text-primary-700">
-          <Target size={24} />
-          KlientHunter
+        <Link href={`/${locale}`} className="flex items-center gap-2.5 font-bold text-lg shrink-0">
+          <span className="flex items-center justify-center w-8 h-8 rounded-xl bg-brand-600 text-white shadow-glow">
+            <Target size={18} />
+          </span>
+          <span className="text-ink">Klient<span className="text-brand-600">Hunter</span></span>
         </Link>
 
-        {/* Desktop links */}
-        <div className="hidden md:flex items-center gap-6">
-          {links.map((l) => (
-            <Link
-              key={l.href}
-              href={l.href}
-              className="text-sm font-medium text-gray-600 hover:text-primary-700 transition-colors"
-            >
-              {l.label}
-            </Link>
-          ))}
+        {/* Desktop nav */}
+        <div className="hidden md:flex items-center gap-1 flex-1">
+          {links.map(l => {
+            const active = pathname.startsWith(l.href);
+            return (
+              <Link
+                key={l.href}
+                href={l.href}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  active
+                    ? 'text-brand-600 bg-brand-50'
+                    : 'text-ink-muted hover:text-ink hover:bg-surface-muted'
+                }`}
+              >
+                {l.label}
+              </Link>
+            );
+          })}
         </div>
 
-        {/* Right */}
-        <div className="hidden md:flex items-center gap-3">
+        {/* Right actions */}
+        <div className="hidden md:flex items-center gap-2 ml-auto">
           <button
             onClick={switchLocale}
-            className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800 transition-colors"
+            className="btn-ghost text-xs gap-1.5 rounded-lg px-2.5 py-1.5"
           >
-            <Globe2 size={16} />
-            {locale === 'cs' ? 'EN' : 'CS'}
+            <Globe2 size={14} />
+            {locale.toUpperCase()}
           </button>
+
           {user ? (
-            <>
-              <span className="text-sm text-gray-600">{user.name || user.email}</span>
-              <button onClick={handleLogout} className="btn-secondary text-sm px-3 py-1.5">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-ink-muted font-medium">{user.name || user.email}</span>
+              <button onClick={handleLogout} className="btn-outline btn-sm">
                 {t('logout')}
               </button>
-            </>
+            </div>
           ) : (
             <>
-              <Link href={`/${locale}/auth/login`} className="btn-secondary text-sm px-3 py-1.5">
+              <Link href={`/${locale}/auth/login`} className="btn-ghost text-sm px-4 py-2">
                 {t('login')}
               </Link>
-              <Link href={`/${locale}/auth/register`} className="btn-primary text-sm px-3 py-1.5">
+              <Link href={`/${locale}/auth/register`} className="btn-primary btn-sm">
                 {t('register')}
               </Link>
             </>
@@ -97,38 +113,38 @@ export function Navbar() {
 
         {/* Mobile toggle */}
         <button
-          className="md:hidden"
-          onClick={() => setMobileOpen((v) => !v)}
-          aria-label="Toggle menu"
+          className="md:hidden ml-auto p-2 rounded-lg hover:bg-surface-muted transition-colors"
+          onClick={() => setMobile(v => !v)}
         >
-          {mobileOpen ? <X size={24} /> : <Menu size={24} />}
+          {mobile ? <X size={20} /> : <Menu size={20} />}
         </button>
-      </div>
+      </nav>
 
       {/* Mobile menu */}
-      {mobileOpen && (
-        <div className="md:hidden border-t border-gray-100 bg-white px-4 py-4 space-y-3">
-          {links.map((l) => (
+      {mobile && (
+        <div className="md:hidden bg-white border-t border-ink/5 px-4 py-4 space-y-1 animate-fade-in shadow-card">
+          {links.map(l => (
             <Link
               key={l.href}
               href={l.href}
-              className="block text-sm font-medium text-gray-700"
-              onClick={() => setMobileOpen(false)}
+              className="block px-3 py-2.5 rounded-xl text-sm font-medium text-ink hover:bg-surface-muted transition-colors"
+              onClick={() => setMobile(false)}
             >
               {l.label}
             </Link>
           ))}
-          <div className="pt-2 border-t border-gray-100 flex flex-col gap-2">
-            <button onClick={switchLocale} className="text-left text-sm text-gray-500">
+          <div className="pt-3 border-t border-ink/5 flex flex-col gap-2">
+            <button onClick={switchLocale} className="btn-ghost text-sm justify-start">
+              <Globe2 size={14} />
               {locale === 'cs' ? 'Switch to English' : 'Přepnout do češtiny'}
             </button>
             {user ? (
-              <button onClick={handleLogout} className="btn-secondary text-sm">
+              <button onClick={handleLogout} className="btn-outline text-sm">
                 {t('logout')}
               </button>
             ) : (
               <>
-                <Link href={`/${locale}/auth/login`} className="btn-secondary text-sm text-center">
+                <Link href={`/${locale}/auth/login`} className="btn-outline text-sm text-center">
                   {t('login')}
                 </Link>
                 <Link href={`/${locale}/auth/register`} className="btn-primary text-sm text-center">
@@ -139,6 +155,6 @@ export function Navbar() {
           </div>
         </div>
       )}
-    </nav>
+    </header>
   );
 }

@@ -25,7 +25,7 @@ export default function RootLayout({
       <body className={inter.className}>
         <NextIntlClientProvider locale={locale} messages={messages}>
           <Navbar />
-          <main>{children}</main>
+          <main className="min-h-screen">{children}</main>
         </NextIntlClientProvider>
       </body>
     </html>

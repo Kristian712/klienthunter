@@ -9,21 +9,50 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        primary: {
-          50: '#eff6ff',
-          100: '#dbeafe',
-          200: '#bfdbfe',
-          300: '#93c5fd',
-          400: '#60a5fa',
-          500: '#3b82f6',
-          600: '#2563eb',
-          700: '#1d4ed8',
-          800: '#1e40af',
-          900: '#1e3a8a',
+        brand: {
+          50:  '#f0f0ff',
+          100: '#e4e4ff',
+          200: '#cdcbff',
+          300: '#aba8ff',
+          400: '#8278fd',
+          500: '#6152f8',
+          600: '#5232ed',
+          700: '#4525d9',
+          800: '#3a1fb6',
+          900: '#311c90',
+          950: '#1d0f5c',
+        },
+        surface: {
+          DEFAULT: '#ffffff',
+          subtle:  '#f8f8fc',
+          muted:   '#f2f2f8',
+        },
+        ink: {
+          DEFAULT: '#0e0e1a',
+          muted:   '#4b4b6a',
+          faint:   '#9898b3',
         },
       },
       fontFamily: {
-        sans: ['Inter', 'sans-serif'],
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+        mono: ['JetBrains Mono', 'monospace'],
+      },
+      boxShadow: {
+        'card':  '0 1px 3px 0 rgba(14,14,26,.06), 0 1px 2px -1px rgba(14,14,26,.06)',
+        'card-hover': '0 4px 16px 0 rgba(14,14,26,.10), 0 1px 4px -1px rgba(14,14,26,.08)',
+        'glow':  '0 0 40px -8px rgba(97,82,248,.45)',
+        'inner-brand': 'inset 0 1px 0 rgba(255,255,255,.12)',
+      },
+      backgroundImage: {
+        'hero-grid': "url(\"data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%236152f8' fill-opacity='0.06'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E\")",
+      },
+      animation: {
+        'fade-up': 'fadeUp .45s cubic-bezier(.16,1,.3,1) both',
+        'fade-in': 'fadeIn .3s ease both',
+      },
+      keyframes: {
+        fadeUp:  { from: { opacity: '0', transform: 'translateY(16px)' }, to: { opacity: '1', transform: 'translateY(0)' } },
+        fadeIn:  { from: { opacity: '0' }, to: { opacity: '1' } },
       },
     },
   },
