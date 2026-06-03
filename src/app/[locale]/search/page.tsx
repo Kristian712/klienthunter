@@ -57,13 +57,7 @@ export default function SearchPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        if (res.status === 401) {
-          setError(locale === 'cs' ? 'Pro vyhledávání se musíte přihlásit.' : 'Please log in to search.');
-        } else if (res.status === 403) {
-          setError(locale === 'cs' ? 'Dosáhli jste limitu vyhledávání. Upgradujte plán.' : 'Search limit reached. Please upgrade.');
-        } else {
-          setError(data.error || 'Error');
-        }
+        setError(data.error || 'Error');
         return;
       }
       setResults(data.results);
