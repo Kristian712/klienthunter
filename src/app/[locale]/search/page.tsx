@@ -58,34 +58,106 @@ const REGIONS = [
   ]},
 ];
 
-const INDUSTRIES = [
-  { group: '🔧 Řemesla & stavba', items: [
-    'Plumber', 'Electrician', 'Bricklayer', 'Carpenter', 'Painter',
-    'Roofer', 'Flooring', 'Welder', 'Landscaper', 'HVAC',
-    // CZ
-    'Instalatér', 'Elektrikář', 'Zedník', 'Truhlář', 'Malíř pokojů',
-  ]},
-  { group: '🍕 Jídlo & pití', items: [
-    'Restaurant', 'Pizzeria', 'Cafe', 'Bakery', 'Butcher',
-    'Restaurace', 'Kavárna', 'Hospoda', 'Pekárna', 'Řeznictví',
-  ]},
-  { group: '💇 Krása & péče', items: [
-    'Hair salon', 'Beauty salon', 'Nail studio', 'Massage', 'Barber',
-    'Kadeřnictví', 'Kosmetický salon', 'Nehtové studio', 'Masáže',
-  ]},
-  { group: '🚗 Auto & doprava', items: [
-    'Car repair', 'Tire shop', 'Auto body shop', 'Car rental',
-    'Autoservis', 'Pneuservis', 'Karosář', 'Autopůjčovna',
-  ]},
-  { group: '🏋️ Zdraví & sport', items: [
-    'Physiotherapist', 'Dentist', 'Veterinarian', 'Gym', 'Yoga',
-    'Fyzioterapeut', 'Zubař', 'Veterinář', 'Posilovna',
-  ]},
-  { group: '📋 Ostatní služby', items: [
-    'Accountant', 'Lawyer', 'Real estate agent', 'Photographer', 'Cleaning service',
-    'Účetní', 'Právník', 'Fotograf', 'Úklid', 'Psí salon',
-  ]},
-];
+// Each industry has a search value (English, for Google Places API)
+// and labels per locale
+const INDUSTRIES: Record<string, { group: string; items: { value: string; label: string }[] }[]> = {
+  cs: [
+    { group: '🔧 Řemesla', items: [
+      { value: 'plumber',      label: 'Instalatér' },
+      { value: 'electrician',  label: 'Elektrikář' },
+      { value: 'carpenter',    label: 'Tesař / Truhlář' },
+      { value: 'painter',      label: 'Malíř pokojů' },
+      { value: 'roofer',       label: 'Pokrývač' },
+      { value: 'landscaper',   label: 'Zahradník' },
+    ]},
+    { group: '🍕 Jídlo & pití', items: [
+      { value: 'restaurant',   label: 'Restaurace' },
+      { value: 'cafe',         label: 'Kavárna' },
+      { value: 'bakery',       label: 'Pekárna' },
+      { value: 'butcher shop', label: 'Řeznictví' },
+    ]},
+    { group: '💇 Krása', items: [
+      { value: 'hair salon',    label: 'Kadeřnictví' },
+      { value: 'beauty salon',  label: 'Kosmetický salon' },
+      { value: 'nail studio',   label: 'Nehtové studio' },
+      { value: 'massage',       label: 'Masáže' },
+    ]},
+    { group: '🚗 Auto', items: [
+      { value: 'car repair',    label: 'Autoservis' },
+      { value: 'tire shop',     label: 'Pneuservis' },
+    ]},
+    { group: '📋 Služby', items: [
+      { value: 'accountant',    label: 'Účetní' },
+      { value: 'photographer',  label: 'Fotograf' },
+      { value: 'cleaning service', label: 'Úklid' },
+      { value: 'veterinarian',  label: 'Veterinář' },
+    ]},
+  ],
+  sk: [
+    { group: '🔧 Remeslá', items: [
+      { value: 'plumber',      label: 'Inštalatér' },
+      { value: 'electrician',  label: 'Elektrikár' },
+      { value: 'carpenter',    label: 'Tesár / Stolár' },
+      { value: 'painter',      label: 'Maliar' },
+      { value: 'roofer',       label: 'Pokrývač' },
+      { value: 'landscaper',   label: 'Záhradník' },
+    ]},
+    { group: '🍕 Jedlo & pitie', items: [
+      { value: 'restaurant',   label: 'Reštaurácia' },
+      { value: 'cafe',         label: 'Kaviareň' },
+      { value: 'bakery',       label: 'Pekáreň' },
+      { value: 'butcher shop', label: 'Mäsiarstvo' },
+    ]},
+    { group: '💇 Krása', items: [
+      { value: 'hair salon',    label: 'Kaderníctvo' },
+      { value: 'beauty salon',  label: 'Kozmetický salón' },
+      { value: 'nail studio',   label: 'Nechtové štúdio' },
+      { value: 'massage',       label: 'Masáže' },
+    ]},
+    { group: '🚗 Auto', items: [
+      { value: 'car repair',    label: 'Autoservis' },
+      { value: 'tire shop',     label: 'Pneuservis' },
+    ]},
+    { group: '📋 Služby', items: [
+      { value: 'accountant',    label: 'Účtovník' },
+      { value: 'photographer',  label: 'Fotograf' },
+      { value: 'cleaning service', label: 'Upratovanie' },
+      { value: 'veterinarian',  label: 'Veterinár' },
+    ]},
+  ],
+  en: [
+    { group: '🔧 Trades', items: [
+      { value: 'plumber',      label: 'Plumber' },
+      { value: 'electrician',  label: 'Electrician' },
+      { value: 'carpenter',    label: 'Carpenter' },
+      { value: 'painter',      label: 'Painter' },
+      { value: 'roofer',       label: 'Roofer' },
+      { value: 'landscaper',   label: 'Landscaper' },
+    ]},
+    { group: '🍕 Food & drink', items: [
+      { value: 'restaurant',   label: 'Restaurant' },
+      { value: 'cafe',         label: 'Cafe' },
+      { value: 'bakery',       label: 'Bakery' },
+      { value: 'butcher shop', label: 'Butcher' },
+    ]},
+    { group: '💇 Beauty', items: [
+      { value: 'hair salon',    label: 'Hair salon' },
+      { value: 'beauty salon',  label: 'Beauty salon' },
+      { value: 'nail studio',   label: 'Nail studio' },
+      { value: 'massage',       label: 'Massage' },
+    ]},
+    { group: '🚗 Auto', items: [
+      { value: 'car repair',    label: 'Car repair' },
+      { value: 'tire shop',     label: 'Tire shop' },
+    ]},
+    { group: '📋 Services', items: [
+      { value: 'accountant',    label: 'Accountant' },
+      { value: 'photographer',  label: 'Photographer' },
+      { value: 'cleaning service', label: 'Cleaning service' },
+      { value: 'veterinarian',  label: 'Veterinarian' },
+    ]},
+  ],
+};
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -465,15 +537,19 @@ export default function SearchPage() {
                   onChange={e => setIndustry(e.target.value)}
                   required={industry !== '__custom__'}
                 >
-                  <option value="">{isCs ? '— Vyberte obor —' : '— Select industry —'}</option>
-                  {INDUSTRIES.map(group => (
+                  <option value="">
+                    {locale === 'cs' ? '— Vyberte obor —' : locale === 'sk' ? '— Vyberte odbor —' : '— Select industry —'}
+                  </option>
+                  {(INDUSTRIES[locale] ?? INDUSTRIES.en).map(group => (
                     <optgroup key={group.group} label={group.group}>
                       {group.items.map(item => (
-                        <option key={item} value={item}>{item}</option>
+                        <option key={item.value} value={item.value}>{item.label}</option>
                       ))}
                     </optgroup>
                   ))}
-                  <option value="__custom__">{isCs ? '✏️ Jiný obor (zadat ručně)' : '✏️ Other industry (type manually)'}</option>
+                  <option value="__custom__">
+                    {locale === 'cs' ? '✏️ Jiný obor (zadat ručně)' : locale === 'sk' ? '✏️ Iný odbor (zadať ručne)' : '✏️ Other (type manually)'}
+                  </option>
                 </select>
                 <ChevronDown size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none" />
               </div>
