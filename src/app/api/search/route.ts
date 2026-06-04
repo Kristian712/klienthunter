@@ -59,6 +59,9 @@ export async function POST(req: NextRequest) {
       limitedPlaces,
       async (place) => {
         const checks = await analyzeBusinessFull(place.website);
+        // hasWebsite = Google Places field is authoritative.
+        // We never override it based on whether our scraper could reach the site.
+        const hasWebsite = Boolean(place.website);
         return prisma.businessResult.create({
           data: {
             searchId:      search.id,
@@ -67,7 +70,7 @@ export async function POST(req: NextRequest) {
             phone:         place.formatted_phone_number || place.international_phone_number,
             address:       place.formatted_address,
             website:       place.website,
-            hasWebsite:    checks.hasWebsite,
+            hasWebsite,
             hasFacebook:   checks.hasFacebook,
             hasInstagram:  checks.hasInstagram,
             hasLinkedIn:   checks.hasLinkedIn,
