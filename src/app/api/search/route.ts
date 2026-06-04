@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { verifyToken, getPlanLimits } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { searchPlaces } from '@/lib/google-places';
+
+export const maxDuration = 60;
 import { analyzeBusinessFull } from '@/lib/business-checks';
 
 const SearchSchema = z.object({
