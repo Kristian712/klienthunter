@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import {
   Search, Download, Globe, Users, Star, ExternalLink,
-  Phone, Mail, MapPin, SlidersHorizontal, X, AlertTriangle, Clock, ChevronDown,
+  Phone, Mail, MapPin, SlidersHorizontal, X, Clock, ChevronDown,
+  Copy, Check, ChevronUp, MessageSquare,
 } from 'lucide-react';
 
 // ── Data: Czech regions ───────────────────────────────────────────────────────
@@ -167,6 +168,100 @@ function SocialLinks({ b }: { b: BusinessResult }) {
         </a>
       )}
     </span>
+  );
+}
+
+// ── Personalized outreach message ────────────────────────────────────────────
+
+function generateMessage(b: BusinessResult): string {
+  const name = b.name;
+
+  if (!b.hasWebsite) {
+    return `Dobrý den ${name},
+
+je mi 17 let, studuji IT a tvořím weby které skutečně fungují – moderní, rychlé, přizpůsobené mobilům.
+
+Všiml jsem si, že ${name} zatím nemá webové stránky. Rád vám zdarma ukážu, jak by mohly vypadat a co by to pro vás znamenalo. Bez závazku.
+
+Pokud web nepříjde vhod, ale znáte někoho komu by se hodil – budu rád za doporučení. 🙏
+
+https://webovkyvanek.cz
+
+Kristián`;
+  }
+
+  if (b.websiteIsOld) {
+    return `Dobrý den ${name},
+
+je mi 17 let, studuji IT a tvořím weby které skutečně fungují – moderní, rychlé, přizpůsobené mobilům.
+
+Všiml jsem si, že web ${name} by mohl použít moderní osvěžení – rychlejší načítání, lepší vzhled na mobilu a aktuální design. Rád vám zdarma ukážu jak by mohl vypadat. Bez závazku.
+
+Pokud to nepříjde vhod, ale znáte někoho komu by nový web pomohl – budu rád za doporučení. 🙏
+
+https://webovkyvanek.cz
+
+Kristián`;
+  }
+
+  return `Dobrý den ${name},
+
+je mi 17 let, studuji IT a tvořím weby které skutečně fungují – moderní, rychlé, přizpůsobené mobilům.
+
+Ať už web potřebuje osvěžení nebo máte jiný projekt – rád vám zdarma ukážu co umím. Bez závazku.
+
+Pokud web nepříjde vhod, ale znáte někoho komu by se hodil – budu rád za doporučení. 🙏
+
+https://webovkyvanek.cz
+
+Kristián`;
+}
+
+function MessageBox({ b }: { b: BusinessResult }) {
+  const [open, setOpen]     = useState(false);
+  const [copied, setCopied] = useState(false);
+  const message = generateMessage(b);
+
+  const copy = useCallback(async () => {
+    await navigator.clipboard.writeText(message);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }, [message]);
+
+  return (
+    <div className="border-t border-ink/5 mt-3">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="flex items-center gap-2 w-full px-5 py-2.5 text-xs font-medium text-ink-muted hover:text-brand-600 hover:bg-brand-50/50 transition-colors"
+      >
+        <MessageSquare size={13} />
+        {open ? 'Skrýt zprávu' : 'Zobrazit zprávu k odeslání'}
+        {open ? <ChevronUp size={13} className="ml-auto" /> : <ChevronDown size={13} className="ml-auto" />}
+      </button>
+
+      {open && (
+        <div className="px-5 pb-4">
+          <div className="relative bg-surface-subtle rounded-xl border border-ink/5 p-4">
+            <pre className="text-xs text-ink-muted whitespace-pre-wrap font-sans leading-relaxed">{message}</pre>
+            <button
+              onClick={copy}
+              className={`absolute top-3 right-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                copied
+                  ? 'bg-emerald-100 text-emerald-700'
+                  : 'bg-white border border-ink/10 text-ink-muted hover:text-brand-600 hover:border-brand-300 shadow-sm'
+              }`}
+            >
+              {copied
+                ? <span className="flex items-center gap-1"><Check size={12} /> Zkopírováno!</span>
+                : <span className="flex items-center gap-1"><Copy size={12} /> Kopírovat</span>}
+            </button>
+          </div>
+          <p className="text-[11px] text-ink-faint mt-2 flex items-center gap-1">
+            💡 Zkopíruj a pošli přes kontaktní formulář, email nebo Facebook zprávu.
+          </p>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -554,6 +649,9 @@ export default function SearchPage() {
                         </div>
                       )}
                     </div>
+
+                    {/* Personalized outreach message */}
+                    <MessageBox b={b} />
                   </div>
                 );
               })}
