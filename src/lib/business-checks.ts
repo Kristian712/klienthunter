@@ -17,6 +17,46 @@ export interface BusinessChecks {
 const HTTP_TIMEOUT = 8000;
 const BOT_UA = 'Mozilla/5.0 (compatible; KlientHunterBot/1.0)';
 
+// Social media domains that Google Places sometimes puts in the "website" field
+const SOCIAL_DOMAINS = [
+  'facebook.com', 'fb.com',
+  'instagram.com',
+  'linkedin.com',
+  'twitter.com', 'x.com',
+  'tiktok.com',
+  'youtube.com',
+  'pinterest.com',
+  'wa.me', 'whatsapp.com',
+  'maps.google.com', 'goo.gl/maps', 'maps.app.goo',
+];
+
+/**
+ * Returns true if the URL is a real website (not a social media profile).
+ * Google Places sometimes fills "website" with a Facebook/Instagram URL.
+ */
+export function isRealWebsite(url: string | undefined): boolean {
+  if (!url) return false;
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, '').toLowerCase();
+    return !SOCIAL_DOMAINS.some(d => host === d || host.endsWith('.' + d));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * If Google Places "website" is actually a social media URL,
+ * extract which network it belongs to.
+ */
+export function socialFromUrl(url: string): { fb?: string; ig?: string; li?: string } {
+  if (!url) return {};
+  const u = url.toLowerCase();
+  if (u.includes('facebook.com') || u.includes('fb.com')) return { fb: url };
+  if (u.includes('instagram.com')) return { ig: url };
+  if (u.includes('linkedin.com'))  return { li: url };
+  return {};
+}
+
 // Extract full href URL for each social network from HTML
 function extractSocialUrl(html: string, domain: string): string | undefined {
   // Match href="..." or href='...' containing the domain
@@ -59,10 +99,24 @@ async function fetchHtml(url: string): Promise<string | null> {
 export async function analyzeBusinessFull(
   websiteUrl: string | undefined
 ): Promise<BusinessChecks> {
-  // ── hasWebsite comes directly from Google Places data (the caller's websiteUrl) ──
-  // We NEVER override this based on whether we can fetch the site.
-  // Google Places is the ground truth for whether a business has a website.
-  const hasWebsite = Boolean(websiteUrl);
+  // ── If Google Places "website" is actually a social media URL, handle it ──
+  if (websiteUrl && !isRealWebsite(websiteUrl)) {
+    const social = socialFromUrl(websiteUrl);
+    return {
+      hasWebsite:   false,  // it's NOT a real website
+      hasFacebook:  Boolean(social.fb),
+      hasInstagram: Boolean(social.ig),
+      hasLinkedIn:  Boolean(social.li),
+      facebookUrl:  social.fb,
+      instagramUrl: social.ig,
+      linkedInUrl:  social.li,
+      websiteIsOld: false,
+      websiteScore: 0,
+      websiteAgeNote: '',
+    };
+  }
+
+  const hasWebsite = isRealWebsite(websiteUrl);
 
   if (!hasWebsite) {
     return {

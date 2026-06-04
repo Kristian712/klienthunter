@@ -5,7 +5,7 @@ import { prisma } from '@/lib/db';
 import { searchPlaces } from '@/lib/google-places';
 
 export const maxDuration = 60;
-import { analyzeBusinessFull } from '@/lib/business-checks';
+import { analyzeBusinessFull, isRealWebsite } from '@/lib/business-checks';
 
 const SearchSchema = z.object({
   region: z.string().min(1),
@@ -61,9 +61,9 @@ export async function POST(req: NextRequest) {
       limitedPlaces,
       async (place) => {
         const checks = await analyzeBusinessFull(place.website);
-        // hasWebsite = Google Places field is authoritative.
-        // We never override it based on whether our scraper could reach the site.
-        const hasWebsite = Boolean(place.website);
+        // isRealWebsite filters out Facebook/Instagram/etc. URLs
+        // that Google Places sometimes puts in the "website" field
+        const hasWebsite = isRealWebsite(place.website);
         return prisma.businessResult.create({
           data: {
             searchId:      search.id,
@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
             name:          place.name,
             phone:         place.formatted_phone_number || place.international_phone_number,
             address:       place.formatted_address,
-            website:       place.website,
+            website:       hasWebsite ? place.website : undefined, // don't store social URLs as website
             hasWebsite,
             hasFacebook:   checks.hasFacebook,
             hasInstagram:  checks.hasInstagram,
