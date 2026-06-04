@@ -4,8 +4,9 @@ import { useTranslations, useLocale } from 'next-intl';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
-import { Menu, X, Globe2, Target, Crown, Shield, User, LogOut, LayoutDashboard } from 'lucide-react';
+import { Menu, X, Globe2, Target, Crown, Shield, User, LogOut, LayoutDashboard, Sun, Moon, Monitor } from 'lucide-react';
 import { loadUser, clearUser, type StoredUser } from '@/lib/client-auth';
+import { useTheme } from './ThemeProvider';
 
 type UserType = StoredUser;
 
@@ -18,6 +19,14 @@ export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [dropdown, setDropdown] = useState(false);
   const dropRef = useRef<HTMLDivElement>(null);
+  const { theme, setTheme } = useTheme();
+
+  const cycleTheme = () => {
+    const next: Record<string, 'dark' | 'system' | 'light'> = { light: 'dark', dark: 'system', system: 'light' };
+    setTheme(next[theme] ?? 'system');
+  };
+  const themeIcon = theme === 'dark' ? <Moon size={15} /> : theme === 'light' ? <Sun size={15} /> : <Monitor size={15} />;
+  const themeLabel = theme === 'dark' ? 'Tmavý' : theme === 'light' ? 'Světlý' : 'Auto';
 
   useEffect(() => {
     setUser(loadUser());
@@ -90,6 +99,10 @@ export function Navbar() {
 
         {/* Right */}
         <div className="hidden md:flex items-center gap-2 ml-auto">
+          <button onClick={cycleTheme} title={themeLabel}
+            className="btn-ghost text-xs gap-1.5 rounded-lg px-2.5 py-1.5">
+            {themeIcon}
+          </button>
           <button onClick={switchLocale} className="btn-ghost text-xs gap-1.5 rounded-lg px-2.5 py-1.5">
             {localeFlag[locale] ?? <Globe2 size={14} />} {locale.toUpperCase()}
           </button>

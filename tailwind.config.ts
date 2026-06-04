@@ -1,6 +1,7 @@
 import type { Config } from 'tailwindcss';
 
 const config: Config = {
+  darkMode: 'class',
   content: [
     './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
@@ -23,14 +24,14 @@ const config: Config = {
           950: '#1d0f5c',
         },
         surface: {
-          DEFAULT: '#ffffff',
-          subtle:  '#f8f8fc',
-          muted:   '#f2f2f8',
+          DEFAULT: 'rgb(var(--surface) / <alpha-value>)',
+          subtle:  'rgb(var(--surface-subtle) / <alpha-value>)',
+          muted:   'rgb(var(--surface-muted) / <alpha-value>)',
         },
         ink: {
-          DEFAULT: '#0e0e1a',
-          muted:   '#4b4b6a',
-          faint:   '#9898b3',
+          DEFAULT: 'rgb(var(--ink) / <alpha-value>)',
+          muted:   'rgb(var(--ink-muted) / <alpha-value>)',
+          faint:   'rgb(var(--ink-faint) / <alpha-value>)',
         },
       },
       fontFamily: {

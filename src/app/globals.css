@@ -13,8 +13,30 @@
     scroll-behavior: smooth;
   }
 
+  /* ── Light mode (default) ── */
+  :root {
+    --surface:        255 255 255;
+    --surface-subtle: 248 248 252;
+    --surface-muted:  242 242 248;
+    --ink:            14 14 26;
+    --ink-muted:      75 75 106;
+    --ink-faint:      152 152 179;
+    --border:         14 14 26;
+  }
+
+  /* ── Dark mode ── */
+  .dark {
+    --surface:        15 15 25;
+    --surface-subtle: 22 22 36;
+    --surface-muted:  30 30 48;
+    --ink:            235 235 245;
+    --ink-muted:      165 165 195;
+    --ink-faint:      100 100 130;
+    --border:         235 235 245;
+  }
+
   body {
-    @apply bg-surface text-ink font-sans;
+    @apply bg-surface text-ink font-sans transition-colors duration-200;
   }
 
   ::selection {
