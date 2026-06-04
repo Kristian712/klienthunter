@@ -26,7 +26,7 @@ export default function LoginPage() {
         body: JSON.stringify(form),
       });
       if (!res.ok) { setError(isCs ? 'Neplatné přihlašovací údaje.' : 'Invalid credentials.'); return; }
-      router.push(`/${locale}/dashboard`);
+      window.location.href = `/${locale}/dashboard`;
     } finally {
       setLoading(false);
     }

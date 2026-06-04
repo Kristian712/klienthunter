@@ -29,8 +29,7 @@ export function Navbar() {
 
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
-    setUser(null);
-    router.push(`/${locale}`);
+    window.location.href = `/${locale}`;
   };
 
   const switchLocale = () => {
