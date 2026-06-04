@@ -4,9 +4,9 @@ import { useTranslations, useLocale } from 'next-intl';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
-import { Menu, X, Globe2, Target, ChevronDown } from 'lucide-react';
+import { Menu, X, Globe2, Target, Crown, Shield } from 'lucide-react';
 
-interface User { id: string; email: string; name?: string; plan: string }
+interface User { id: string; email: string; name?: string; plan: string; isAdmin?: boolean; isVip?: boolean }
 
 export function Navbar() {
   const t = useTranslations('nav');
@@ -42,6 +42,7 @@ export function Navbar() {
     { href: `/${locale}/search`,  label: t('search') },
     { href: `/${locale}/pricing`, label: t('pricing') },
     ...(user ? [{ href: `/${locale}/dashboard`, label: t('dashboard') }] : []),
+    ...(user?.isAdmin ? [{ href: `/${locale}/admin`, label: 'Admin' }] : []),
   ];
 
   return (
@@ -94,6 +95,16 @@ export function Navbar() {
 
           {user ? (
             <div className="flex items-center gap-2">
+              {user.isVip && (
+                <span className="flex items-center gap-1 px-2 py-1 rounded-full bg-yellow-100 text-yellow-700 text-xs font-semibold">
+                  <Crown size={11} className="fill-yellow-500 text-yellow-500" /> VIP
+                </span>
+              )}
+              {user.isAdmin && (
+                <span className="flex items-center gap-1 px-2 py-1 rounded-full bg-purple-100 text-purple-700 text-xs font-semibold">
+                  <Shield size={11} /> Admin
+                </span>
+              )}
               <span className="text-sm text-ink-muted font-medium">{user.name || user.email}</span>
               <button onClick={handleLogout} className="btn-outline btn-sm">
                 {t('logout')}

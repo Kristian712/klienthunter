@@ -8,6 +8,8 @@ export interface JWTPayload {
   userId: string;
   email: string;
   plan: string;
+  isAdmin: boolean;
+  isVip: boolean;
 }
 
 export function signToken(payload: JWTPayload): string {
@@ -38,7 +40,13 @@ export async function getCurrentUser(): Promise<JWTPayload | null> {
 }
 
 export const PLAN_LIMITS = {
-  FREE: { searches: 5, resultsPerSearch: 20 },
-  PRO: { searches: 100, resultsPerSearch: 200 },
+  FREE:     { searches: 5,        resultsPerSearch: 20 },
+  PRO:      { searches: 100,      resultsPerSearch: 200 },
   BUSINESS: { searches: Infinity, resultsPerSearch: 500 },
+  VIP:      { searches: Infinity, resultsPerSearch: 500 },
 };
+
+export function getPlanLimits(plan: string, isVip: boolean) {
+  if (isVip) return PLAN_LIMITS.VIP;
+  return PLAN_LIMITS[plan as keyof typeof PLAN_LIMITS] ?? PLAN_LIMITS.FREE;
+}

@@ -1,6 +1,20 @@
-// TEST MODE: always returns null (no DB)
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { verifyToken } from '@/lib/auth';
+import { prisma } from '@/lib/db';
 
-export async function GET() {
-  return NextResponse.json({ user: null });
+export async function GET(req: NextRequest) {
+  try {
+    const token = req.cookies.get('auth-token')?.value;
+    if (!token) return NextResponse.json({ user: null });
+
+    const payload = verifyToken(token);
+    const user = await prisma.user.findUnique({
+      where: { id: payload.userId },
+      select: { id: true, email: true, name: true, plan: true, isAdmin: true, isVip: true },
+    });
+
+    return NextResponse.json({ user });
+  } catch {
+    return NextResponse.json({ user: null });
+  }
 }
