@@ -270,13 +270,69 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* ── FAQ ── */}
+      <section className="section bg-surface">
+        <div className="container max-w-3xl">
+          <div className="text-center mb-12">
+            <div className="chip mb-4">FAQ</div>
+            <h2 className="text-3xl font-bold text-ink">
+              {isCs ? 'Nejčastější otázky' : 'Frequently asked questions'}
+            </h2>
+          </div>
+          <div className="space-y-4">
+            {[
+              {
+                q_cs: 'Je to opravdu zdarma?',
+                q_en: 'Is it really free?',
+                a_cs: 'Základní plán je zdarma – 5 vyhledávání měsíčně, 20 výsledků každé. Pro více výsledků nabízíme placené plány.',
+                a_en: 'The basic plan is free – 5 searches per month, 20 results each. For more results we offer paid plans.',
+              },
+              {
+                q_cs: 'Jak získám přístup? Potřebuji invite kód?',
+                q_en: 'How do I get access? Do I need an invite code?',
+                a_cs: 'Ano, registrace je momentálně pouze na pozvánku. Kontaktujte nás a rádi vám invite kód zašleme.',
+                a_en: 'Yes, registration is currently invite-only. Contact us and we\'ll send you an invite code.',
+              },
+              {
+                q_cs: 'Odkud pocházejí data o firmách?',
+                q_en: 'Where does the business data come from?',
+                a_cs: 'Data čerpáme z Google Maps API – stejná databáze, kterou používá Google při vyhledávání.',
+                a_en: 'Data comes from Google Maps API – the same database Google uses for searches.',
+              },
+              {
+                q_cs: 'Jak funguje detekce webu a sociálních sítí?',
+                q_en: 'How does website and social media detection work?',
+                a_cs: 'Při každém vyhledávání automaticky navštívíme web každé firmy a zkontrolujeme přítomnost FB/IG/LI odkazů a stáří webu.',
+                a_en: 'With each search we automatically visit each business website and check for FB/IG/LI links and site age.',
+              },
+              {
+                q_cs: 'Mohu exportovat výsledky do Excelu?',
+                q_en: 'Can I export results to Excel?',
+                a_cs: 'Ano – export do Excelu je dostupný pro Pro a Business plán. Získáte kompletní tabulku se všemi kontakty.',
+                a_en: 'Yes – Excel export is available for Pro and Business plans. You get a complete table with all contacts.',
+              },
+            ].map((item, i) => (
+              <details key={i} className="card group">
+                <summary className="font-medium text-ink cursor-pointer list-none flex items-center justify-between">
+                  {isCs ? item.q_cs : item.q_en}
+                  <span className="text-ink-faint group-open:rotate-180 transition-transform">▾</span>
+                </summary>
+                <p className="text-ink-muted text-sm mt-3 leading-relaxed">
+                  {isCs ? item.a_cs : item.a_en}
+                </p>
+              </details>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ── CTA bottom ── */}
-      <section className="section bg-surface text-center">
+      <section className="section bg-[#07071a] text-center">
         <div className="max-w-2xl mx-auto">
-          <h2 className="text-3xl md:text-4xl font-bold text-ink mb-4">
+          <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
             {isCs ? 'Začni získávat klienty ještě dnes' : 'Start getting clients today'}
           </h2>
-          <p className="text-ink-muted mb-8">
+          <p className="text-white/40 mb-8">
             {isCs ? 'Zdarma. Bez platební karty. Zrušení kdykoliv.' : 'Free. No credit card. Cancel anytime.'}
           </p>
           <Link href={`/${locale}/auth/register`} className="btn-primary btn-lg shadow-glow">
@@ -287,12 +343,51 @@ export default function HomePage() {
       </section>
 
       {/* ── Footer ── */}
-      <footer className="border-t border-ink/5 py-8 px-4">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-ink-faint">
-          <span>© 2025 KlientHunter</span>
-          <div className="flex gap-6">
-            <Link href={`/${locale}/pricing`} className="hover:text-ink transition-colors">{isCs ? 'Ceník' : 'Pricing'}</Link>
-            <Link href={`/${locale}/search`} className="hover:text-ink transition-colors">{isCs ? 'Vyhledávání' : 'Search'}</Link>
+      <footer className="border-t border-white/5 bg-[#07071a] py-10 px-4">
+        <div className="max-w-6xl mx-auto">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
+            <div>
+              <p className="text-white/20 text-xs font-semibold uppercase tracking-wider mb-3">
+                {isCs ? 'Produkt' : 'Product'}
+              </p>
+              <div className="space-y-2">
+                <Link href={`/${locale}/search`} className="block text-sm text-white/40 hover:text-white/70">{isCs ? 'Vyhledávání' : 'Search'}</Link>
+                <Link href={`/${locale}/pricing`} className="block text-sm text-white/40 hover:text-white/70">{isCs ? 'Ceník' : 'Pricing'}</Link>
+              </div>
+            </div>
+            <div>
+              <p className="text-white/20 text-xs font-semibold uppercase tracking-wider mb-3">
+                {isCs ? 'Podpora' : 'Support'}
+              </p>
+              <div className="space-y-2">
+                <Link href={`/${locale}/contact`} className="block text-sm text-white/40 hover:text-white/70">{isCs ? 'Kontakt' : 'Contact'}</Link>
+              </div>
+            </div>
+            <div>
+              <p className="text-white/20 text-xs font-semibold uppercase tracking-wider mb-3">
+                {isCs ? 'Právní' : 'Legal'}
+              </p>
+              <div className="space-y-2">
+                <Link href={`/${locale}/privacy`} className="block text-sm text-white/40 hover:text-white/70">{isCs ? 'Ochrana údajů' : 'Privacy Policy'}</Link>
+                <Link href={`/${locale}/terms`} className="block text-sm text-white/40 hover:text-white/70">{isCs ? 'Podmínky použití' : 'Terms of Service'}</Link>
+              </div>
+            </div>
+            <div>
+              <p className="text-white/20 text-xs font-semibold uppercase tracking-wider mb-3">
+                {isCs ? 'Jazyk' : 'Language'}
+              </p>
+              <div className="space-y-2">
+                <Link href="/cs" className="block text-sm text-white/40 hover:text-white/70">🇨🇿 Čeština</Link>
+                <Link href="/sk" className="block text-sm text-white/40 hover:text-white/70">🇸🇰 Slovenčina</Link>
+                <Link href="/en" className="block text-sm text-white/40 hover:text-white/70">🇬🇧 English</Link>
+              </div>
+            </div>
+          </div>
+          <div className="border-t border-white/5 pt-6 flex flex-col md:flex-row items-center justify-between gap-2">
+            <span className="text-white/20 text-sm">© 2026 KlientHunter</span>
+            <span className="text-white/20 text-xs">
+              {isCs ? 'Vytvořeno s ❤️ v České republice' : 'Made with ❤️ in Czech Republic'}
+            </span>
           </div>
         </div>
       </footer>

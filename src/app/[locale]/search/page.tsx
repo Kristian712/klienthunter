@@ -8,52 +8,82 @@ import {
   Copy, Check, ChevronUp, MessageSquare,
 } from 'lucide-react';
 
-// ── Data: Czech regions ───────────────────────────────────────────────────────
+// ── Regions – global ─────────────────────────────────────────────────────────
+// Top CZ regions by number of businesses without digital presence (analysis):
+// 1. Moravskoslezský – industrial tradition, low digitisation
+// 2. Jihočeský – rural, many trades & craft shops
+// 3. Ústecký – economically weaker, less digital adoption
 
-const CZ_REGIONS = [
-  { value: 'Celá ČR',            label: '🇨🇿 Celá ČR (všechny kraje)' },
-  { value: 'Praha',               label: 'Praha' },
-  { value: 'Středočeský kraj',    label: 'Středočeský kraj' },
-  { value: 'Jihočeský kraj',      label: 'Jihočeský kraj' },
-  { value: 'Plzeňský kraj',       label: 'Plzeňský kraj' },
-  { value: 'Karlovarský kraj',    label: 'Karlovarský kraj' },
-  { value: 'Ústecký kraj',        label: 'Ústecký kraj' },
-  { value: 'Liberecký kraj',      label: 'Liberecký kraj' },
-  { value: 'Královéhradecký kraj',label: 'Královéhradecký kraj' },
-  { value: 'Pardubický kraj',     label: 'Pardubický kraj' },
-  { value: 'Kraj Vysočina',       label: 'Kraj Vysočina' },
-  { value: 'Jihomoravský kraj',   label: 'Jihomoravský kraj' },
-  { value: 'Olomoucký kraj',      label: 'Olomoucký kraj' },
-  { value: 'Zlínský kraj',        label: 'Zlínský kraj' },
-  { value: 'Moravskoslezský kraj',label: 'Moravskoslezský kraj' },
+const REGIONS = [
+  { group: '🇨🇿 Česká republika', items: [
+    { value: 'Praha, Czech Republic',               label: 'Praha' },
+    { value: 'Ostrava, Moravskoslezský kraj',        label: 'Ostrava / Moravskoslezský kraj' },
+    { value: 'České Budějovice, Jihočeský kraj',     label: 'Č. Budějovice / Jihočeský kraj' },
+    { value: 'Ústí nad Labem, Ústecký kraj',         label: 'Ústí nad Labem / Ústecký kraj' },
+    { value: 'Brno, Czech Republic',                 label: 'Brno' },
+  ]},
+  { group: '🇸🇰 Slovensko', items: [
+    { value: 'Bratislava, Slovakia',  label: 'Bratislava' },
+    { value: 'Košice, Slovakia',      label: 'Košice' },
+    { value: 'Žilina, Slovakia',      label: 'Žilina' },
+    { value: 'Banská Bystrica, Slovakia', label: 'Banská Bystrica' },
+    { value: 'Prešov, Slovakia',      label: 'Prešov' },
+  ]},
+  { group: '🇩🇪 Německo', items: [
+    { value: 'Berlin, Germany',  label: 'Berlín' },
+    { value: 'Munich, Germany',  label: 'Mnichov' },
+    { value: 'Hamburg, Germany', label: 'Hamburg' },
+    { value: 'Frankfurt, Germany', label: 'Frankfurt' },
+  ]},
+  { group: '🇦🇹 Rakousko', items: [
+    { value: 'Vienna, Austria', label: 'Vídeň' },
+    { value: 'Graz, Austria',   label: 'Graz' },
+    { value: 'Linz, Austria',   label: 'Linz' },
+  ]},
+  { group: '🇬🇧 Velká Británie', items: [
+    { value: 'London, UK',     label: 'Londýn' },
+    { value: 'Manchester, UK', label: 'Manchester' },
+    { value: 'Birmingham, UK', label: 'Birmingham' },
+  ]},
+  { group: '🇺🇸 USA', items: [
+    { value: 'New York, USA',     label: 'New York' },
+    { value: 'Los Angeles, USA',  label: 'Los Angeles' },
+    { value: 'Chicago, USA',      label: 'Chicago' },
+    { value: 'Houston, USA',      label: 'Houston' },
+  ]},
+  { group: '🇵🇱 Polsko', items: [
+    { value: 'Warsaw, Poland',  label: 'Varšava' },
+    { value: 'Krakow, Poland',  label: 'Krakov' },
+    { value: 'Wroclaw, Poland', label: 'Wroclaw' },
+  ]},
 ];
 
 const INDUSTRIES = [
-  { group: 'Řemesla & stavba', items: [
-    'Instalatér', 'Elektrikář', 'Zedník', 'Malíř pokojů', 'Tesař', 'Truhlář',
-    'Klempíř', 'Pokrývač', 'Podlahář', 'Sklenář', 'Topenář', 'Svářeč',
-    'Obkladač', 'Sádrokartonář', 'Zahradník', 'Výkopové práce',
+  { group: '🔧 Řemesla & stavba', items: [
+    'Plumber', 'Electrician', 'Bricklayer', 'Carpenter', 'Painter',
+    'Roofer', 'Flooring', 'Welder', 'Landscaper', 'HVAC',
+    // CZ
+    'Instalatér', 'Elektrikář', 'Zedník', 'Truhlář', 'Malíř pokojů',
   ]},
-  { group: 'Jídlo & pití', items: [
-    'Restaurace', 'Pizzerie', 'Kavárna', 'Hospoda', 'Cukrárna',
-    'Pekárna', 'Řeznictví', 'Bistro', 'Bufet', 'Kebab',
+  { group: '🍕 Jídlo & pití', items: [
+    'Restaurant', 'Pizzeria', 'Cafe', 'Bakery', 'Butcher',
+    'Restaurace', 'Kavárna', 'Hospoda', 'Pekárna', 'Řeznictví',
   ]},
-  { group: 'Krása & péče', items: [
+  { group: '💇 Krása & péče', items: [
+    'Hair salon', 'Beauty salon', 'Nail studio', 'Massage', 'Barber',
     'Kadeřnictví', 'Kosmetický salon', 'Nehtové studio', 'Masáže',
-    'Holičství', 'Solárium', 'Tetovací studio', 'Pedikúra',
   ]},
-  { group: 'Auto & doprava', items: [
-    'Autoservis', 'Pneuservis', 'Autoklempíř', 'Autodílna',
-    'Taxi', 'Autopůjčovna', 'Karosář', 'Autolakovna',
+  { group: '🚗 Auto & doprava', items: [
+    'Car repair', 'Tire shop', 'Auto body shop', 'Car rental',
+    'Autoservis', 'Pneuservis', 'Karosář', 'Autopůjčovna',
   ]},
-  { group: 'Zdraví & sport', items: [
-    'Fyzioterapeut', 'Zubař', 'Veterinář', 'Lékárna',
-    'Posilovna', 'Fitness centrum', 'Jóga', 'Plavecký klub',
+  { group: '🏋️ Zdraví & sport', items: [
+    'Physiotherapist', 'Dentist', 'Veterinarian', 'Gym', 'Yoga',
+    'Fyzioterapeut', 'Zubař', 'Veterinář', 'Posilovna',
   ]},
-  { group: 'Ostatní služby', items: [
-    'Účetní', 'Právník', 'Realitní agent', 'Pojišťovací agent',
-    'Fotograf', 'Čistírna', 'Prádelna', 'Úklid', 'Hlídání dětí',
-    'Výuka jazyků', 'Psí salon', 'Pohřební ústav',
+  { group: '📋 Ostatní služby', items: [
+    'Accountant', 'Lawyer', 'Real estate agent', 'Photographer', 'Cleaning service',
+    'Účetní', 'Právník', 'Fotograf', 'Úklid', 'Psí salon',
   ]},
 ];
 
@@ -398,9 +428,13 @@ export default function SearchPage() {
                   onChange={e => setRegion(e.target.value)}
                   required={region !== '__custom__'}
                 >
-                  <option value="">{isCs ? '— Vyberte kraj —' : '— Select region —'}</option>
-                  {CZ_REGIONS.map(r => (
-                    <option key={r.value} value={r.value}>{r.label}</option>
+                  <option value="">{isCs ? '— Vyberte region —' : '— Select region —'}</option>
+                  {REGIONS.map(group => (
+                    <optgroup key={group.group} label={group.group}>
+                      {group.items.map(r => (
+                        <option key={r.value} value={r.value}>{r.label}</option>
+                      ))}
+                    </optgroup>
                   ))}
                   <option value="__custom__">{isCs ? '✏️ Jiný (zadat ručně)' : '✏️ Other (type manually)'}</option>
                 </select>

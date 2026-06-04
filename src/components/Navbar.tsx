@@ -44,9 +44,12 @@ export function Navbar() {
   };
 
   const switchLocale = () => {
-    const next = locale === 'cs' ? 'en' : 'cs';
+    const order = ['cs', 'en', 'sk'];
+    const next = order[(order.indexOf(locale) + 1) % order.length];
     window.location.href = pathname.replace(`/${locale}`, `/${next}`);
   };
+
+  const localeFlag: Record<string, string> = { cs: '🇨🇿', en: '🇬🇧', sk: '🇸🇰' };
 
   const links = [
     { href: `/${locale}/search`,  label: t('search') },
@@ -88,7 +91,7 @@ export function Navbar() {
         {/* Right */}
         <div className="hidden md:flex items-center gap-2 ml-auto">
           <button onClick={switchLocale} className="btn-ghost text-xs gap-1.5 rounded-lg px-2.5 py-1.5">
-            <Globe2 size={14} />{locale.toUpperCase()}
+            {localeFlag[locale] ?? <Globe2 size={14} />} {locale.toUpperCase()}
           </button>
 
           {user ? (

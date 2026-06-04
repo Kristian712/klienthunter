@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import { NextIntlClientProvider, useMessages } from 'next-intl';
 import { Navbar } from '@/components/Navbar';
+import { CookieBanner } from '@/components/CookieBanner';
 import '../globals.css';
 
 const inter = Inter({ subsets: ['latin', 'latin-ext'] });
@@ -26,6 +27,7 @@ export default function RootLayout({
         <NextIntlClientProvider locale={locale} messages={messages}>
           <Navbar />
           <main className="min-h-screen">{children}</main>
+          <CookieBanner />
         </NextIntlClientProvider>
       </body>
     </html>
