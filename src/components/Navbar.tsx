@@ -19,7 +19,24 @@ export function Navbar() {
   const dropRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetch('/api/auth/me', { credentials: 'include' }).then(r => r.json()).then(d => setUser(d.user));
+    // Read from localStorage first (instant, no network)
+    const stored = localStorage.getItem('kh_user');
+    if (stored) {
+      try { setUser(JSON.parse(stored)); } catch {}
+    }
+    // Then verify with server and update
+    fetch('/api/auth/me', { credentials: 'include' })
+      .then(r => r.json())
+      .then(d => {
+        if (d.user) {
+          setUser(d.user);
+          localStorage.setItem('kh_user', JSON.stringify(d.user));
+        } else {
+          setUser(null);
+          localStorage.removeItem('kh_user');
+        }
+      })
+      .catch(() => {});
   }, [pathname]);
 
   useEffect(() => {
@@ -38,6 +55,7 @@ export function Navbar() {
 
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
+    localStorage.removeItem('kh_user');
     window.location.href = `/${locale}`;
   };
 

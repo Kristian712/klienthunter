@@ -43,6 +43,7 @@ export default function RegisterPage() {
         setError(msgs[data.error] ?? (isCs ? 'Něco se pokazilo.' : 'Something went wrong.'));
         return;
       }
+      localStorage.setItem('kh_user', JSON.stringify(data.user));
       window.location.href = `/${locale}/dashboard`;
     } finally {
       setLoading(false);
