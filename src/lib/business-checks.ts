@@ -5,20 +5,35 @@ export interface BusinessChecks {
   hasFacebook: boolean;
   hasInstagram: boolean;
   hasLinkedIn: boolean;
+  facebookUrl?: string;
+  instagramUrl?: string;
+  linkedInUrl?: string;
   email?: string;
   websiteIsOld: boolean;
-  websiteScore: number;    // 0 = very old, 100 = modern; 50 = unknown
+  websiteScore: number;
   websiteAgeNote: string;
 }
 
 const HTTP_TIMEOUT = 8000;
 const BOT_UA = 'Mozilla/5.0 (compatible; KlientHunterBot/1.0)';
 
-const SOCIAL_PATTERNS = {
-  facebook:  /(?:https?:\/\/)?(?:www\.)?facebook\.com\/[^"'\s>]+/i,
-  instagram: /(?:https?:\/\/)?(?:www\.)?instagram\.com\/[^"'\s>]+/i,
-  linkedin:  /(?:https?:\/\/)?(?:www\.)?linkedin\.com\/[^"'\s>]+/i,
-};
+// Extract full href URL for each social network from HTML
+function extractSocialUrl(html: string, domain: string): string | undefined {
+  // Match href="..." or href='...' containing the domain
+  const pattern = new RegExp(
+    `href=["']([^"']*(?:https?://)?(?:www\\.)?${domain}/[^"'\\s?#][^"']*)["']`,
+    'i'
+  );
+  const m = html.match(pattern);
+  if (!m) return undefined;
+  let url = m[1];
+  // Ensure absolute URL
+  if (url.startsWith('//')) url = 'https:' + url;
+  if (!url.startsWith('http')) url = 'https://' + url;
+  // Filter out share/sharer links and plugin URLs
+  if (/sharer|share\?|plugins|dialog\/feed/i.test(url)) return undefined;
+  return url;
+}
 
 // Fetch HTML from a URL, return null if unreachable
 async function fetchHtml(url: string): Promise<string | null> {
@@ -78,10 +93,13 @@ export async function analyzeBusinessFull(
     };
   }
 
-  // ── Social media detection ──
-  const hasFacebook  = SOCIAL_PATTERNS.facebook.test(html);
-  const hasInstagram = SOCIAL_PATTERNS.instagram.test(html);
-  const hasLinkedIn  = SOCIAL_PATTERNS.linkedin.test(html);
+  // ── Social media – extract actual profile URLs ──
+  const facebookUrl  = extractSocialUrl(html, 'facebook\\.com');
+  const instagramUrl = extractSocialUrl(html, 'instagram\\.com');
+  const linkedInUrl  = extractSocialUrl(html, 'linkedin\\.com');
+  const hasFacebook  = Boolean(facebookUrl);
+  const hasInstagram = Boolean(instagramUrl);
+  const hasLinkedIn  = Boolean(linkedInUrl);
 
   // ── Email extraction ──
   const emailMatch = html.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/);
@@ -95,6 +113,9 @@ export async function analyzeBusinessFull(
     hasFacebook,
     hasInstagram,
     hasLinkedIn,
+    facebookUrl,
+    instagramUrl,
+    linkedInUrl,
     email,
     websiteIsOld:  quality.isOld,
     websiteScore:  quality.score,

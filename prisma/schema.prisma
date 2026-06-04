@@ -53,6 +53,9 @@ model BusinessResult {
   hasFacebook   Boolean  @default(false)
   hasInstagram  Boolean  @default(false)
   hasLinkedIn   Boolean  @default(false)
+  facebookUrl   String?
+  instagramUrl  String?
+  linkedInUrl   String?
   websiteIsOld  Boolean  @default(false)
   websiteScore  Int      @default(50)
   websiteAgeNote String  @default("")
