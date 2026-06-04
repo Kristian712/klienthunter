@@ -20,7 +20,7 @@ export function Navbar() {
 
   useEffect(() => {
     fetch('/api/auth/me', { credentials: 'include' }).then(r => r.json()).then(d => setUser(d.user));
-  }, []);
+  }, [pathname]);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 12);
