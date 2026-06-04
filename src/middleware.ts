@@ -7,7 +7,7 @@ const intlMiddleware = createMiddleware({
   localePrefix: 'always',
 });
 
-const protectedPaths = ['/dashboard', '/search', '/saved'];
+const protectedPaths = ['/dashboard', '/search', '/saved', '/profile'];
 const adminPaths = ['/admin'];
 
 // Lightweight JWT decoder for Edge Runtime (no Node.js crypto needed).
