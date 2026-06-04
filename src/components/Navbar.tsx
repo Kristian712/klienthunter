@@ -19,7 +19,7 @@ export function Navbar() {
   const dropRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetch('/api/auth/me').then(r => r.json()).then(d => setUser(d.user));
+    fetch('/api/auth/me', { credentials: 'include' }).then(r => r.json()).then(d => setUser(d.user));
   }, []);
 
   useEffect(() => {
