@@ -13,7 +13,7 @@
     scroll-behavior: smooth;
   }
 
-  /* ── Light mode (default) ── */
+  /* ── Light mode ── */
   :root {
     --surface:        255 255 255;
     --surface-subtle: 248 248 252;
@@ -21,26 +21,41 @@
     --ink:            14 14 26;
     --ink-muted:      75 75 106;
     --ink-faint:      152 152 179;
-    --border:         14 14 26;
+
+    --card-bg:        255 255 255;
+    --card-border:    14 14 26;
+    --input-bg:       255 255 255;
+    --input-border:   14 14 26;
+    --nav-bg:         255 255 255;
   }
 
   /* ── Dark mode ── */
   .dark {
-    --surface:        15 15 25;
-    --surface-subtle: 22 22 36;
-    --surface-muted:  30 30 48;
-    --ink:            235 235 245;
-    --ink-muted:      165 165 195;
-    --ink-faint:      100 100 130;
-    --border:         235 235 245;
+    --surface:        13 13 20;
+    --surface-subtle: 18 18 28;
+    --surface-muted:  25 25 40;
+    --ink:            225 225 240;
+    --ink-muted:      148 148 175;
+    --ink-faint:      80 80 108;
+
+    --card-bg:        19 19 32;
+    --card-border:    255 255 255;
+    --input-bg:       22 22 36;
+    --input-border:   255 255 255;
+    --nav-bg:         15 15 24;
+
+    color-scheme: dark;
   }
 
   body {
-    @apply bg-surface text-ink font-sans transition-colors duration-200;
+    background-color: rgb(var(--surface));
+    color: rgb(var(--ink));
+    @apply font-sans;
+    transition: background-color .2s, color .2s;
   }
 
   ::selection {
-    @apply bg-brand-200 text-brand-900;
+    @apply bg-brand-500/30 text-brand-200;
   }
 }
 
@@ -55,42 +70,51 @@
   }
 
   .btn-primary {
-    @apply btn bg-brand-600 text-white shadow-inner-brand
-           hover:bg-brand-700 active:scale-[.98] px-5 py-2.5 text-sm;
+    @apply btn bg-brand-600 text-white hover:bg-brand-500
+           active:scale-[.98] px-5 py-2.5 text-sm shadow-sm;
   }
 
   .btn-outline {
-    @apply btn border border-ink/10 text-ink bg-white
-           hover:bg-surface-muted active:scale-[.98] px-5 py-2.5 text-sm;
+    @apply btn border text-sm px-5 py-2.5 active:scale-[.98]
+           border-[rgb(var(--card-border)/0.12)]
+           bg-[rgb(var(--card-bg))]
+           text-[rgb(var(--ink))]
+           hover:bg-[rgb(var(--surface-muted))];
   }
 
   .btn-ghost {
-    @apply btn text-ink-muted hover:text-ink hover:bg-surface-muted px-3 py-2 text-sm;
+    @apply btn text-sm px-3 py-2
+           text-[rgb(var(--ink-muted))]
+           hover:text-[rgb(var(--ink))]
+           hover:bg-[rgb(var(--surface-muted))];
   }
 
-  .btn-lg {
-    @apply px-7 py-3.5 text-base rounded-2xl;
-  }
-
-  .btn-sm {
-    @apply px-3.5 py-1.5 text-xs rounded-lg;
-  }
+  .btn-lg  { @apply px-7 py-3.5 text-base rounded-2xl; }
+  .btn-sm  { @apply px-3.5 py-1.5 text-xs rounded-lg; }
 
   /* ── Inputs ── */
   .input {
-    @apply w-full rounded-xl border border-ink/10 bg-white px-4 py-2.5 text-sm
-           placeholder:text-ink-faint text-ink
+    @apply w-full rounded-xl px-4 py-2.5 text-sm
            focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent
            transition duration-150;
+    background-color: rgb(var(--input-bg));
+    border: 1px solid rgb(var(--input-border) / 0.12);
+    color: rgb(var(--ink));
   }
+  .input::placeholder { color: rgb(var(--ink-faint)); }
 
-  .label {
-    @apply block text-sm font-medium text-ink-muted mb-1.5;
-  }
+  .label { @apply block text-sm font-medium mb-1.5; color: rgb(var(--ink-muted)); }
 
   /* ── Cards ── */
   .card {
-    @apply bg-white rounded-2xl shadow-card border border-ink/5 p-6;
+    @apply rounded-2xl p-6;
+    background-color: rgb(var(--card-bg));
+    border: 1px solid rgb(var(--card-border) / 0.07);
+    box-shadow: 0 1px 3px rgb(0 0 0 / 0.08), 0 1px 2px rgb(0 0 0 / 0.05);
+  }
+
+  .dark .card {
+    box-shadow: 0 1px 3px rgb(0 0 0 / 0.4), 0 0 0 1px rgb(255 255 255 / 0.04);
   }
 
   .card-hover {
@@ -98,54 +122,94 @@
   }
 
   /* ── Badges ── */
-  .badge {
-    @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium;
-  }
+  .badge { @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium; }
 
-  .badge-green  { @apply badge bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200; }
-  .badge-red    { @apply badge bg-red-50 text-red-600 ring-1 ring-red-200; }
-  .badge-yellow { @apply badge bg-amber-50 text-amber-700 ring-1 ring-amber-200; }
-  .badge-purple { @apply badge bg-brand-50 text-brand-700 ring-1 ring-brand-200; }
+  .badge-green  { @apply badge bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/20; }
+  .badge-red    { @apply badge bg-red-500/10 text-red-400 ring-1 ring-red-500/20; }
+  .badge-yellow { @apply badge bg-amber-500/10 text-amber-400 ring-1 ring-amber-500/20; }
+  .badge-purple { @apply badge bg-brand-500/10 text-brand-400 ring-1 ring-brand-500/20; }
 
-  /* ── Section ── */
-  .section { @apply py-20 px-4; }
-  .container { @apply max-w-6xl mx-auto; }
-
-  /* ── Divider ── */
-  .divider { @apply border-t border-ink/5; }
+  /* Light mode badge overrides */
+  :not(.dark) .badge-green  { @apply bg-emerald-50 text-emerald-700 ring-emerald-200; }
+  :not(.dark) .badge-red    { @apply bg-red-50 text-red-600 ring-red-200; }
+  :not(.dark) .badge-yellow { @apply bg-amber-50 text-amber-700 ring-amber-200; }
+  :not(.dark) .badge-purple { @apply bg-brand-50 text-brand-700 ring-brand-200; }
 
   /* ── Chip ── */
   .chip {
-    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold
-           bg-brand-50 text-brand-700 border border-brand-100;
+    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold;
+    background-color: rgb(var(--brand-50, 97 82 248) / 0.1);
+    color: rgb(97 82 248);
+    border: 1px solid rgb(97 82 248 / 0.2);
   }
+
+  /* ── Section & container ── */
+  .section    { @apply py-20 px-4; }
+  .container  { @apply max-w-6xl mx-auto; }
+  .divider    { border-top: 1px solid rgb(var(--ink) / 0.06); }
 }
 
-/* ── Hero gradient orbs ── */
+/* ── Dark Navbar ── */
+.dark header {
+  border-bottom-color: rgb(255 255 255 / 0.06) !important;
+}
+
+/* ── Scrollbar (dark) ── */
+.dark ::-webkit-scrollbar { width: 8px; height: 8px; }
+.dark ::-webkit-scrollbar-track { background: rgb(var(--surface-subtle)); }
+.dark ::-webkit-scrollbar-thumb { background: rgb(var(--ink-faint)); border-radius: 4px; }
+.dark ::-webkit-scrollbar-thumb:hover { background: rgb(var(--ink-muted)); }
+
+/* ── Hero orbs ── */
 .hero-orb-1 {
-  position: absolute;
-  width: 600px; height: 600px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(97,82,248,.18) 0%, transparent 70%);
-  top: -100px; left: -100px;
-  pointer-events: none;
+  position: absolute; width: 600px; height: 600px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(97,82,248,.22) 0%, transparent 70%);
+  top: -100px; left: -100px; pointer-events: none;
 }
 .hero-orb-2 {
-  position: absolute;
-  width: 400px; height: 400px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(99,202,183,.14) 0%, transparent 70%);
-  bottom: -80px; right: -60px;
-  pointer-events: none;
+  position: absolute; width: 400px; height: 400px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(99,202,183,.16) 0%, transparent 70%);
+  bottom: -80px; right: -60px; pointer-events: none;
+}
+
+/* ── Select dark mode ── */
+.dark select.input option {
+  background-color: rgb(var(--input-bg));
+  color: rgb(var(--ink));
 }
 
 /* ── Result table ── */
 .results-table th {
-  @apply px-4 py-3 text-xs font-semibold text-ink-faint uppercase tracking-wider text-left bg-surface-subtle;
+  padding: 12px 16px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  text-align: left;
+  color: rgb(var(--ink-faint));
+  background-color: rgb(var(--surface-subtle));
 }
 .results-table td {
-  @apply px-4 py-4 text-sm text-ink;
+  padding: 16px;
+  font-size: 14px;
+  color: rgb(var(--ink));
 }
 .results-table tbody tr {
-  @apply border-t border-ink/5 hover:bg-surface-subtle/70 transition-colors;
+  border-top: 1px solid rgb(var(--ink) / 0.05);
+  transition: background-color .15s;
 }
+.results-table tbody tr:hover {
+  background-color: rgb(var(--surface-subtle) / 0.7);
+}
+
+/* ── Animations ── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.animate-fade-up { animation: fadeUp .45s cubic-bezier(.16,1,.3,1) both; }
+.animate-fade-in { animation: fadeIn .3s ease both; }

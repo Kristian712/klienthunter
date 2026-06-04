@@ -71,7 +71,7 @@ export function Navbar() {
 
   return (
     <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-      scrolled ? 'bg-white/90 backdrop-blur-xl shadow-card border-b border-ink/5' : 'bg-transparent'
+      scrolled ? 'bg-white/90 dark:bg-[#0d0d14]/95 backdrop-blur-xl shadow-sm border-b border-black/5 dark:border-white/5' : 'bg-transparent'
     }`}>
       <nav className="max-w-6xl mx-auto px-4 flex items-center h-16 gap-8">
 
@@ -132,7 +132,8 @@ export function Navbar() {
 
               {/* Dropdown */}
               {dropdown && (
-                <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-2xl shadow-card-hover border border-ink/5 py-1.5 animate-fade-in">
+                <div className="absolute right-0 top-full mt-2 w-52 rounded-2xl py-1.5 animate-fade-in"
+                  style={{ backgroundColor: 'rgb(var(--card-bg))', border: '1px solid rgb(var(--card-border) / 0.08)', boxShadow: '0 8px 32px rgb(0 0 0 / 0.18)' }}>
                   <div className="px-4 py-2 border-b border-ink/5">
                     <p className="text-xs font-semibold text-ink truncate">{user.name || user.email}</p>
                     <p className="text-[11px] text-ink-faint truncate">{user.email}</p>
@@ -181,7 +182,7 @@ export function Navbar() {
 
       {/* Mobile menu */}
       {mobile && (
-        <div className="md:hidden bg-white border-t border-ink/5 px-4 py-4 space-y-1 animate-fade-in shadow-card">
+        <div className="md:hidden border-t border-black/5 dark:border-white/5 px-4 py-4 space-y-1 animate-fade-in bg-white dark:bg-[#0d0d14] shadow-lg">
           {links.map(l => (
             <Link key={l.href} href={l.href}
               className="block px-3 py-2.5 rounded-xl text-sm font-medium text-ink hover:bg-surface-muted transition-colors"
