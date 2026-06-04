@@ -154,17 +154,17 @@ export default function AdminPage() {
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           {[
-            { label: isCs ? 'Uživatelů'       : 'Users',         value: stats.total,       icon: <Users size={18} />,  color: 'text-brand-600 bg-brand-50' },
-            { label: isCs ? 'VIP'              : 'VIP',           value: stats.vip,         icon: <Crown size={18} />,  color: 'text-yellow-600 bg-yellow-50' },
-            { label: isCs ? 'Adminů'           : 'Admins',        value: stats.admins,      icon: <Shield size={18} />, color: 'text-purple-600 bg-purple-50' },
-            { label: isCs ? 'Volné kódy'       : 'Free codes',    value: stats.unusedCodes, icon: <Ticket size={18} />, color: 'text-emerald-600 bg-emerald-50' },
+            { label: isCs ? 'Uživatelů' : 'Users',      value: stats.total,       icon: <Users size={18} />,  color: 'text-brand-500 bg-brand-500/10' },
+            { label: isCs ? 'VIP'        : 'VIP',        value: stats.vip,         icon: <Crown size={18} />,  color: 'text-yellow-500 bg-yellow-500/10' },
+            { label: isCs ? 'Adminů'     : 'Admins',     value: stats.admins,      icon: <Shield size={18} />, color: 'text-purple-500 bg-purple-500/10' },
+            { label: isCs ? 'Volné kódy' : 'Free codes', value: stats.unusedCodes, icon: <Ticket size={18} />, color: 'text-emerald-500 bg-emerald-500/10' },
           ].map(s => (
             <div key={s.label} className="card">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs text-ink-faint font-medium">{s.label}</span>
+                <span className="text-xs font-medium" style={{ color: 'rgb(var(--ink-faint))' }}>{s.label}</span>
                 <span className={`p-1.5 rounded-lg ${s.color}`}>{s.icon}</span>
               </div>
-              <span className="text-3xl font-bold text-ink">{s.value}</span>
+              <span className="text-3xl font-bold" style={{ color: 'rgb(var(--ink))' }}>{s.value}</span>
             </div>
           ))}
         </div>
@@ -174,8 +174,14 @@ export default function AdminPage() {
           {(['users', 'codes'] as const).map(t => (
             <button key={t} onClick={() => setTab(t)}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                tab === t ? 'bg-white shadow-card text-ink' : 'text-ink-faint hover:text-ink'
-              }`}>
+                tab === t
+                  ? 'shadow-sm'
+                  : 'hover:text-[rgb(var(--ink))]'
+              }`}
+            style={tab === t
+              ? { backgroundColor: 'rgb(var(--card-bg))', color: 'rgb(var(--ink))' }
+              : { color: 'rgb(var(--ink-faint))' }
+            }>
               {t === 'users' ? (isCs ? 'Uživatelé' : 'Users') : (isCs ? 'Invite kódy' : 'Invite codes')}
               <span className="ml-2 text-xs opacity-60">
                 {t === 'users' ? users.length : codes.length}
@@ -219,14 +225,14 @@ export default function AdminPage() {
                       <td className="text-ink-faint text-xs">{new Date(user.createdAt).toLocaleDateString(isCs ? 'cs-CZ' : 'en-US')}</td>
                       <td>
                         <button onClick={() => toggleVip(user)} disabled={updating === user.id + '-vip'}
-                          className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-all ${user.isVip ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200' : 'bg-ink/5 text-ink-faint hover:bg-ink/10'}`}>
+                          className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-all ${user.isVip ? 'bg-yellow-500/15 text-yellow-500 hover:bg-yellow-500/25' : 'bg-[rgb(var(--ink)/0.06)] text-[rgb(var(--ink-faint))] hover:bg-[rgb(var(--ink)/0.1)]'}`}>
                           <Crown size={13} className={user.isVip ? 'fill-yellow-500 text-yellow-500' : ''} />
                           {user.isVip ? 'VIP' : (isCs ? 'Přidat' : 'Grant')}
                         </button>
                       </td>
                       <td>
                         <button onClick={() => toggleAdmin(user)} disabled={updating === user.id + '-admin'}
-                          className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-all ${user.isAdmin ? 'bg-purple-100 text-purple-700 hover:bg-purple-200' : 'bg-ink/5 text-ink-faint hover:bg-ink/10'}`}>
+                          className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-all ${user.isAdmin ? 'bg-purple-500/15 text-purple-400 hover:bg-purple-500/25' : 'bg-[rgb(var(--ink)/0.06)] text-[rgb(var(--ink-faint))] hover:bg-[rgb(var(--ink)/0.1)]'}`}>
                           <Shield size={13} />
                           {user.isAdmin ? 'Admin' : (isCs ? 'Přidat' : 'Grant')}
                         </button>
@@ -335,13 +341,13 @@ export default function AdminPage() {
                             <div className="flex items-center gap-1">
                               {!used && (
                                 <button onClick={() => copyCode(c)} title={isCs ? 'Kopírovat odkaz pro registraci' : 'Copy registration link'}
-                                  className={`p-1.5 rounded-lg transition-all ${isCopied ? 'bg-emerald-100 text-emerald-700' : 'text-ink-faint hover:text-brand-600 hover:bg-brand-50'}`}>
+                                  className={`p-1.5 rounded-lg transition-all ${isCopied ? 'bg-emerald-500/15 text-emerald-400' : 'text-[rgb(var(--ink-faint))] hover:text-brand-500 hover:bg-brand-500/10'}`}>
                                   {isCopied ? <Check size={14} /> : <Link2 size={14} />}
                                 </button>
                               )}
                               {!used && (
                                 <button onClick={() => deleteCode(c.id)} title={isCs ? 'Smazat kód' : 'Delete code'}
-                                  className="p-1.5 rounded-lg text-ink-faint hover:text-red-600 hover:bg-red-50 transition-all">
+                                  className="p-1.5 rounded-lg transition-all text-[rgb(var(--ink-faint))] hover:text-red-400 hover:bg-red-500/10">
                                   <Trash2 size={14} />
                                 </button>
                               )}
