@@ -279,44 +279,38 @@ function generateMessage(b: BusinessResult): string {
   const name = b.name;
 
   if (!b.hasWebsite) {
-    return `Dobrý den ${name},
+    return `Dobrý den, ${name} 👋
 
-je mi 17 let, studuji IT a tvořím weby které skutečně fungují – moderní, rychlé, přizpůsobené mobilům.
+Jsem Kristián, je mi 17 let a dělám weby na míru – moderní, rychlé a dobře vypadající na mobilu i počítači.
 
-Všiml jsem si, že ${name} zatím nemá webové stránky. Rád vám zdarma ukážu, jak by mohly vypadat a co by to pro vás znamenalo. Bez závazku.
+Zaujalo mě, že zatím web nemáte. Přitom dnes může být web jeden z nejlepších způsobů jak získat nové zákazníky. Rád vám zdarma ukážu, jak by mohl vypadat – bez jakýchkoliv závazků.
 
-Pokud web nepříjde vhod, ale znáte někoho komu by se hodil – budu rád za doporučení. 🙏
+A pokud web teď nepotřebujete, ale napadne vás někdo komu by se hodil – budu za doporučení moc vděčný 🙏
 
-https://webovkyvanek.cz
-
-Kristián`;
+Kristián · webovkyvanek.cz`;
   }
 
   if (b.websiteIsOld) {
-    return `Dobrý den ${name},
+    return `Dobrý den, ${name} 👋
 
-je mi 17 let, studuji IT a tvořím weby které skutečně fungují – moderní, rychlé, přizpůsobené mobilům.
+Jsem Kristián, je mi 17 let a specializuji se na moderní weby.
 
-Všiml jsem si, že web ${name} by mohl použít moderní osvěžení – rychlejší načítání, lepší vzhled na mobilu a aktuální design. Rád vám zdarma ukážu jak by mohl vypadat. Bez závazku.
+Narazil jsem na váš web a napadlo mě, že by si mohl zasloužit osvěžení – rychlejší načítání, aktuální design a správné zobrazení na mobilu. Rád vám zdarma ukážu jak by mohl nový vypadat. Žádný závazek.
 
-Pokud to nepříjde vhod, ale znáte někoho komu by nový web pomohl – budu rád za doporučení. 🙏
+Pokud zájem nebude, třeba znáte někoho pro koho by nový web byl přínos – budu za každé doporučení moc rád 🙏
 
-https://webovkyvanek.cz
-
-Kristián`;
+Kristián · webovkyvanek.cz`;
   }
 
-  return `Dobrý den ${name},
+  return `Dobrý den, ${name} 👋
 
-je mi 17 let, studuji IT a tvořím weby které skutečně fungují – moderní, rychlé, přizpůsobené mobilům.
+Jsem Kristián, je mi 17 let a specializuji se na moderní weby.
 
-Ať už web potřebuje osvěžení nebo máte jiný projekt – rád vám zdarma ukážu co umím. Bez závazku.
+Narazil jsem na váš web a napadlo mě, že by si mohl zasloužit osvěžení – rychlejší načítání, aktuální design a správné zobrazení na mobilu. Rád vám zdarma ukážu jak by mohl nový vypadat. Žádný závazek.
 
-Pokud web nepříjde vhod, ale znáte někoho komu by se hodil – budu rád za doporučení. 🙏
+Pokud zájem nebude, třeba znáte někoho pro koho by nový web byl přínos – budu za každé doporučení moc rád 🙏
 
-https://webovkyvanek.cz
-
-Kristián`;
+Kristián · webovkyvanek.cz`;
 }
 
 function MessageBox({ b }: { b: BusinessResult }) {
