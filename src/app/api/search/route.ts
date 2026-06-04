@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { region, industry } = SearchSchema.parse(body);
 
-    const limits = getPlanLimits(payload.plan, payload.isVip);
+    const limits = getPlanLimits(payload.plan, payload.isVip, payload.isAdmin);
 
     if (limits.searches !== Infinity) {
       const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
@@ -49,15 +49,18 @@ export async function POST(req: NextRequest) {
             phone: place.formatted_phone_number || place.international_phone_number,
             address: place.formatted_address,
             website: place.website,
-            hasWebsite: checks.hasWebsite,
-            hasFacebook: checks.hasFacebook,
-            hasInstagram: checks.hasInstagram,
-            hasLinkedIn: checks.hasLinkedIn,
-            email: checks.email,
-            reviewCount: place.user_ratings_total ?? 0,
-            rating: place.rating,
+            hasWebsite:    checks.hasWebsite,
+            hasFacebook:   checks.hasFacebook,
+            hasInstagram:  checks.hasInstagram,
+            hasLinkedIn:   checks.hasLinkedIn,
+            websiteIsOld:  checks.websiteIsOld,
+            websiteScore:  checks.websiteScore,
+            websiteAgeNote: checks.websiteAgeNote,
+            email:         checks.email,
+            reviewCount:   place.user_ratings_total ?? 0,
+            rating:        place.rating,
             googleMapsUrl: place.url,
-            category: place.types?.[0],
+            category:      place.types?.[0],
           },
         });
       })

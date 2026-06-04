@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const GOOGLE_PLACES_BASE = 'https://maps.googleapis.com/maps/api/place';
+const BASE = 'https://maps.googleapis.com/maps/api/place';
 const API_KEY = process.env.GOOGLE_MAPS_API_KEY;
 
 export interface PlaceResult {
@@ -16,45 +16,95 @@ export interface PlaceResult {
   url?: string;
 }
 
-export async function searchPlaces(query: string, region: string): Promise<PlaceResult[]> {
-  const searchQuery = `${query} ${region}`;
+// Major Czech cities covering all regions
+const CZ_CITIES = [
+  'Praha', 'Brno', 'Ostrava', 'Plzeň', 'Liberec',
+  'Olomouc', 'Ústí nad Labem', 'České Budějovice',
+  'Hradec Králové', 'Pardubice', 'Zlín', 'Jihlava',
+];
 
-  const textSearchRes = await axios.get(`${GOOGLE_PLACES_BASE}/textsearch/json`, {
-    params: {
-      query: searchQuery,
-      key: API_KEY,
-      language: 'cs',
-    },
+const WHOLE_CZ_TRIGGERS = ['celá čr', 'cela cr', 'celé česko', 'czech republic', 'česká republika'];
+
+function isWholeCzechRepublic(region: string): boolean {
+  return WHOLE_CZ_TRIGGERS.includes(region.toLowerCase().trim());
+}
+
+export async function searchPlaces(query: string, region: string): Promise<PlaceResult[]> {
+  if (isWholeCzechRepublic(region)) {
+    return searchWholeCzechRepublic(query);
+  }
+  return searchSingleRegion(query, region);
+}
+
+async function searchSingleRegion(query: string, region: string): Promise<PlaceResult[]> {
+  const res = await axios.get(`${BASE}/textsearch/json`, {
+    params: { query: `${query} ${region}`, key: API_KEY, language: 'cs' },
   });
 
-  if (textSearchRes.data.status !== 'OK' && textSearchRes.data.status !== 'ZERO_RESULTS') {
-    throw new Error(`Google Places API error: ${textSearchRes.data.status}`);
+  if (res.data.status !== 'OK' && res.data.status !== 'ZERO_RESULTS') {
+    throw new Error(`Google Places API: ${res.data.status}`);
   }
 
-  const places = textSearchRes.data.results || [];
-  const detailedPlaces: PlaceResult[] = [];
+  return enrichPlaces(res.data.results ?? []);
+}
 
-  for (const place of places.slice(0, 20)) {
-    try {
-      const details = await getPlaceDetails(place.place_id);
-      detailedPlaces.push(details);
-    } catch {
-      detailedPlaces.push({
-        place_id: place.place_id,
-        name: place.name,
-        formatted_address: place.formatted_address,
-        rating: place.rating,
-        user_ratings_total: place.user_ratings_total,
-        types: place.types,
+async function searchWholeCzechRepublic(query: string): Promise<PlaceResult[]> {
+  // Search all major cities in parallel, then deduplicate
+  const cityResults = await Promise.allSettled(
+    CZ_CITIES.map(city =>
+      axios.get(`${BASE}/textsearch/json`, {
+        params: { query: `${query} ${city}`, key: API_KEY, language: 'cs' },
+      })
+    )
+  );
+
+  const seen = new Set<string>();
+  const allPlaces: any[] = [];
+
+  for (const result of cityResults) {
+    if (result.status !== 'fulfilled') continue;
+    const places = result.value.data.results ?? [];
+    for (const p of places) {
+      if (!seen.has(p.place_id)) {
+        seen.add(p.place_id);
+        allPlaces.push(p);
+      }
+    }
+  }
+
+  return enrichPlaces(allPlaces);
+}
+
+async function enrichPlaces(places: any[]): Promise<PlaceResult[]> {
+  const results: PlaceResult[] = [];
+
+  // Fetch details in parallel, max 20 to avoid rate limits
+  const batch = places.slice(0, 20);
+  const details = await Promise.allSettled(batch.map(p => getPlaceDetails(p.place_id)));
+
+  for (let i = 0; i < batch.length; i++) {
+    const d = details[i];
+    if (d.status === 'fulfilled') {
+      results.push(d.value);
+    } else {
+      // Fallback to text-search data if details fail
+      const p = batch[i];
+      results.push({
+        place_id: p.place_id,
+        name: p.name,
+        formatted_address: p.formatted_address,
+        rating: p.rating,
+        user_ratings_total: p.user_ratings_total,
+        types: p.types,
       });
     }
   }
 
-  return detailedPlaces;
+  return results;
 }
 
 export async function getPlaceDetails(placeId: string): Promise<PlaceResult> {
-  const res = await axios.get(`${GOOGLE_PLACES_BASE}/details/json`, {
+  const res = await axios.get(`${BASE}/details/json`, {
     params: {
       place_id: placeId,
       fields: 'place_id,name,formatted_address,formatted_phone_number,international_phone_number,website,rating,user_ratings_total,types,url',
@@ -63,9 +113,6 @@ export async function getPlaceDetails(placeId: string): Promise<PlaceResult> {
     },
   });
 
-  if (res.data.status !== 'OK') {
-    throw new Error(`Place details error: ${res.data.status}`);
-  }
-
+  if (res.data.status !== 'OK') throw new Error(`Place details: ${res.data.status}`);
   return res.data.result;
 }

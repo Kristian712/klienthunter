@@ -53,6 +53,9 @@ model BusinessResult {
   hasFacebook   Boolean  @default(false)
   hasInstagram  Boolean  @default(false)
   hasLinkedIn   Boolean  @default(false)
+  websiteIsOld  Boolean  @default(false)
+  websiteScore  Int      @default(50)
+  websiteAgeNote String  @default("")
   reviewCount   Int      @default(0)
   rating        Float?
   googleMapsUrl String?
