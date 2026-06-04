@@ -10,6 +10,21 @@ const SearchSchema = z.object({
   industry: z.string().min(1),
 });
 
+// Run website analysis in parallel batches to avoid overwhelming target servers
+async function analyzeInBatches<T>(
+  items: T[],
+  fn: (item: T) => Promise<unknown>,
+  batchSize = 8
+) {
+  const results: unknown[] = [];
+  for (let i = 0; i < items.length; i += batchSize) {
+    const batch = items.slice(i, i + batchSize);
+    const settled = await Promise.allSettled(batch.map(fn));
+    results.push(...settled.map(r => (r.status === 'fulfilled' ? r.value : null)));
+  }
+  return results;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const token = req.cookies.get('auth-token')?.value;
@@ -35,20 +50,23 @@ export async function POST(req: NextRequest) {
       data: { userId: payload.userId, query: industry, region },
     });
 
+    // Fetch all places (may take a while for Celá ČR)
     const places = await searchPlaces(industry, region);
     const limitedPlaces = places.slice(0, limits.resultsPerSearch);
 
-    const results = await Promise.all(
-      limitedPlaces.map(async (place) => {
+    // Analyze websites in batches of 8 concurrent requests
+    const results = (await analyzeInBatches(
+      limitedPlaces,
+      async (place) => {
         const checks = await analyzeBusinessFull(place.website);
         return prisma.businessResult.create({
           data: {
-            searchId: search.id,
-            placeId: place.place_id,
-            name: place.name,
-            phone: place.formatted_phone_number || place.international_phone_number,
-            address: place.formatted_address,
-            website: place.website,
+            searchId:      search.id,
+            placeId:       place.place_id,
+            name:          place.name,
+            phone:         place.formatted_phone_number || place.international_phone_number,
+            address:       place.formatted_address,
+            website:       place.website,
             hasWebsite:    checks.hasWebsite,
             hasFacebook:   checks.hasFacebook,
             hasInstagram:  checks.hasInstagram,
@@ -63,8 +81,9 @@ export async function POST(req: NextRequest) {
             category:      place.types?.[0],
           },
         });
-      })
-    );
+      },
+      8
+    )).filter(Boolean);
 
     return NextResponse.json({ searchId: search.id, results });
   } catch (err) {

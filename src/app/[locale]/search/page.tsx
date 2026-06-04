@@ -84,6 +84,7 @@ export default function SearchPage() {
   const [results, setResults]     = useState<BusinessResult[]>([]);
   const [searchId, setSearchId]   = useState<string | null>(null);
   const [loading, setLoading]     = useState(false);
+  const [loadingMsg, setLoadingMsg] = useState('');
   const [error, setError]         = useState('');
   const [hasSearched, setHasSearched] = useState(false);
 
@@ -96,6 +97,10 @@ export default function SearchPage() {
   const cnt = (key: keyof Filters, val: boolean) =>
     results.filter(b => match(b, { ...EMPTY, [key]: val })).length;
 
+  const isWholeCzech = (r: string) =>
+    ['celá čr','cela cr','celé česko','czech republic','czechia','česká republika','ceska republika']
+      .includes(r.toLowerCase().trim());
+
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -103,6 +108,13 @@ export default function SearchPage() {
     setResults([]);
     setFilters(EMPTY);
     setHasSearched(true);
+    if (isWholeCzech(region)) {
+      setLoadingMsg(isCs
+        ? 'Prohledávám všech 14 krajů ČR… může to trvat 1–2 minuty.'
+        : 'Searching all 14 Czech regions… this may take 1–2 minutes.');
+    } else {
+      setLoadingMsg('');
+    }
     try {
       const res = await fetch('/api/search', {
         method: 'POST',
@@ -120,6 +132,7 @@ export default function SearchPage() {
       setSearchId(data.searchId);
     } finally {
       setLoading(false);
+      setLoadingMsg('');
     }
   };
 
@@ -192,11 +205,22 @@ export default function SearchPage() {
               ) : <><Search size={16} />{t('search_button')}</>}
             </button>
           </div>
+
+          {loading && loadingMsg && (
+            <div className="mt-4 flex items-center gap-2 text-sm text-brand-600 bg-brand-50 border border-brand-200 rounded-xl px-4 py-3">
+              <svg className="animate-spin h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+              </svg>
+              {loadingMsg}
+            </div>
+          )}
+
           <p className="text-[11px] text-ink-faint mt-3 flex items-center gap-1">
             <AlertTriangle size={11} />
             {isCs
-              ? 'Tip: "Celá ČR" prohledá 12 krajských měst najednou a sloučí výsledky.'
-              : 'Tip: "Czech Republic" searches 12 major cities and merges results.'}
+              ? 'Tip: "Celá ČR" prohledá všech 14 krajů a sloučí výsledky (trvá 1–2 min).'
+              : 'Tip: "Czech Republic" searches all 14 regions and merges results (takes 1–2 min).'}
           </p>
         </form>
 
