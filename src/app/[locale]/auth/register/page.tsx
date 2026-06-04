@@ -3,16 +3,23 @@
 import { useState } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { Target, Mail, Lock, User, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Target, Mail, Lock, User, ArrowRight, CheckCircle2, Ticket } from 'lucide-react';
 
 export default function RegisterPage() {
   const t = useTranslations('auth');
   const locale = useLocale();
   const isCs = locale === 'cs';
   const router = useRouter();
-  const [form, setForm]     = useState({ email: '', password: '', name: '' });
-  const [error, setError]   = useState('');
+  const searchParams = useSearchParams();
+
+  const [form, setForm] = useState({
+    email: '',
+    password: '',
+    name: '',
+    inviteCode: searchParams.get('code') ?? '',
+  });
+  const [error, setError]     = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -25,7 +32,17 @@ export default function RegisterPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
       });
-      if (!res.ok) { setError(isCs ? 'Email je již registrovaný.' : 'Email already in use.'); return; }
+      const data = await res.json();
+      if (!res.ok) {
+        const msgs: Record<string, string> = {
+          'Invalid invite code':      isCs ? 'Neplatný invite kód.' : 'Invalid invite code.',
+          'Invite code already used': isCs ? 'Tento invite kód byl již použit.' : 'Invite code already used.',
+          'Invite code expired':      isCs ? 'Platnost invite kódu vypršela.' : 'Invite code expired.',
+          'Email already in use':     isCs ? 'Email je již registrovaný.' : 'Email already in use.',
+        };
+        setError(msgs[data.error] ?? (isCs ? 'Něco se pokazilo.' : 'Something went wrong.'));
+        return;
+      }
       router.push(`/${locale}/dashboard`);
     } finally {
       setLoading(false);
@@ -33,8 +50,8 @@ export default function RegisterPage() {
   };
 
   const perks = isCs
-    ? ['5 vyhledávání zdarma', 'Přístup ke všem filtrům', 'Export do CSV', 'Bez kreditní karty']
-    : ['5 free searches', 'Access to all filters', 'CSV export', 'No credit card'];
+    ? ['5 vyhledávání zdarma', 'Přístup ke všem filtrům', 'Export výsledků', 'Bez kreditní karty']
+    : ['5 free searches', 'All filters included', 'Export results', 'No credit card'];
 
   return (
     <div className="min-h-screen flex pt-16">
@@ -46,11 +63,8 @@ export default function RegisterPage() {
           </span>
           Klient<span className="text-brand-400">Hunter</span>
         </Link>
-
         <div className="space-y-4">
-          <p className="text-white font-semibold text-lg">
-            {isCs ? 'Co získáš zdarma:' : "What you get for free:"}
-          </p>
+          <p className="text-white font-semibold text-lg">{isCs ? 'Co získáš zdarma:' : 'What you get for free:'}</p>
           {perks.map(p => (
             <div key={p} className="flex items-center gap-3">
               <CheckCircle2 size={18} className="text-brand-400 shrink-0" />
@@ -58,10 +72,7 @@ export default function RegisterPage() {
             </div>
           ))}
         </div>
-
-        <p className="text-white/20 text-xs">
-          {isCs ? 'Žádný spam. Zrušení kdykoliv.' : 'No spam. Cancel anytime.'}
-        </p>
+        <p className="text-white/20 text-xs">{isCs ? 'Přístup pouze na pozvánku.' : 'Invite-only access.'}</p>
       </div>
 
       {/* Right form */}
@@ -70,58 +81,63 @@ export default function RegisterPage() {
           <div className="mb-8">
             <h1 className="text-2xl font-bold text-ink">{t('register_title')}</h1>
             <p className="text-ink-muted text-sm mt-1">
-              {isCs ? 'Začni získávat klienty ještě dnes.' : 'Start getting clients today.'}
+              {isCs ? 'Pro registraci potřebuješ platný invite kód.' : 'You need a valid invite code to register.'}
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Invite code – first and prominent */}
             <div>
-              <label className="label">{t('name_label')}</label>
-              <div className="relative">
-                <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-faint" />
-                <input
-                  type="text"
-                  className="input pl-9"
-                  placeholder={t('name_placeholder')}
-                  value={form.name}
-                  onChange={e => setForm({ ...form, name: e.target.value })}
-                />
-              </div>
+              <label className="label flex items-center gap-1">
+                <Ticket size={13} />
+                {isCs ? 'Invite kód' : 'Invite code'}
+                <span className="text-red-500 ml-0.5">*</span>
+              </label>
+              <input
+                type="text"
+                className="input font-mono tracking-widest uppercase"
+                placeholder="XXXXX-XXXXX"
+                value={form.inviteCode}
+                onChange={e => setForm({ ...form, inviteCode: e.target.value.toUpperCase() })}
+                required
+                autoFocus={!form.inviteCode}
+              />
+              <p className="text-[11px] text-ink-faint mt-1">
+                {isCs ? 'Kód ti pošle administrátor.' : 'The code is sent by an administrator.'}
+              </p>
             </div>
-            <div>
-              <label className="label">{t('email_label')}</label>
-              <div className="relative">
-                <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-faint" />
-                <input
-                  type="email"
-                  className="input pl-9"
-                  placeholder={t('email_placeholder')}
-                  value={form.email}
-                  onChange={e => setForm({ ...form, email: e.target.value })}
-                  required
-                />
+
+            <div className="border-t border-ink/5 pt-4">
+              <div>
+                <label className="label">{t('name_label')}</label>
+                <div className="relative">
+                  <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-faint" />
+                  <input type="text" className="input pl-9" placeholder={t('name_placeholder')}
+                    value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
+                </div>
               </div>
-            </div>
-            <div>
-              <label className="label">{t('password_label')}</label>
-              <div className="relative">
-                <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-faint" />
-                <input
-                  type="password"
-                  className="input pl-9"
-                  placeholder={isCs ? 'Alespoň 8 znaků' : 'At least 8 characters'}
-                  value={form.password}
-                  onChange={e => setForm({ ...form, password: e.target.value })}
-                  required
-                  minLength={8}
-                />
+              <div className="mt-4">
+                <label className="label">{t('email_label')}</label>
+                <div className="relative">
+                  <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-faint" />
+                  <input type="email" className="input pl-9" placeholder={t('email_placeholder')}
+                    value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} required />
+                </div>
+              </div>
+              <div className="mt-4">
+                <label className="label">{t('password_label')}</label>
+                <div className="relative">
+                  <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-faint" />
+                  <input type="password" className="input pl-9"
+                    placeholder={isCs ? 'Alespoň 8 znaků' : 'At least 8 characters'}
+                    value={form.password} onChange={e => setForm({ ...form, password: e.target.value })}
+                    required minLength={8} />
+                </div>
               </div>
             </div>
 
             {error && (
-              <div className="rounded-xl bg-red-50 border border-red-200 text-red-700 px-4 py-3 text-sm">
-                {error}
-              </div>
+              <div className="rounded-xl bg-red-50 border border-red-200 text-red-700 px-4 py-3 text-sm">{error}</div>
             )}
 
             <button type="submit" disabled={loading} className="btn-primary w-full py-3 rounded-xl text-base">
@@ -131,7 +147,9 @@ export default function RegisterPage() {
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
                 </svg>
               ) : (
-                <><span>{t('register_button')}</span><ArrowRight size={16} /></>
+                <span className="flex items-center gap-2 justify-center">
+                  {t('register_button')} <ArrowRight size={16} />
+                </span>
               )}
             </button>
           </form>
@@ -141,12 +159,6 @@ export default function RegisterPage() {
             <Link href={`/${locale}/auth/login`} className="text-brand-600 font-medium hover:underline">
               {t('login_link')}
             </Link>
-          </p>
-
-          <p className="text-center text-xs text-ink-faint mt-4">
-            {isCs
-              ? 'Registrací souhlasíš s podmínkami použití a zásadami ochrany soukromí.'
-              : 'By registering you agree to our terms and privacy policy.'}
           </p>
         </div>
       </div>

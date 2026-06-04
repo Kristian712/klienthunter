@@ -21,6 +21,8 @@ model User {
 
   searches         Search[]
   savedResults     SavedResult[]
+  createdCodes     InviteCode[] @relation("CreatedCodes")
+  usedCode         InviteCode[] @relation("UsedCode")
 }
 
 enum Plan {
@@ -68,6 +70,20 @@ model BusinessResult {
 
   search  Search        @relation(fields: [searchId], references: [id], onDelete: Cascade)
   savedBy SavedResult[]
+}
+
+model InviteCode {
+  id        String    @id @default(cuid())
+  code      String    @unique
+  note      String?
+  createdBy String
+  usedBy    String?
+  usedAt    DateTime?
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+
+  creator    User  @relation("CreatedCodes", fields: [createdBy], references: [id], onDelete: Cascade)
+  usedByUser User? @relation("UsedCode",    fields: [usedBy],    references: [id], onDelete: SetNull)
 }
 
 model SavedResult {
