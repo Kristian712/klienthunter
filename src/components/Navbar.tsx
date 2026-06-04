@@ -4,9 +4,10 @@ import { useTranslations, useLocale } from 'next-intl';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
-import { Menu, X, Globe2, Target, Crown, Shield, User, LogOut, LayoutDashboard, Settings } from 'lucide-react';
+import { Menu, X, Globe2, Target, Crown, Shield, User, LogOut, LayoutDashboard } from 'lucide-react';
+import { loadUser, clearUser, type StoredUser } from '@/lib/client-auth';
 
-interface UserType { id: string; email: string; name?: string; plan: string; isAdmin?: boolean; isVip?: boolean }
+type UserType = StoredUser;
 
 export function Navbar() {
   const t = useTranslations('nav');
@@ -19,24 +20,7 @@ export function Navbar() {
   const dropRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Read from localStorage first (instant, no network)
-    const stored = localStorage.getItem('kh_user');
-    if (stored) {
-      try { setUser(JSON.parse(stored)); } catch {}
-    }
-    // Then verify with server and update
-    fetch('/api/auth/me', { credentials: 'include' })
-      .then(r => r.json())
-      .then(d => {
-        if (d.user) {
-          setUser(d.user);
-          localStorage.setItem('kh_user', JSON.stringify(d.user));
-        } else {
-          setUser(null);
-          localStorage.removeItem('kh_user');
-        }
-      })
-      .catch(() => {});
+    setUser(loadUser());
   }, [pathname]);
 
   useEffect(() => {
@@ -55,7 +39,7 @@ export function Navbar() {
 
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
-    localStorage.removeItem('kh_user');
+    clearUser();
     window.location.href = `/${locale}`;
   };
 

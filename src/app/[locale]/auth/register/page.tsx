@@ -5,6 +5,7 @@ import { useTranslations, useLocale } from 'next-intl';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Target, Mail, Lock, User, ArrowRight, CheckCircle2, Ticket } from 'lucide-react';
+import { saveUser } from '@/lib/client-auth';
 
 export default function RegisterPage() {
   const t = useTranslations('auth');
@@ -43,7 +44,7 @@ export default function RegisterPage() {
         setError(msgs[data.error] ?? (isCs ? 'Něco se pokazilo.' : 'Something went wrong.'));
         return;
       }
-      localStorage.setItem('kh_user', JSON.stringify(data.user));
+      saveUser(data.user);
       window.location.href = `/${locale}/dashboard`;
     } finally {
       setLoading(false);
