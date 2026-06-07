@@ -87,6 +87,7 @@ export default function FacebookFinderPage() {
   const [error, setError]             = useState('');
   const [hasSearched, setHasSearched] = useState(false);
   const [cookiesSet, setCookiesSet]   = useState<boolean | null>(null);
+  const [debug, setDebug]             = useState<{htmlLen:number; htmlSample:string} | null>(null);
 
   // Check if FB cookies are configured
   useEffect(() => {
@@ -114,7 +115,12 @@ export default function FacebookFinderPage() {
         setError(res.status === 401 ? 'Přihlaste se prosím.' : data.error || 'Chyba.');
         return;
       }
-      if (data.error) { setError(data.error); return; }
+      if (data.error) {
+        setError(data.error);
+        if (data._debug) setDebug(data._debug);
+        return;
+      }
+      setDebug(null);
       setLeads(data.leads ?? []);
     } finally {
       setLoading(false);
@@ -202,8 +208,19 @@ export default function FacebookFinderPage() {
 
         {/* ── Error ── */}
         {error && (
-          <div className="rounded-xl bg-red-50 border border-red-200 text-red-700 px-4 py-3 text-sm mb-4">
+          <div className="rounded-xl bg-red-50 border border-red-200 text-red-700 px-4 py-3 text-sm mb-2">
             {error}
+          </div>
+        )}
+
+        {/* ── Debug info (copy & send to developer) ── */}
+        {debug && (
+          <div className="rounded-xl bg-gray-50 border border-gray-200 px-4 py-3 mb-4 text-xs text-gray-600">
+            <p className="font-semibold mb-1">Debug info (pošli vývojáři):</p>
+            <p>HTML délka: {debug.htmlLen} znaků</p>
+            <pre className="mt-2 whitespace-pre-wrap break-all bg-white border border-gray-100 rounded p-2 text-[10px] select-all max-h-48 overflow-auto">
+              {debug.htmlSample}
+            </pre>
           </div>
         )}
 

@@ -12,6 +12,12 @@ export interface FbLead {
   activityLabel: string;
 }
 
+export interface ScrapeResult {
+  leads: FbLead[];
+  error?: string;
+  _debug?: { htmlLen: number; pageType: string; htmlSample: string };
+}
+
 const MBASIC = 'https://mbasic.facebook.com';
 const MOBILE_UA =
   'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36';
@@ -220,7 +226,7 @@ export async function scrapeFacebookGroup(
   groupInput: string,
   cUser: string,
   xs: string,
-): Promise<{ leads: FbLead[]; error?: string }> {
+): Promise<ScrapeResult> {
   const slug = normalizeGroupSlug(groupInput);
   if (!slug) return { leads: [], error: 'Zadej platný odkaz na skupinu.' };
 
@@ -251,9 +257,12 @@ export async function scrapeFacebookGroup(
   const profiles = parseProfiles(html);
 
   if (profiles.length === 0) {
+    // Return first 1500 chars of HTML so we can diagnose the structure
+    const htmlSample = html.substring(0, 1500).replace(/\s+/g, ' ');
     return {
       leads: [],
       error: 'Ve skupině nebyli nalezeni žádní přispěvatelé. Zkontroluj, že jsi členem skupiny a skupina má nedávné příspěvky.',
+      _debug: { htmlLen: html.length, pageType, htmlSample },
     };
   }
 

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { verifyToken } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { scrapeFacebookGroup } from '@/lib/facebook-scraper';
+import { scrapeFacebookGroup, type ScrapeResult } from '@/lib/facebook-scraper';
 
 export const maxDuration = 60;
 
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const result = await scrapeFacebookGroup(groupInput, user.facebookCUser, user.facebookXs);
+    const result: ScrapeResult = await scrapeFacebookGroup(groupInput, user.facebookCUser, user.facebookXs);
     return NextResponse.json(result);
   } catch (err) {
     if (err instanceof z.ZodError) {
