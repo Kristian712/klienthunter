@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import {
   Search, Download, Globe, Users, Star, ExternalLink,
   Phone, Mail, MapPin, SlidersHorizontal, X, Clock, ChevronDown,
-  Copy, Check, ChevronUp, MessageSquare,
+  Copy, Check, ChevronUp, MessageSquare, Send,
 } from 'lucide-react';
 
 // ── Regions – global ─────────────────────────────────────────────────────────
@@ -380,10 +380,45 @@ function WebsiteScoreBadge({ score, isOld, note, isCs }: { score: number; isOld:
 
 // ── Main component ────────────────────────────────────────────────────────────
 
+function SendEmailButton({ businessId, email }: { businessId: string; email: string }) {
+  const [status, setStatus] = useState<'idle'|'sending'|'sent'|'error'>('idle');
+  const [errMsg, setErrMsg] = useState('');
+
+  const send = async () => {
+    setStatus('sending');
+    const res = await fetch('/api/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ businessResultId: businessId }),
+    });
+    const d = await res.json();
+    if (res.ok) { setStatus('sent'); }
+    else { setStatus('error'); setErrMsg(d.error || 'Chyba'); }
+  };
+
+  if (status === 'sent') return <span className="flex items-center gap-1 text-xs text-emerald-600 font-medium"><Check size={12} /> Odesláno!</span>;
+  if (status === 'error') return <span className="text-xs text-red-500" title={errMsg}>Chyba</span>;
+
+  return (
+    <button onClick={send} disabled={status === 'sending'}
+      className="flex items-center gap-1 text-xs text-brand-600 hover:text-brand-700 font-medium disabled:opacity-50 transition-colors">
+      {status === 'sending'
+        ? <><svg className="animate-spin h-3 w-3" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>Odesílám…</>
+        : <><Send size={12} /> Poslat email</>}
+    </button>
+  );
+}
+
 export default function SearchPage() {
   const t = useTranslations('search');
   const locale = useLocale();
   const isCs = locale === 'cs';
+
+  const [brevoConfigured, setBrevoConfigured] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/profile/brevo').then(r => r.json()).then(d => setBrevoConfigured(d.configured ?? false)).catch(() => {});
+  }, []);
 
   const [region, setRegion]           = useState('');
   const [customRegion, setCustomRegion] = useState('');
@@ -710,6 +745,9 @@ export default function SearchPage() {
                                className="flex items-center gap-1 text-xs text-ink-muted hover:text-brand-600 transition-colors truncate max-w-[220px]">
                               <Globe size={11} />{b.website.replace(/^https?:\/\//, '')}
                             </a>
+                          )}
+                          {b.email && brevoConfigured && (
+                            <SendEmailButton businessId={b.id} email={b.email} />
                           )}
                         </div>
 

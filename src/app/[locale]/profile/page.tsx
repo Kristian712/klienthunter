@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
-import { Crown, Shield, User, Mail, Calendar, Search, BarChart3, Edit2, Check, X, Lock } from 'lucide-react';
+import { Crown, Shield, User, Mail, Calendar, Search, BarChart3, Edit2, Check, X, Lock, Send } from 'lucide-react';
 
 interface ProfileData {
   user: {
@@ -33,6 +33,10 @@ export default function ProfilePage() {
   const [toast, setToast]       = useState('');
   const [error, setError]       = useState('');
 
+  const [brevoConfigured, setBrevoConfigured] = useState(false);
+  const [brevoForm, setBrevoForm]             = useState({ apiKey: '', senderEmail: '' });
+  const [brevoSaving, setBrevoSaving]         = useState(false);
+  const [brevoOpen, setBrevoOpen]             = useState(false);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
 
@@ -42,7 +46,33 @@ export default function ProfilePage() {
       setNameVal(d.user?.name ?? '');
       setLoading(false);
     });
+    fetch('/api/profile/brevo').then(r => r.json()).then(d => {
+      setBrevoConfigured(d.configured ?? false);
+    }).catch(() => {});
   }, []);
+
+  const saveBrevo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBrevoSaving(true);
+    const res = await fetch('/api/profile/brevo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ apiKey: brevoForm.apiKey, senderEmail: brevoForm.senderEmail }),
+    });
+    if (res.ok) {
+      setBrevoConfigured(true);
+      setBrevoForm({ apiKey: '', senderEmail: '' });
+      setBrevoOpen(false);
+      showToast('Brevo nastaveno – emaily připraveny!');
+    }
+    setBrevoSaving(false);
+  };
+
+  const deleteBrevo = async () => {
+    await fetch('/api/profile/brevo', { method: 'DELETE' });
+    setBrevoConfigured(false);
+    showToast('Brevo odebráno.');
+  };
 
   const saveName = async () => {
     setSaving(true);
@@ -219,6 +249,64 @@ export default function ProfilePage() {
                 </button>
               </div>
             </form>
+          )}
+        </div>
+
+        {/* Brevo email */}
+        <div className="card">
+          <h2 className="font-semibold text-ink flex items-center gap-2 mb-1">
+            <Send size={16} className="text-brand-600" /> Automatické emaily (Brevo)
+          </h2>
+          <p className="text-xs text-ink-faint mb-4">
+            {brevoConfigured
+              ? 'Brevo je nastaveno. Tlačítko "Poslat email" je aktivní na stránce Vyhledávání.'
+              : 'Nastav Brevo a odesílej oslovovací emaily přímo z KlientHunteru – 300 emailů/den zdarma.'}
+          </p>
+
+          {brevoConfigured ? (
+            <div className="flex items-center gap-3">
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
+                <Check size={11} /> Připojeno
+              </span>
+              <button onClick={deleteBrevo} className="text-xs text-red-500 hover:text-red-700 underline underline-offset-2">Odebrat</button>
+            </div>
+          ) : (
+            <>
+              {!brevoOpen && (
+                <button onClick={() => setBrevoOpen(true)} className="btn-outline btn-sm">Nastavit Brevo</button>
+              )}
+              {brevoOpen && (
+                <>
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4 text-xs text-blue-700">
+                    <p className="font-semibold mb-1">Jak získat API klíč (2 minuty):</p>
+                    <ol className="space-y-1 list-decimal list-inside">
+                      <li>Zaregistruj se zdarma na <strong>brevo.com</strong></li>
+                      <li>Jdi do <strong>Settings → API Keys → Generate new API key</strong></li>
+                      <li>Zkopíruj klíč a vlož sem</li>
+                      <li>Email odesílatele musí být ověřen v Brevo (<strong>Settings → Senders</strong>)</li>
+                    </ol>
+                  </div>
+                  <form onSubmit={saveBrevo} className="space-y-3 max-w-lg">
+                    <div>
+                      <label className="label">Brevo API klíč</label>
+                      <input className="input font-mono text-sm" placeholder="xkeysib-..." value={brevoForm.apiKey}
+                        onChange={e => setBrevoForm(p => ({ ...p, apiKey: e.target.value }))} required autoComplete="off" />
+                    </div>
+                    <div>
+                      <label className="label">Ověřený email odesílatele</label>
+                      <input className="input" type="email" placeholder="tvuj@email.cz" value={brevoForm.senderEmail}
+                        onChange={e => setBrevoForm(p => ({ ...p, senderEmail: e.target.value }))} required />
+                    </div>
+                    <div className="flex gap-2">
+                      <button type="submit" disabled={brevoSaving} className="btn-primary btn-sm">
+                        {brevoSaving ? 'Ukládám…' : 'Uložit a aktivovat'}
+                      </button>
+                      <button type="button" onClick={() => setBrevoOpen(false)} className="btn-outline btn-sm">Zrušit</button>
+                    </div>
+                  </form>
+                </>
+              )}
+            </>
           )}
         </div>
 
