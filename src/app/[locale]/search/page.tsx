@@ -7,6 +7,7 @@ import {
   Phone, Mail, MapPin, SlidersHorizontal, X, Clock, ChevronDown,
   Copy, Check, ChevronUp, MessageSquare, Send,
 } from 'lucide-react';
+import { buildGreeting } from '@/lib/czech-vocative';
 
 // ── Regions – global ─────────────────────────────────────────────────────────
 // Top CZ regions by number of businesses without digital presence (analysis):
@@ -276,41 +277,41 @@ function SocialLinks({ b }: { b: BusinessResult }) {
 // ── Personalized outreach message ────────────────────────────────────────────
 
 function generateMessage(b: BusinessResult): string {
-  const name = b.name;
+  const greeting = buildGreeting(b.name);
 
   if (!b.hasWebsite) {
-    return `Dobrý den, ${name} 👋
+    return `${greeting}
 
-Jsem Kristián, je mi 17 let a dělám weby na míru – moderní, rychlé a dobře vypadající na mobilu i počítači.
+viděl jsem vaši firmu na Google Maps – zákazníci vás hledají, ale web nemáte.
 
-Zaujalo mě, že zatím web nemáte. Přitom dnes může být web jeden z nejlepších způsobů jak získat nové zákazníky. Rád vám zdarma ukážu, jak by mohl vypadat – bez jakýchkoliv závazků.
+Dělám weby přesně pro živnostníky jako jste vy – rychle, za rozumnou cenu.
 
-A pokud web teď nepotřebujete, ale napadne vás někdo komu by se hodil – budu za doporučení moc vděčný 🙏
+Ukázky na webovkyvanek.cz. Měl byste zájem?
 
-Kristián · https://webovkyvanek.cz/`;
+Kristián`;
   }
 
   if (b.websiteIsOld) {
-    return `Dobrý den, ${name} 👋
+    return `${greeting}
 
-Jsem Kristián, je mi 17 let a specializuji se na moderní weby.
+narazil jsem na váš web – myslím, že by si zasloužil osvěžení. Pomalejší načítání a starší design odvádí zákazníky.
 
-Narazil jsem na váš web a napadlo mě, že by si mohl zasloužit osvěžení – rychlejší načítání, aktuální design a správné zobrazení na mobilu. Rád vám zdarma ukážu jak by mohl nový vypadat. Žádný závazek.
+Dělám moderní weby pro živnostníky – rychle, za rozumnou cenu.
 
-Pokud zájem nebude, třeba znáte někoho pro koho by nový web byl přínos – budu za každé doporučení moc rád 🙏
+Ukázky na webovkyvanek.cz. Měl byste zájem?
 
-Kristián · https://webovkyvanek.cz/`;
+Kristián`;
   }
 
-  return `Dobrý den, ${name} 👋
+  return `${greeting}
 
-Jsem Kristián, je mi 17 let a specializuji se na moderní weby.
+narazil jsem na váš web a napadlo mě, že by mohl fungovat lépe – rychlejší načítání, modernější design, lepší zobrazení na mobilu.
 
-Narazil jsem na váš web a napadlo mě, že by si mohl zasloužit osvěžení – rychlejší načítání, aktuální design a správné zobrazení na mobilu. Rád vám zdarma ukážu jak by mohl nový vypadat. Žádný závazek.
+Dělám weby pro živnostníky – rychle, za rozumnou cenu.
 
-Pokud zájem nebude, třeba znáte někoho pro koho by nový web byl přínos – budu za každé doporučení moc rád 🙏
+Ukázky na webovkyvanek.cz. Měl byste zájem?
 
-Kristián · https://webovkyvanek.cz/`;
+Kristián`;
 }
 
 function MessageBox({ b }: { b: BusinessResult }) {
