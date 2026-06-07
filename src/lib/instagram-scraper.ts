@@ -11,10 +11,11 @@ export interface IgLead {
   activityLabel: string;
 }
 
-const BROWSER_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
-const MOBILE_UA  = 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.1 Mobile/15E148 Safari/604.1';
+const MOBILE_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.1 Mobile/15E148 Safari/604.1';
 
 const LINK_IN_BIO = ['linktr.ee', 'linktree', 'links.ee', 'beacons.ai', 'bio.link', 'taplink.cc', 'solo.to', 'campsite.bio'];
+
+const IG_SKIP = new Set(['p', 'reel', 'explore', 'stories', 'accounts', 'direct', 'tv', 'reels', 'about', 'blog', 'press', 'legal', 'help', 'privacy', 'safety', 'api', 'developer', 'download', 'lite', 'ads', 'hashtag', 'music']);
 
 function activityLabel(followers: number): string {
   if (followers >= 5000) return 'Velmi aktivní';
@@ -32,29 +33,35 @@ function isRealWebsite(url: string | undefined): boolean {
   } catch { return false; }
 }
 
-const IG_SKIP = new Set(['p', 'reel', 'explore', 'stories', 'accounts', 'direct', 'tv', 'reels', 'about', 'blog', 'press', 'legal', 'help', 'privacy', 'safety', 'api', 'developer', 'download', 'lite', 'ads']);
-
-function extractUsernames(html: string): string[] {
-  const seen = new Set<string>();
-  // Match instagram.com/USERNAME from hrefs and text
-  const re = /instagram\.com\/([a-zA-Z0-9._]{2,30})\/?[^a-zA-Z0-9._]/gi;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(html)) !== null) {
-    const u = m[1].toLowerCase();
-    if (!IG_SKIP.has(u) && !u.startsWith('_') && !u.endsWith('_')) seen.add(u);
-  }
-  return Array.from(seen);
+function extractUsername(url: string): string | null {
+  try {
+    const path = new URL(url).pathname.replace(/^\//, '').replace(/\/$/, '');
+    const segment = path.split('/')[0];
+    if (!segment || segment.length < 2 || IG_SKIP.has(segment)) return null;
+    if (!/^[a-zA-Z0-9._]{2,30}$/.test(segment)) return null;
+    return segment.toLowerCase();
+  } catch { return null; }
 }
 
-async function ddgSearch(query: string): Promise<string | null> {
+async function cseSearch(query: string): Promise<string[]> {
+  const key = process.env.GOOGLE_CSE_API_KEY;
+  const cx = process.env.GOOGLE_CSE_ID;
+  if (!key || !cx) return [];
+
   try {
-    const res = await axios.post(
-      'https://html.duckduckgo.com/html/',
-      new URLSearchParams({ q: query, kl: 'cs-cz' }).toString(),
-      { headers: { 'User-Agent': BROWSER_UA, 'Content-Type': 'application/x-www-form-urlencoded' }, timeout: 12_000 }
-    );
-    return typeof res.data === 'string' ? res.data : null;
-  } catch { return null; }
+    const res = await axios.get('https://www.googleapis.com/customsearch/v1', {
+      params: { key, cx, q: query, num: 10, gl: 'cz', hl: 'cs' },
+      timeout: 12_000,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const items: any[] = res.data?.items ?? [];
+    const usernames: string[] = [];
+    for (const item of items) {
+      const u = extractUsername(item.link ?? '');
+      if (u) usernames.push(u);
+    }
+    return usernames;
+  } catch { return []; }
 }
 
 async function fetchIgProfile(username: string): Promise<IgLead | null> {
@@ -67,20 +74,21 @@ async function fetchIgProfile(username: string): Promise<IgLead | null> {
       }
     );
     const user = res.data?.data?.user;
-    if (!user || !user.username) return null;
+    if (!user?.username) return null;
 
     const website = user.external_url || undefined;
     const hasWebsite = isRealWebsite(website);
+    const followers = user.edge_followed_by?.count ?? 0;
 
     return {
       username: user.username,
       fullName: user.full_name || user.username,
       biography: (user.biography || '').substring(0, 150),
-      followers: user.edge_followed_by?.count ?? 0,
+      followers,
       profileUrl: `https://www.instagram.com/${user.username}/`,
       hasWebsite,
       website: hasWebsite ? website : undefined,
-      activityLabel: activityLabel(user.edge_followed_by?.count ?? 0),
+      activityLabel: activityLabel(followers),
     };
   } catch { return null; }
 }
@@ -94,20 +102,21 @@ export async function searchInstagram(
   const loc = location.trim();
   const nic = niche.trim();
 
-  // Run 3 query variants in parallel for max coverage
+  if (!process.env.GOOGLE_CSE_API_KEY || !process.env.GOOGLE_CSE_ID) {
+    return { leads: [], total: 0, error: 'Instagram vyhledávání není nakonfigurováno.' };
+  }
+
   const queries = [
-    `site:instagram.com ${nic}${loc ? ' ' + loc : ''}`,
-    `${nic}${loc ? ' ' + loc : ''} instagram`,
-    `${nic} instagram profil${loc ? ' ' + loc : ''}`,
+    `${nic}${loc ? ' ' + loc : ''}`,
+    ...(loc ? [`${loc} ${nic}`] : []),
   ];
 
-  const htmls = await Promise.all(queries.map(q => ddgSearch(q)));
+  const results = await Promise.all(queries.map(q => cseSearch(q)));
 
   const seen = new Set<string>();
   const usernames: string[] = [];
-  for (const html of htmls) {
-    if (!html) continue;
-    for (const u of extractUsernames(html)) {
+  for (const batch of results) {
+    for (const u of batch) {
       if (!seen.has(u)) { seen.add(u); usernames.push(u); }
     }
   }
@@ -118,13 +127,13 @@ export async function searchInstagram(
 
   const profiles: IgLead[] = [];
   for (const username of usernames.slice(0, 20)) {
-    await sleep(250);
+    await sleep(200);
     const p = await fetchIgProfile(username);
     if (p) profiles.push(p);
   }
 
   if (profiles.length === 0) {
-    return { leads: [], total: 0, error: 'Nepodařilo se načíst profily. Zkus jiný obor.' };
+    return { leads: [], total: 0, error: 'Nepodařilo se načíst profily z Instagramu.' };
   }
 
   const noWebsite = profiles

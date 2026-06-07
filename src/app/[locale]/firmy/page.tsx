@@ -5,18 +5,73 @@ import { useLocale } from 'next-intl';
 import { Search, Phone, MapPin, ExternalLink, Globe, ChevronDown, ChevronUp, Copy, Check, MessageSquare } from 'lucide-react';
 import type { FirmyLead } from '@/lib/firmy-scraper';
 
+const CZECH_NAMES = new Set([
+  // Male
+  'Adam','Aleš','Alexej','Alexandr','Alois','Antonín','Bedřich','Bohdan','Bohumil','Bohumír',
+  'Bořek','Bořivoj','Břetislav','Cyril','Čeněk','Daniel','Dalibor','David','Dominik','Dušan',
+  'Eduard','Emil','Erik','Filip','František','Hugo','Ivo','Ivan','Jakub','Jan','Jaromír',
+  'Jaroslav','Jindřich','Jiří','Josef','Kamil','Karel','Ladislav','Libor','Lubomír','Lukáš',
+  'Marcel','Marek','Martin','Matěj','Michal','Miloš','Milan','Miloslav','Miroslav','Ondřej',
+  'Patrik','Pavel','Petr','Přemysl','Radek','Radim','Radomír','Radoslav','René','Robert',
+  'Roman','Rostislav','Rudolf','Stanislav','Štěpán','Tomáš','Václav','Viktor','Vladimír',
+  'Vladislav','Vojtěch','Zbyněk','Zdeněk','Zdirad','Richard','Petr',
+  // Female
+  'Adéla','Alena','Alexandra','Alžběta','Aneta','Anežka','Anna','Barbora','Blanka','Dana',
+  'Daniela','Dagmar','Dita','Dominika','Eva','Gabriela','Hana','Helena','Ilona','Irena',
+  'Ivana','Jana','Jitka','Karolína','Kateřina','Klára','Kristýna','Lenka','Linda','Lucie',
+  'Ludmila','Marcela','Markéta','Marie','Marta','Martina','Michaela','Milena','Monika',
+  'Natálie','Nikola','Pavla','Petra','Radka','Renata','Romana','Simona','Soňa','Stanislava',
+  'Šárka','Tereza','Věra','Veronika','Zdenka','Zuzana',
+]);
+
+function toVocative(name: string): string {
+  const n = name.trim();
+  if (!n) return n;
+  const lower = n.toLowerCase();
+  const last  = lower[lower.length - 1];
+  const last2 = lower.slice(-2);
+
+  // -ie, -í → beze změny (Lucie, Jiří)
+  if (last2 === 'ie' || last === 'í') return n;
+  // -e, -o → beze změny (cizí jména)
+  if (last === 'e' || last === 'o') return n;
+  // -a → -o (Jana→Jano, Petra→Petro)
+  if (last === 'a') return n.slice(0, -1) + 'o';
+  // -el (pohybné e): Pavel→Pavle, Karel→Karle
+  if (last2 === 'el') return n.slice(0, -2) + 'le';
+  // -ek (pohybné e): Marek→Marku, Radek→Radku, Zdeněk→Zdeňku, František→Františku
+  if (last2 === 'ek') return n.slice(0, -2) + 'ku';
+  // -k (ostatní): Patrik→Patriku, Dominik→Dominiku
+  if (last === 'k') return n + 'u';
+  // měkké souhlásky → -i (Tomáš→Tomáši, Ondřej→Ondřeji)
+  if ('šžčřj'.includes(last)) return n + 'i';
+  // ostatní tvrdé souhlásky → -e (Jan→Jane, Martin→Martine, Jakub→Jakube)
+  return n + 'e';
+}
+
+function extractFirstName(businessName: string): string | null {
+  const clean = businessName.replace(/\b(s\.r\.o\.?|a\.s\.?|v\.o\.s\.?|spol\.|IČ\s*\d+|IČO\s*\d+)\b/gi, '');
+  const words = clean.split(/[\s\-–,/]+/).map(w => w.replace(/[^a-zA-ZáčďéěíňóřšťúůýžÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ]/g, ''));
+  for (const word of words) {
+    const capitalized = word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    if (CZECH_NAMES.has(capitalized) && word.length > 2) return capitalized;
+  }
+  return null;
+}
+
 function generateMessage(lead: FirmyLead, query: string): string {
-  return `Dobrý den, ${lead.name} 👋
+  const firstName = extractFirstName(lead.name);
+  const greeting  = firstName ? `Dobrý den, ${toVocative(firstName)},` : 'Dobrý den,';
 
-Váš záznam jsem našel na Firmy.cz – vidím, že podnikáte v oblasti ${query} a zatím nemáte vlastní web.
+  return `${greeting}
 
-Jsem Kristián, je mi 17 let a dělám weby na míru – moderní, rychlé, dobře vypadající na mobilu i počítači.
+viděl jsem že nabízíte ${query}, ale zákazníci vás na Googlu nenajdou.
 
-Web může být váš nejlepší obchodní zástupce – pracuje 24/7 a přivádí nové zákazníky. Rád vám zdarma ukážu jak by mohl vypadat – bez závazků.
+Dělám weby přesně pro živnostníky jako jste vy – rychle, za rozumnou cenu.
 
-A pokud web teď nepotřebujete, třeba znáte někoho pro koho by byl přínosem 🙏
+Ukázky na webovkyvanek.cz. Měl byste zájem?
 
-Kristián · https://webovkyvanek.cz/`;
+Kristián`;
 }
 
 function MessageBox({ lead, query }: { lead: FirmyLead; query: string }) {
