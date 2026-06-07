@@ -93,66 +93,80 @@ function isValidSlug(slug: string): boolean {
   if (!slug || slug.length < 2) return false;
   if (SKIP_SLUGS.has(slug.toLowerCase())) return false;
   // Must be alphanumeric + dots/underscores/hyphens only
-  if (!/^[a-zA-Z0-9._-]{2,60}$/.test(slug)) return false;
-  // Must contain at least one letter (not purely numeric IDs)
-  if (/^\d+$/.test(slug)) return false;
+  if (!/^[a-zA-Z0-9._-]{2,80}$/.test(slug)) return false;
   return true;
+}
+
+// Normalise any FB href (relative or absolute) to a canonical profilePath
+function hrefToProfilePath(href: string): string | null {
+  // Strip absolute mbasic/m/www prefix
+  href = href
+    .replace(/^https?:\/\/(mbasic\.|m\.|www\.)?facebook\.com/, '')
+    .replace(/&amp;/g, '&');
+
+  if (!href.startsWith('/')) return null;
+
+  // profile.php — extract numeric id
+  if (href.includes('profile.php')) {
+    const id = href.match(/id=(\d+)/)?.[1];
+    return id ? `/profile.php?id=${id}` : null;
+  }
+
+  // /NNN  or  /slug  (first path segment only)
+  const slug = href.replace(/^\//, '').split(/[/?#]/)[0];
+  if (!isValidSlug(slug)) return null;
+  return '/' + slug;
 }
 
 // Extract profile links from HTML — tries multiple strategies
 function parseProfiles(html: string): Array<{ name: string; profilePath: string; postCount: number }> {
   const counts = new Map<string, { name: string; count: number }>();
 
-  const addProfile = (rawPath: string, rawName: string) => {
-    const name = rawName.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim();
+  const addProfile = (rawHref: string, rawName: string) => {
+    const name = rawName.replace(/&amp;/g, '&').replace(/&#039;/g, "'").trim();
     if (!isValidName(name)) return;
 
-    let profilePath: string;
-    if (rawPath.includes('profile.php')) {
-      const id = rawPath.match(/id=(\d+)/)?.[1];
-      if (!id) return;
-      profilePath = `/profile.php?id=${id}`;
-    } else {
-      const slug = rawPath.replace(/^\//, '').split(/[/?#]/)[0];
-      if (!isValidSlug(slug)) return;
-      profilePath = '/' + slug;
-    }
+    const profilePath = hrefToProfilePath(rawHref);
+    if (!profilePath) return;
 
     const existing = counts.get(profilePath);
     if (existing) {
       existing.count++;
-      // Keep the longer/better name
       if (name.length > existing.name.length) existing.name = name;
     } else {
       counts.set(profilePath, { name, count: 1 });
     }
   };
 
-  // Strategy 1: links inside <h3> tags (post author headers)
-  const h3Re = /<h3[^>]*>[\s\S]{0,50}<a\s+href="(\/(?:profile\.php\?[^"]*|[^"/?#\s][^"?#\s]*))"[^>]*>([^<]{3,80})<\/a>/gi;
   let m: RegExpExecArray | null;
+
+  // Strategy 1: links inside <h3> (post author headers in mbasic)
+  const h3Re = /<h3[^>]*>[\s\S]{0,100}<a\s+href="([^"]+)"[^>]*>([^<]{2,80})<\/a>/gi;
   while ((m = h3Re.exec(html)) !== null) addProfile(m[1], m[2]);
 
-  // Strategy 2: links inside <strong> tags (another mbasic pattern)
-  const strongRe = /<strong[^>]*>[\s\S]{0,30}<a\s+href="(\/(?:profile\.php\?[^"]*|[^"/?#\s][^"?#\s]*))"[^>]*>([^<]{3,80})<\/a>/gi;
+  // Strategy 2: links inside <strong> (alt mbasic author pattern)
+  const strongRe = /<strong[^>]*>[\s\S]{0,50}<a\s+href="([^"]+)"[^>]*>([^<]{2,80})<\/a>/gi;
   while ((m = strongRe.exec(html)) !== null) addProfile(m[1], m[2]);
 
-  // Strategy 3: any anchor with profile.php (always a real profile)
-  const phpRe = /<a\s+href="(\/profile\.php\?(?:id=\d+)[^"]*)"[^>]*>([^<]{3,80})<\/a>/gi;
+  // Strategy 3: any profile.php link (always a real profile, regardless of context)
+  const phpRe = /<a\s+href="([^"]*profile\.php[^"]*)"[^>]*>([^<]{2,80})<\/a>/gi;
   while ((m = phpRe.exec(html)) !== null) addProfile(m[1], m[2]);
 
-  // Strategy 4: broad — any anchor with /slug pattern near common group post context
-  // Only if we still have 0 results from above strategies
+  // Strategy 4: data-ft blocks (mbasic story containers)
+  const ftRe = /data-ft="[^"]*"[^>]*>[\s\S]{0,200}?<a\s+href="([^"]+)"[^>]*>([^<]{2,80})<\/a>/gi;
+  while ((m = ftRe.exec(html)) !== null) addProfile(m[1], m[2]);
+
+  // Strategy 5: broad fallback — all anchors with valid-looking FB hrefs
   if (counts.size === 0) {
-    const broadRe = /<a\s+href="\/([\w.]{4,50})[?#]?[^"]*"[^>]*>([^<]{4,60})<\/a>/gi;
+    const broadRe = /<a\s+href="([^"]{5,120})"[^>]*>([^<]{3,60})<\/a>/gi;
     while ((m = broadRe.exec(html)) !== null) {
-      const slug = m[1];
-      const name = m[2];
-      if (isValidSlug(slug) && isValidName(name)) addProfile('/' + slug, name);
+      if (m[1].includes('facebook.com') || m[1].startsWith('/')) {
+        addProfile(m[1], m[2]);
+      }
     }
   }
 
-  console.log(`[FB scraper] Found ${counts.size} unique profiles in HTML (len=${html.length})`);
+  console.log(`[FB scraper] strategies done: ${counts.size} profiles | html len: ${html.length}`);
 
   return Array.from(counts.entries())
     .map(([path, { name, count }]) => ({ name, profilePath: path, postCount: count }))

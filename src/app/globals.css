@@ -55,7 +55,13 @@
   }
 
   ::selection {
-    @apply bg-brand-500/30 text-brand-200;
+    background-color: rgba(97, 82, 248, 0.25);
+    color: inherit;
+  }
+
+  .dark ::selection {
+    background-color: rgba(97, 82, 248, 0.55);
+    color: #ffffff;
   }
 }
 
