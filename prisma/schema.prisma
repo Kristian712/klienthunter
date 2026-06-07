@@ -16,8 +16,6 @@ model User {
   isAdmin          Boolean   @default(false)
   isVip            Boolean   @default(false)
   stripeCustomerId String?
-  facebookCUser    String?
-  facebookXs       String?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 

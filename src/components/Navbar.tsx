@@ -61,9 +61,8 @@ export function Navbar() {
   const localeFlag: Record<string, string> = { cs: '🇨🇿', en: '🇬🇧', sk: '🇸🇰' };
 
   const links = [
-    { href: `/${locale}/search`,           label: t('search') },
-    { href: `/${locale}/facebook-finder`,  label: 'Facebook Finder' },
-    { href: `/${locale}/pricing`,          label: t('pricing') },
+    { href: `/${locale}/search`,  label: t('search') },
+    { href: `/${locale}/pricing`, label: t('pricing') },
     ...(user ? [{ href: `/${locale}/dashboard`, label: t('dashboard') }] : []),
     ...(user?.isAdmin ? [{ href: `/${locale}/admin`, label: 'Admin' }] : []),
   ];

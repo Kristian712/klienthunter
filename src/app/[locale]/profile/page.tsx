@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
-import { Crown, Shield, User, Mail, Calendar, Search, BarChart3, Edit2, Check, X, Lock, Facebook } from 'lucide-react';
+import { Crown, Shield, User, Mail, Calendar, Search, BarChart3, Edit2, Check, X, Lock } from 'lucide-react';
 
 interface ProfileData {
   user: {
@@ -33,10 +33,6 @@ export default function ProfilePage() {
   const [toast, setToast]       = useState('');
   const [error, setError]       = useState('');
 
-  const [fbConnected, setFbConnected] = useState(false);
-  const [fbForm, setFbForm]           = useState({ cUser: '', xs: '' });
-  const [fbSaving, setFbSaving]       = useState(false);
-  const [fbOpen, setFbOpen]           = useState(false);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
 
@@ -46,33 +42,7 @@ export default function ProfilePage() {
       setNameVal(d.user?.name ?? '');
       setLoading(false);
     });
-    fetch('/api/profile/facebook-cookies').then(r => r.json()).then(d => {
-      setFbConnected(d.connected ?? false);
-    });
   }, []);
-
-  const saveFbCookies = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setFbSaving(true);
-    const res = await fetch('/api/profile/facebook-cookies', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cUser: fbForm.cUser, xs: fbForm.xs }),
-    });
-    if (res.ok) {
-      setFbConnected(true);
-      setFbForm({ cUser: '', xs: '' });
-      setFbOpen(false);
-      showToast('Facebook cookies uloženy');
-    }
-    setFbSaving(false);
-  };
-
-  const deleteFbCookies = async () => {
-    await fetch('/api/profile/facebook-cookies', { method: 'DELETE' });
-    setFbConnected(false);
-    showToast('Facebook cookies odstraněny');
-  };
 
   const saveName = async () => {
     setSaving(true);
@@ -249,92 +219,6 @@ export default function ProfilePage() {
                 </button>
               </div>
             </form>
-          )}
-        </div>
-
-        {/* Facebook Finder cookies */}
-        <div className="card">
-          <h2 className="font-semibold text-ink flex items-center gap-2 mb-4">
-            <Facebook size={16} className="text-[#1877F2]" />
-            Facebook Finder
-          </h2>
-
-          {fbConnected ? (
-            /* ── Connected state ── */
-            <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-4">
-              <p className="font-semibold text-emerald-800 flex items-center gap-2 mb-1">
-                <Check size={16} /> Uloženo!
-              </p>
-              <p className="text-sm text-emerald-700 mb-3">
-                Facebook cookies jsou nastaveny. Teď můžeš hledat ve Facebook skupinách.
-              </p>
-              <div className="flex items-center gap-3">
-                <a
-                  href={`/${locale}/facebook-finder`}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-white"
-                  style={{ backgroundColor: '#1877F2' }}
-                >
-                  <Facebook size={14} /> Jít na Facebook Finder
-                </a>
-                <button
-                  onClick={deleteFbCookies}
-                  className="text-xs text-red-500 hover:text-red-700 underline underline-offset-2"
-                >
-                  Odebrat cookies
-                </button>
-              </div>
-            </div>
-          ) : (
-            /* ── Setup state ── */
-            <>
-              {/* Instructions */}
-              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4">
-                <p className="font-semibold text-blue-800 text-sm mb-2">Jak získat cookies (1 minuta):</p>
-                <ol className="space-y-1.5 text-blue-700 text-xs list-decimal list-inside">
-                  <li>Otevři <strong>facebook.com</strong> v Chrome a přihlas se</li>
-                  <li>Stiskni <strong>Cmd+Option+I</strong> (Mac) nebo <strong>F12</strong> (Windows)</li>
-                  <li>V horní liště DevTools klikni na <strong>»</strong> úplně vpravo → vyber <strong>Application</strong></li>
-                  <li>Vlevo klikni na <strong>Cookies</strong> → <strong>https://www.facebook.com</strong></li>
-                  <li>Najdi řádek <strong>c_user</strong> → klikni na buňku ve sloupci <em>Value</em> → označ vše a zkopíruj</li>
-                  <li>Stejně zkopíruj hodnotu řádku <strong>xs</strong></li>
-                </ol>
-                <p className="text-[11px] text-blue-500 mt-2">Cookies vydrží ~90 dní, pak je budeš muset obnovit stejným způsobem.</p>
-              </div>
-
-              <form onSubmit={saveFbCookies} className="space-y-3 max-w-lg">
-                <div>
-                  <label className="label">Cookie <strong>c_user</strong></label>
-                  <input
-                    className="input font-mono"
-                    placeholder="např. 100083512345678"
-                    value={fbForm.cUser}
-                    onChange={e => setFbForm(p => ({ ...p, cUser: e.target.value }))}
-                    required
-                    autoComplete="off"
-                  />
-                </div>
-                <div>
-                  <label className="label">Cookie <strong>xs</strong></label>
-                  <input
-                    className="input font-mono"
-                    placeholder="např. 12%3AaBcDeFgHiJkL%3A..."
-                    value={fbForm.xs}
-                    onChange={e => setFbForm(p => ({ ...p, xs: e.target.value }))}
-                    required
-                    autoComplete="off"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  disabled={fbSaving || !fbForm.cUser.trim() || !fbForm.xs.trim()}
-                  className="btn-primary"
-                >
-                  {fbSaving
-                    ? <span className="flex items-center gap-2"><svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg> Ukládám…</span>
-                    : 'Uložit a aktivovat Facebook Finder'}
-                </button>
-              </form>
-            </>
           )}
         </div>
 
