@@ -84,46 +84,56 @@ export default function FacebookFinderPage() {
 
   const [step, setStep]               = useState<Step>('url');
   const [groupUrl, setGroupUrl]       = useState('');
-  const [mbasicUrl, setMbasicUrl]     = useState('');
-  const [pastedHtml, setPastedHtml]   = useState('');
+  const [fbUrl, setFbUrl]             = useState('');
+  const [pastedJson, setPastedJson]   = useState('');
   const [leads, setLeads]             = useState<FbLead[]>([]);
   const [total, setTotal]             = useState(0);
   const [loading, setLoading]         = useState(false);
   const [error, setError]             = useState('');
+  const [snippetCopied, setSnippetCopied] = useState(false);
 
-  // Derive group URL for page-source viewing
   useEffect(() => {
-    if (!groupUrl.trim()) { setMbasicUrl(''); return; }
+    if (!groupUrl.trim()) { setFbUrl(''); return; }
     let slug = groupUrl.trim()
       .replace(/^https?:\/\/(www\.|m\.|mbasic\.)?facebook\.com\/groups\//i, '')
       .replace(/^https?:\/\/fb\.com\/groups\//i, '')
       .replace(/[/?#].*$/, '');
-    setMbasicUrl(slug ? `https://www.facebook.com/groups/${slug}` : '');
+    setFbUrl(slug ? `https://www.facebook.com/groups/${slug}` : '');
   }, [groupUrl]);
+
+  // JS snippet that runs in Facebook group page console and copies member data
+  const jsSnippet = `(function(){const r=new Map();document.querySelectorAll('a[href*="facebook.com/"][role="link"],h2 a[href*="facebook.com"],h3 a[href*="facebook.com"],strong a[href*="facebook.com"]').forEach(el=>{const n=(el.innerText||'').trim();const h=el.href||'';if(!n||n.length<3||n.length>80)return;if(h.includes('/groups/')||h.includes('/events/')||h.includes('/hashtag/'))return;try{const k=new URL(h).pathname;const e=r.get(k);e?e.count++:r.set(k,{name:n,url:h,count:1});}catch(e){}});const d=JSON.stringify([...r.values()]);navigator.clipboard.writeText(d).then(()=>alert('Hotovo! Zkopírováno '+r.size+' lidí. Vrať se na KlientHunter a vlož výsledek.'));})();`;
+
+  const copySnippet = useCallback(async () => {
+    await navigator.clipboard.writeText(jsSnippet);
+    setSnippetCopied(true);
+    setTimeout(() => setSnippetCopied(false), 3000);
+  }, [jsSnippet]);
 
   const goToPaste = (e: React.FormEvent) => {
     e.preventDefault();
-    if (mbasicUrl) setStep('paste');
+    if (fbUrl) setStep('paste');
   };
 
   const analyze = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!pastedHtml.trim()) return;
+    if (!pastedJson.trim()) return;
     setLoading(true);
     setError('');
     try {
+      let data: Array<{name: string; url: string; count?: number}>;
+      try { data = JSON.parse(pastedJson); }
+      catch { setError('Neplatný formát — vlož přesně to co skript zkopíroval do schránky.'); setLoading(false); return; }
+
       const res = await fetch('/api/facebook-groups', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ html: pastedHtml }),
+        body: JSON.stringify({ data }),
       });
-      const data = await res.json();
-      if (!res.ok || data.error) {
-        setError(data.error || 'Chyba při analýze.');
-        return;
-      }
-      setLeads(data.leads ?? []);
-      setTotal(data.total ?? 0);
+      const result = await res.json();
+      if (!res.ok || result.error) { setError(result.error || 'Chyba.'); return; }
+      setLeads(result.leads ?? []);
+      setTotal(result.total ?? 0);
       setStep('results');
     } finally {
       setLoading(false);
@@ -181,15 +191,15 @@ export default function FacebookFinderPage() {
               onChange={e => setGroupUrl(e.target.value)}
               required
             />
-            {mbasicUrl && (
+            {fbUrl && (
               <div className="bg-surface-subtle rounded-xl px-4 py-3 mb-4 text-sm">
                 <p className="text-ink-faint text-xs mb-1">Budeme pracovat s touto adresou:</p>
-                <code className="text-brand-600 break-all text-xs">{mbasicUrl}</code>
+                <code className="text-brand-600 break-all text-xs">{fbUrl}</code>
               </div>
             )}
             <button
               type="submit"
-              disabled={!mbasicUrl}
+              disabled={!fbUrl}
               className="h-[42px] px-5 rounded-xl font-semibold text-sm text-white flex items-center gap-2 disabled:opacity-50"
               style={{ backgroundColor: '#1877F2' }}
             >
@@ -198,66 +208,78 @@ export default function FacebookFinderPage() {
           </form>
         )}
 
-        {/* ── STEP 2: Open + paste source ── */}
+        {/* ── STEP 2: Console snippet + paste JSON ── */}
         {step === 'paste' && (
           <form onSubmit={analyze} className="space-y-4">
             <div className="card">
-              <h2 className="font-semibold text-ink mb-3">Krok 2 — Otevři skupinu a zkopíruj zdrojový kód</h2>
+              <h2 className="font-semibold text-ink mb-3">Krok 2 — Spusť skript v konzoli a vlož výsledek</h2>
 
               <div className="space-y-3">
+                {/* Step 1 */}
                 <div className="flex items-start gap-3 p-3 rounded-xl bg-surface-subtle">
                   <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[#1877F2] text-white text-xs font-bold flex items-center justify-center">1</span>
                   <div>
                     <p className="text-sm font-medium text-ink">Otevři skupinu v prohlížeči</p>
-                    <a
-                      href={mbasicUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 mt-1 text-xs text-[#1877F2] hover:underline"
-                    >
-                      <ExternalLink size={11} /> {mbasicUrl}
+                    <a href={fbUrl} target="_blank" rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 mt-1 text-xs text-[#1877F2] hover:underline">
+                      <ExternalLink size={11} /> {fbUrl}
                     </a>
                     <p className="text-xs text-ink-faint mt-0.5">Musíš být přihlášen a člen skupiny.</p>
                   </div>
                 </div>
 
+                {/* Step 2 */}
                 <div className="flex items-start gap-3 p-3 rounded-xl bg-surface-subtle">
                   <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[#1877F2] text-white text-xs font-bold flex items-center justify-center">2</span>
                   <div>
-                    <p className="text-sm font-medium text-ink">Zobraz zdrojový kód stránky</p>
+                    <p className="text-sm font-medium text-ink">Otevři konzoli prohlížeče</p>
                     <p className="text-xs text-ink-faint mt-0.5">
-                      <strong>Mac:</strong> Cmd+U &nbsp;|&nbsp; <strong>Windows:</strong> Ctrl+U
+                      <strong>Mac:</strong> Cmd+Option+J &nbsp;|&nbsp; <strong>Windows:</strong> Ctrl+Shift+J
                     </p>
-                    <p className="text-xs text-ink-faint">Otevře se nová záložka se zdrojovým kódem (view-source:…).</p>
+                    <p className="text-xs text-ink-faint">Otevře se záložka Console v DevTools.</p>
                   </div>
                 </div>
 
+                {/* Step 3 — copy snippet */}
                 <div className="flex items-start gap-3 p-3 rounded-xl bg-surface-subtle">
                   <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[#1877F2] text-white text-xs font-bold flex items-center justify-center">3</span>
-                  <div>
-                    <p className="text-sm font-medium text-ink">Označ vše a zkopíruj</p>
-                    <p className="text-xs text-ink-faint mt-0.5">
-                      <strong>Mac:</strong> Cmd+A pak Cmd+C &nbsp;|&nbsp; <strong>Windows:</strong> Ctrl+A pak Ctrl+C
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-ink mb-2">Zkopíruj a vlož tento kód do konzole, stiskni Enter</p>
+                    <div className="relative">
+                      <pre className="bg-gray-900 text-green-400 rounded-xl p-3 text-[10px] overflow-x-auto whitespace-pre-wrap break-all leading-relaxed font-mono">
+                        {jsSnippet}
+                      </pre>
+                      <button
+                        type="button"
+                        onClick={copySnippet}
+                        className={`absolute top-2 right-2 flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
+                          snippetCopied ? 'bg-emerald-500 text-white' : 'bg-white/10 text-white hover:bg-white/20'
+                        }`}
+                      >
+                        {snippetCopied ? <><Check size={11} /> Zkopírováno</> : <><Copy size={11} /> Kopírovat</>}
+                      </button>
+                    </div>
+                    <p className="text-xs text-ink-faint mt-1.5">
+                      Po spuštění se zobrazí dialog "Hotovo!" a data se zkopírují do schránky.
                     </p>
                   </div>
                 </div>
 
+                {/* Step 4 — paste result */}
                 <div className="flex items-start gap-3 p-3 rounded-xl bg-surface-subtle">
                   <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[#1877F2] text-white text-xs font-bold flex items-center justify-center">4</span>
                   <div className="flex-1">
-                    <p className="text-sm font-medium text-ink mb-2">Vlož zdrojový kód sem</p>
+                    <p className="text-sm font-medium text-ink mb-2">Vlož výsledek sem (Cmd+V / Ctrl+V)</p>
                     <textarea
                       className="input font-mono text-xs resize-none"
-                      rows={6}
-                      placeholder="Vlož sem zkopírovaný zdrojový kód (Cmd+V nebo Ctrl+V)…"
-                      value={pastedHtml}
-                      onChange={e => setPastedHtml(e.target.value)}
+                      rows={4}
+                      placeholder='[{"name":"Jan Novák","url":"https://www.facebook.com/jan.novak","count":1},...]'
+                      value={pastedJson}
+                      onChange={e => setPastedJson(e.target.value)}
                       required
                     />
-                    {pastedHtml && (
-                      <p className="text-[11px] text-emerald-600 mt-1">
-                        ✓ {pastedHtml.length.toLocaleString()} znaků vloženo
-                      </p>
+                    {pastedJson.trim().startsWith('[') && (
+                      <p className="text-[11px] text-emerald-600 mt-1">✓ Vypadá dobře</p>
                     )}
                   </div>
                 </div>
@@ -265,37 +287,22 @@ export default function FacebookFinderPage() {
             </div>
 
             {error && (
-              <div className="rounded-xl bg-red-50 border border-red-200 text-red-700 px-4 py-3 text-sm">
-                {error}
-              </div>
+              <div className="rounded-xl bg-red-50 border border-red-200 text-red-700 px-4 py-3 text-sm">{error}</div>
             )}
 
             <div className="flex gap-3">
-              <button
-                type="submit"
-                disabled={loading || !pastedHtml.trim()}
+              <button type="submit" disabled={loading || !pastedJson.trim()}
                 className="h-[42px] px-6 rounded-xl font-semibold text-sm text-white flex items-center gap-2 disabled:opacity-50"
-                style={{ backgroundColor: '#1877F2' }}
-              >
+                style={{ backgroundColor: '#1877F2' }}>
                 {loading ? (
-                  <>
-                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-                    </svg>
-                    Analyzuji…
-                  </>
-                ) : (
-                  <><Search size={15} /> Najít lidi bez webu</>
-                )}
+                  <><svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                  </svg> Analyzuji…</>
+                ) : <><Search size={15} /> Najít lidi bez webu</>}
               </button>
-              <button
-                type="button"
-                onClick={() => { setStep('url'); setPastedHtml(''); setError(''); }}
-                className="btn-outline h-[42px]"
-              >
-                ← Zpět
-              </button>
+              <button type="button" onClick={() => { setStep('url'); setPastedJson(''); setError(''); }}
+                className="btn-outline h-[42px]">← Zpět</button>
             </div>
           </form>
         )}
@@ -311,7 +318,7 @@ export default function FacebookFinderPage() {
                 </p>
               </div>
               <button
-                onClick={() => { setStep('url'); setLeads([]); setPastedHtml(''); setGroupUrl(''); }}
+                onClick={() => { setStep('url'); setLeads([]); setPastedJson(''); setGroupUrl(''); }}
                 className="btn-outline btn-sm"
               >
                 Nové hledání

@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { verifyToken } from '@/lib/auth';
-import { parseGroupHtml, type ScrapeResult } from '@/lib/facebook-scraper';
+import { parseGroupHtml, parseGroupData, type ScrapeResult } from '@/lib/facebook-scraper';
 
 export const maxDuration = 30;
 
-const Schema = z.object({
-  html: z.string().min(100),
-});
+const Schema = z.union([
+  z.object({ html: z.string().min(100) }),
+  z.object({ data: z.array(z.object({ name: z.string(), url: z.string(), count: z.number().optional() })) }),
+]);
 
 export async function POST(req: NextRequest) {
   try {
@@ -16,9 +17,12 @@ export async function POST(req: NextRequest) {
     verifyToken(token);
 
     const body = await req.json();
-    const { html } = Schema.parse(body);
+    const parsed = Schema.parse(body);
 
-    const result: ScrapeResult = await parseGroupHtml(html);
+    const result: ScrapeResult = 'data' in parsed
+      ? await parseGroupData(parsed.data)
+      : await parseGroupHtml(parsed.html);
+
     return NextResponse.json(result);
   } catch (err) {
     if (err instanceof z.ZodError) {

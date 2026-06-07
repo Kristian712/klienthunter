@@ -174,6 +174,25 @@ async function checkWebsite(fbUrl: string): Promise<{ hasWebsite: boolean; websi
   }
 }
 
+// Parse pre-extracted JSON data (from browser console snippet)
+export async function parseGroupData(
+  data: Array<{ name: string; url: string; count?: number }>
+): Promise<ScrapeResult> {
+  if (!data.length) return { leads: [], error: 'Žádná data k zpracování.' };
+
+  const sorted = [...data].sort((a, b) => (b.count ?? 1) - (a.count ?? 1)).slice(0, 30);
+  const leads: FbLead[] = [];
+
+  for (const item of sorted) {
+    if (!isValidName(item.name)) continue;
+    const fbUrl = hrefToProfileUrl(item.url) ?? item.url;
+    const { hasWebsite, website } = await checkWebsite(fbUrl);
+    leads.push({ name: item.name, facebookPageUrl: fbUrl, hasWebsite, website, postCount: item.count ?? 1 });
+  }
+
+  return { leads: leads.filter(l => !l.hasWebsite), total: data.length };
+}
+
 export async function parseGroupHtml(html: string): Promise<ScrapeResult> {
   const authors = extractAuthors(html);
 
