@@ -288,10 +288,10 @@ export default function ProfilePage() {
                 <ol className="space-y-1 text-blue-700 text-xs list-decimal list-inside">
                   <li>Otevři <strong>facebook.com</strong> v Chrome a přihlas se</li>
                   <li>Otevři DevTools: <strong>Mac:</strong> Cmd+Option+I &nbsp;|&nbsp; <strong>Windows:</strong> F12</li>
-                  <li>Klikni na záložku <strong>Application</strong></li>
-                  <li>Vlevo rozbal: <strong>Cookies → https://www.facebook.com</strong></li>
-                  <li>Najdi řádek <strong>c_user</strong> → klikni na něj → zkopíruj hodnotu ze sloupce Value</li>
-                  <li>Najdi řádek <strong>xs</strong> → klikni na něj → zkopíruj hodnotu ze sloupce Value</li>
+                  <li>V liště záložek (Elements, Console…) klikni na <strong>&raquo;</strong> úplně vpravo — tam je skrytá záložka <strong>Application</strong></li>
+                  <li>Vlevo v panelu klikni na <strong>Cookies</strong> → <strong>https://www.facebook.com</strong></li>
+                  <li>V tabulce najdi řádek <strong>c_user</strong> → klikni na hodnotu ve sloupci <em>Value</em> → Ctrl+A, Ctrl+C</li>
+                  <li>Stejně zkopíruj hodnotu řádku <strong>xs</strong></li>
                 </ol>
                 <p className="text-[11px] text-blue-600 mt-2">
                   ⚠️ Doporučujeme použít vedlejší FB účet. Cookies expirují za ~90 dní.
