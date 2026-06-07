@@ -81,17 +81,23 @@ function MessageBox({ lead }: { lead: FbLead }) {
 export default function FacebookFinderPage() {
   const locale = useLocale();
 
-  const [niche, setNiche]             = useState('');
-  const [location, setLocation]       = useState('');
+  const [groupInput, setGroupInput]   = useState('');
   const [leads, setLeads]             = useState<FbLead[]>([]);
   const [loading, setLoading]         = useState(false);
   const [error, setError]             = useState('');
   const [hasSearched, setHasSearched] = useState(false);
+  const [cookiesSet, setCookiesSet]   = useState<boolean | null>(null);
+
+  // Check if FB cookies are configured
+  useState(() => {
+    fetch('/api/profile/facebook-cookies')
+      .then(r => r.json())
+      .then(d => setCookiesSet(d.connected ?? false));
+  });
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    const query = [niche.trim(), location.trim()].filter(Boolean).join(' ');
-    if (!query) return;
+    if (!groupInput.trim()) return;
     setLoading(true);
     setError('');
     setLeads([]);
@@ -100,11 +106,11 @@ export default function FacebookFinderPage() {
       const res = await fetch('/api/facebook-groups', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ groupInput: query }),
+        body: JSON.stringify({ groupInput: groupInput.trim() }),
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(res.status === 401 ? 'Přihlaste se prosím.' : data.error || 'Chyba při hledání.');
+        setError(res.status === 401 ? 'Přihlaste se prosím.' : data.error || 'Chyba.');
         return;
       }
       if (data.error) { setError(data.error); return; }
@@ -134,32 +140,38 @@ export default function FacebookFinderPage() {
 
       <div className="max-w-4xl mx-auto px-4 py-6">
 
+        {/* ── Cookies missing banner ── */}
+        {cookiesSet === false && (
+          <div className="rounded-xl bg-yellow-50 border border-yellow-200 px-4 py-3 mb-5 flex items-center justify-between gap-3">
+            <p className="text-sm text-yellow-800">
+              Pro vyhledávání v Facebook skupinách je potřeba nastavit <strong>Facebook cookies</strong>.
+            </p>
+            <a href={`/${locale}/profile`} className="shrink-0 text-xs font-semibold text-yellow-800 underline underline-offset-2">
+              Nastavit v Profilu →
+            </a>
+          </div>
+        )}
+
         {/* ── Search form ── */}
         <form onSubmit={handleSearch} className="card mb-6">
-          <div className="grid sm:grid-cols-5 gap-3 items-end">
-            <div className="sm:col-span-2">
-              <label className="label"><FbIcon /> Obor / profese</label>
+          <div className="flex gap-3 items-end">
+            <div className="flex-1">
+              <label className="label"><FbIcon /> Odkaz nebo název skupiny</label>
               <input
                 className="input"
-                placeholder="instalatér, kadeřník, malíř…"
-                value={niche}
-                onChange={e => setNiche(e.target.value)}
+                placeholder="facebook.com/groups/nazevskupiny"
+                value={groupInput}
+                onChange={e => setGroupInput(e.target.value)}
                 required
               />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="label">Město / region</label>
-              <input
-                className="input"
-                placeholder="Praha, Brno, Ostrava…"
-                value={location}
-                onChange={e => setLocation(e.target.value)}
-              />
+              <p className="text-[11px] text-ink-faint mt-1.5">
+                Funguje pro skupiny, do kterých máš přístup přes svůj Facebook účet.
+              </p>
             </div>
             <button
               type="submit"
-              disabled={loading || !niche.trim()}
-              className="h-[42px] px-5 rounded-xl font-semibold text-sm text-white flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+              disabled={loading || !groupInput.trim() || cookiesSet === false}
+              className="shrink-0 h-[42px] px-5 rounded-xl font-semibold text-sm text-white flex items-center gap-2 transition-all disabled:opacity-50"
               style={{ backgroundColor: '#1877F2' }}
             >
               {loading ? (
@@ -168,7 +180,7 @@ export default function FacebookFinderPage() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
                   </svg>
-                  Hledám…
+                  Načítám…
                 </>
               ) : (
                 <><Search size={15} /> Hledat</>
@@ -182,7 +194,7 @@ export default function FacebookFinderPage() {
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
               </svg>
-              Hledám Facebook stránky a kontroluji weby… může trvat 30–60 sekund.
+              Načítám členy skupiny a kontroluji profily… může trvat 30–60 sekund.
             </div>
           )}
         </form>
@@ -289,9 +301,9 @@ export default function FacebookFinderPage() {
             <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-[#1877F2]/10 mx-auto mb-4">
               <FbIcon size={28} />
             </div>
-            <p className="font-medium text-ink-muted mb-1">Zadej obor a město výše</p>
+            <p className="font-medium text-ink-muted mb-1">Zadej odkaz na Facebook skupinu</p>
             <p className="text-sm max-w-sm mx-auto">
-              např. <strong className="text-ink">instalatér Praha</strong> nebo <strong className="text-ink">kadeřník Brno</strong> — najdeme Facebook stránky bez webu.
+              např. <strong className="text-ink">facebook.com/groups/instalateriprahaaoko</strong> — najdeme členy bez webu.
             </p>
           </div>
         )}

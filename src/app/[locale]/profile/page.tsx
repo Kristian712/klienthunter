@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
-import { Crown, Shield, User, Mail, Calendar, Search, BarChart3, Edit2, Check, X, Lock } from 'lucide-react';
+import { Crown, Shield, User, Mail, Calendar, Search, BarChart3, Edit2, Check, X, Lock, Facebook } from 'lucide-react';
 
 interface ProfileData {
   user: {
@@ -33,6 +33,11 @@ export default function ProfilePage() {
   const [toast, setToast]       = useState('');
   const [error, setError]       = useState('');
 
+  const [fbConnected, setFbConnected] = useState(false);
+  const [fbForm, setFbForm]           = useState({ cUser: '', xs: '' });
+  const [fbSaving, setFbSaving]       = useState(false);
+  const [fbOpen, setFbOpen]           = useState(false);
+
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
 
   useEffect(() => {
@@ -41,7 +46,33 @@ export default function ProfilePage() {
       setNameVal(d.user?.name ?? '');
       setLoading(false);
     });
+    fetch('/api/profile/facebook-cookies').then(r => r.json()).then(d => {
+      setFbConnected(d.connected ?? false);
+    });
   }, []);
+
+  const saveFbCookies = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFbSaving(true);
+    const res = await fetch('/api/profile/facebook-cookies', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cUser: fbForm.cUser, xs: fbForm.xs }),
+    });
+    if (res.ok) {
+      setFbConnected(true);
+      setFbForm({ cUser: '', xs: '' });
+      setFbOpen(false);
+      showToast('Facebook cookies uloženy');
+    }
+    setFbSaving(false);
+  };
+
+  const deleteFbCookies = async () => {
+    await fetch('/api/profile/facebook-cookies', { method: 'DELETE' });
+    setFbConnected(false);
+    showToast('Facebook cookies odstraněny');
+  };
 
   const saveName = async () => {
     setSaving(true);
@@ -218,6 +249,85 @@ export default function ProfilePage() {
                 </button>
               </div>
             </form>
+          )}
+        </div>
+
+        {/* Facebook Finder cookies */}
+        <div className="card">
+          <div className="flex items-center justify-between mb-1">
+            <h2 className="font-semibold text-ink flex items-center gap-2">
+              <Facebook size={16} className="text-[#1877F2]" />
+              Facebook Finder
+            </h2>
+            {fbConnected ? (
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
+                  <Check size={11} /> Připojeno
+                </span>
+                <button onClick={deleteFbCookies} className="btn-outline btn-sm text-red-600 border-red-200 hover:bg-red-50">
+                  Odebrat
+                </button>
+              </div>
+            ) : (
+              <button onClick={() => setFbOpen(v => !v)} className="btn-outline btn-sm">
+                Nastavit cookies
+              </button>
+            )}
+          </div>
+          <p className="text-xs text-ink-faint mb-3">
+            {fbConnected
+              ? 'Facebook session cookies jsou uloženy. Facebook Finder může prohledávat skupiny.'
+              : 'Pro vyhledávání v Facebook skupinách potřebujeme tvoje session cookies.'}
+          </p>
+
+          {fbOpen && !fbConnected && (
+            <>
+              {/* Step-by-step instructions */}
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4 text-sm">
+                <p className="font-semibold text-blue-800 mb-2">Jak získat cookies (30 sekund):</p>
+                <ol className="space-y-1 text-blue-700 text-xs list-decimal list-inside">
+                  <li>Otevři <strong>facebook.com</strong> v Chrome a přihlas se</li>
+                  <li>Stiskni <strong>F12</strong> (DevTools) → záložka <strong>Application</strong></li>
+                  <li>Vlevo: <strong>Cookies → https://www.facebook.com</strong></li>
+                  <li>Najdi řádek <strong>c_user</strong> → zkopíruj hodnotu ze sloupce Value</li>
+                  <li>Najdi řádek <strong>xs</strong> → zkopíruj hodnotu ze sloupce Value</li>
+                </ol>
+                <p className="text-[11px] text-blue-600 mt-2">
+                  ⚠️ Doporučujeme použít vedlejší FB účet. Cookies expirují za ~90 dní.
+                </p>
+              </div>
+
+              <form onSubmit={saveFbCookies} className="space-y-3 max-w-lg">
+                <div>
+                  <label className="label">Hodnota cookie <strong>c_user</strong></label>
+                  <input
+                    className="input font-mono text-sm"
+                    placeholder="123456789"
+                    value={fbForm.cUser}
+                    onChange={e => setFbForm(p => ({ ...p, cUser: e.target.value }))}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="label">Hodnota cookie <strong>xs</strong></label>
+                  <input
+                    className="input font-mono text-sm"
+                    placeholder="AbCdEfGhIjKl..."
+                    value={fbForm.xs}
+                    onChange={e => setFbForm(p => ({ ...p, xs: e.target.value }))}
+                    required
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <button type="submit" disabled={fbSaving} className="btn-primary btn-sm">
+                    {fbSaving ? 'Ukládám…' : 'Uložit cookies'}
+                  </button>
+                  <button type="button" onClick={() => setFbOpen(false)} className="btn-outline btn-sm">
+                    Zrušit
+                  </button>
+                </div>
+              </form>
+            </>
           )}
         </div>
 

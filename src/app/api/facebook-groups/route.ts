@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { verifyToken } from '@/lib/auth';
+import { prisma } from '@/lib/db';
 import { scrapeFacebookGroup } from '@/lib/facebook-scraper';
 
 export const maxDuration = 60;
@@ -13,14 +14,24 @@ export async function POST(req: NextRequest) {
   try {
     const token = req.cookies.get('auth-token')?.value;
     if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    verifyToken(token);
+    const payload = verifyToken(token);
 
     const body = await req.json();
     const { groupInput } = Schema.parse(body);
 
-    const result = await scrapeFacebookGroup(groupInput);
+    const user = await prisma.user.findUnique({
+      where: { id: payload.userId },
+      select: { facebookCUser: true, facebookXs: true },
+    });
 
+    if (!user?.facebookCUser || !user?.facebookXs) {
+      return NextResponse.json(
+        { error: 'Facebook cookies nejsou nastaveny. Nastav je v Profilu.' },
+        { status: 400 }
+      );
+    }
+
+    const result = await scrapeFacebookGroup(groupInput, user.facebookCUser, user.facebookXs);
     return NextResponse.json(result);
   } catch (err) {
     if (err instanceof z.ZodError) {
