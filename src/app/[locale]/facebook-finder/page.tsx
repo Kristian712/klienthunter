@@ -91,14 +91,14 @@ export default function FacebookFinderPage() {
   const [loading, setLoading]         = useState(false);
   const [error, setError]             = useState('');
 
-  // Derive mbasic URL from group input
+  // Derive group URL for page-source viewing
   useEffect(() => {
     if (!groupUrl.trim()) { setMbasicUrl(''); return; }
     let slug = groupUrl.trim()
       .replace(/^https?:\/\/(www\.|m\.|mbasic\.)?facebook\.com\/groups\//i, '')
       .replace(/^https?:\/\/fb\.com\/groups\//i, '')
       .replace(/[/?#].*$/, '');
-    setMbasicUrl(slug ? `https://mbasic.facebook.com/groups/${slug}` : '');
+    setMbasicUrl(slug ? `https://www.facebook.com/groups/${slug}` : '');
   }, [groupUrl]);
 
   const goToPaste = (e: React.FormEvent) => {
@@ -226,9 +226,9 @@ export default function FacebookFinderPage() {
                   <div>
                     <p className="text-sm font-medium text-ink">Zobraz zdrojový kód stránky</p>
                     <p className="text-xs text-ink-faint mt-0.5">
-                      <strong>Mac:</strong> Cmd+Option+U &nbsp;|&nbsp; <strong>Windows:</strong> Ctrl+U
+                      <strong>Mac:</strong> Cmd+U &nbsp;|&nbsp; <strong>Windows:</strong> Ctrl+U
                     </p>
-                    <p className="text-xs text-ink-faint">Otevře se nová záložka se zdrojovým kódem.</p>
+                    <p className="text-xs text-ink-faint">Otevře se nová záložka se zdrojovým kódem (view-source:…).</p>
                   </div>
                 </div>
 

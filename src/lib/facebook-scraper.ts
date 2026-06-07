@@ -66,12 +66,12 @@ function hrefToProfileUrl(href: string): string | null {
   return `https://www.facebook.com/${slug}`;
 }
 
-// Parse Facebook group HTML (pasted page source) and extract post authors
+// Parse Facebook group HTML/JSON (pasted page source) and extract post authors
 function extractAuthors(html: string): Map<string, { name: string; count: number }> {
   const found = new Map<string, { name: string; count: number }>();
 
   const add = (href: string, rawName: string) => {
-    const name = rawName.replace(/&amp;/g, '&').replace(/&#039;/g, "'").replace(/&quot;/g, '"').trim();
+    const name = rawName.replace(/&amp;/g, '&').replace(/&#039;/g, "'").replace(/&quot;/g, '"').replace(/\\u0026/g, '&').trim();
     if (!isValidName(name)) return;
     const url = hrefToProfileUrl(href);
     if (!url) return;
@@ -86,23 +86,44 @@ function extractAuthors(html: string): Map<string, { name: string; count: number
 
   let m: RegExpExecArray | null;
 
-  // Strategy 1: <h3> and <h4> author links (mbasic post headers)
-  const hxRe = /<h[34][^>]*>[\s\S]{0,120}<a\s+href="([^"]+)"[^>]*>([^<]{2,80})<\/a>/gi;
-  while ((m = hxRe.exec(html)) !== null) add(m[1], m[2]);
+  // ── Strategy A: regular Facebook JSON embedded in <script> tags ──
+  // Facebook embeds all post/actor data as JSON in script tags
+  // Pattern: "actor":{"__typename":"User","name":"Jan Novak","url":"https://..."}
+  // Also: "node":{"actor":{"name":...,"url":...}}
+  const actorRe = /"(?:actor|author|node_actor|owner)"\s*:\s*\{[^}]*?"name"\s*:\s*"([^"]{2,80})"[^}]*?"url"\s*:\s*"(https?:\\?\/\\?\/(?:www\.)?facebook\.com\\?\/[^"\\]{2,80})"/gi;
+  while ((m = actorRe.exec(html)) !== null) {
+    const name = m[1].replace(/\\n/g, ' ').replace(/\\/g, '');
+    const url = m[2].replace(/\\/g, '');
+    add(url, name);
+  }
 
-  // Strategy 2: <strong> author links
+  // Also try reversed order (url before name)
+  const actorRe2 = /"(?:actor|author|node_actor|owner)"\s*:\s*\{[^}]*?"url"\s*:\s*"(https?:\\?\/\\?\/(?:www\.)?facebook\.com\\?\/[^"\\]{2,80})"[^}]*?"name"\s*:\s*"([^"]{2,80})"/gi;
+  while ((m = actorRe2.exec(html)) !== null) {
+    const url = m[1].replace(/\\/g, '');
+    const name = m[2].replace(/\\n/g, ' ').replace(/\\/g, '');
+    add(url, name);
+  }
+
+  // Broader JSON pattern: any object with both "name" and a facebook.com "url"
+  const jsonPersonRe = /"name"\s*:\s*"([^"]{3,80})"(?:[^}]{0,200}?)"url"\s*:\s*"(https?:\\?\/\\?\/(?:www\.)?facebook\.com\\?\/(?:profile\.php\?id=\d+|[\w.]{3,60}))"/gi;
+  while ((m = jsonPersonRe.exec(html)) !== null) {
+    const name = m[1].replace(/\\n/g, ' ').replace(/\\/g, '');
+    const url = m[2].replace(/\\/g, '');
+    if (name.split(' ').length >= 1) add(url, name);
+  }
+
+  // ── Strategy B: HTML <a> tags (mbasic or m.facebook.com) ──
+  const h3Re = /<h[34][^>]*>[\s\S]{0,120}<a\s+href="([^"]+)"[^>]*>([^<]{2,80})<\/a>/gi;
+  while ((m = h3Re.exec(html)) !== null) add(m[1], m[2]);
+
   const strongRe = /<strong[^>]*>[\s\S]{0,60}<a\s+href="([^"]+)"[^>]*>([^<]{2,80})<\/a>/gi;
   while ((m = strongRe.exec(html)) !== null) add(m[1], m[2]);
 
-  // Strategy 3: profile.php links (numeric IDs)
   const phpRe = /<a\s+href="([^"]*profile\.php[^"]*)"[^>]*>([^<]{2,80})<\/a>/gi;
   while ((m = phpRe.exec(html)) !== null) add(m[1], m[2]);
 
-  // Strategy 4: data-ft story container author links
-  const ftRe = /data-ft="[^"]*"[\s\S]{0,300}?<a\s+href="([^"]+)"[^>]*>([^<]{3,80})<\/a>/gi;
-  while ((m = ftRe.exec(html)) !== null) add(m[1], m[2]);
-
-  // Strategy 5: broad fallback — any FB profile-looking link
+  // ── Strategy C: broad fallback ──
   if (found.size === 0) {
     const broadRe = /<a\s+href="([^"]{5,150})"[^>]*>([^<]{3,60})<\/a>/gi;
     while ((m = broadRe.exec(html)) !== null) {
@@ -111,6 +132,7 @@ function extractAuthors(html: string): Map<string, { name: string; count: number
     }
   }
 
+  console.log(`[FB parser] found ${found.size} authors in ${html.length} chars`);
   return found;
 }
 
@@ -158,7 +180,7 @@ export async function parseGroupHtml(html: string): Promise<ScrapeResult> {
   if (authors.size === 0) {
     return {
       leads: [],
-      error: 'V HTML nebyli nalezeni žádní přispěvatelé. Ujisti se, že jsi zkopíroval zdrojový kód celé stránky skupiny (Ctrl+U nebo Cmd+U).',
+      error: 'Nepodařilo se najít žádné přispěvatele. Ujisti se, že: 1) jsi otevřel stránku skupiny na www.facebook.com a jsi přihlášen, 2) zobrazil zdrojový kód (Cmd+U / Ctrl+U), 3) zkopíroval vše (Cmd+A + Cmd+C) a vložil sem.',
     };
   }
 
