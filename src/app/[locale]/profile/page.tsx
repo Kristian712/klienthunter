@@ -287,10 +287,11 @@ export default function ProfilePage() {
                 <p className="font-semibold text-blue-800 mb-2">Jak získat cookies (30 sekund):</p>
                 <ol className="space-y-1 text-blue-700 text-xs list-decimal list-inside">
                   <li>Otevři <strong>facebook.com</strong> v Chrome a přihlas se</li>
-                  <li>Stiskni <strong>F12</strong> (DevTools) → záložka <strong>Application</strong></li>
-                  <li>Vlevo: <strong>Cookies → https://www.facebook.com</strong></li>
-                  <li>Najdi řádek <strong>c_user</strong> → zkopíruj hodnotu ze sloupce Value</li>
-                  <li>Najdi řádek <strong>xs</strong> → zkopíruj hodnotu ze sloupce Value</li>
+                  <li>Otevři DevTools: <strong>Mac:</strong> Cmd+Option+I &nbsp;|&nbsp; <strong>Windows:</strong> F12</li>
+                  <li>Klikni na záložku <strong>Application</strong></li>
+                  <li>Vlevo rozbal: <strong>Cookies → https://www.facebook.com</strong></li>
+                  <li>Najdi řádek <strong>c_user</strong> → klikni na něj → zkopíruj hodnotu ze sloupce Value</li>
+                  <li>Najdi řádek <strong>xs</strong> → klikni na něj → zkopíruj hodnotu ze sloupce Value</li>
                 </ol>
                 <p className="text-[11px] text-blue-600 mt-2">
                   ⚠️ Doporučujeme použít vedlejší FB účet. Cookies expirují za ~90 dní.
