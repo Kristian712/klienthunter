@@ -51,7 +51,6 @@ function MessageBox({ lead }: { lead: FbLead }) {
         {open ? 'Skrýt zprávu' : 'Zobrazit zprávu k odeslání'}
         {open ? <ChevronUp size={13} className="ml-auto" /> : <ChevronDown size={13} className="ml-auto" />}
       </button>
-
       {open && (
         <div className="px-5 pb-4">
           <div className="relative bg-surface-subtle rounded-xl border border-ink/5 p-4">
@@ -70,7 +69,7 @@ function MessageBox({ lead }: { lead: FbLead }) {
             </button>
           </div>
           <p className="text-[11px] text-ink-faint mt-2">
-            💡 Zkopíruj a pošli přes Facebook Messenger přímo na profil.
+            💡 Zkopíruj a pošli přes Facebook Messenger.
           </p>
         </div>
       )}
@@ -78,50 +77,54 @@ function MessageBox({ lead }: { lead: FbLead }) {
   );
 }
 
+type Step = 'url' | 'paste' | 'results';
+
 export default function FacebookFinderPage() {
   const locale = useLocale();
 
-  const [groupInput, setGroupInput]   = useState('');
+  const [step, setStep]               = useState<Step>('url');
+  const [groupUrl, setGroupUrl]       = useState('');
+  const [mbasicUrl, setMbasicUrl]     = useState('');
+  const [pastedHtml, setPastedHtml]   = useState('');
   const [leads, setLeads]             = useState<FbLead[]>([]);
+  const [total, setTotal]             = useState(0);
   const [loading, setLoading]         = useState(false);
   const [error, setError]             = useState('');
-  const [hasSearched, setHasSearched] = useState(false);
-  const [cookiesSet, setCookiesSet]   = useState<boolean | null>(null);
-  const [debug, setDebug]             = useState<{htmlLen:number; htmlSample:string} | null>(null);
 
-  // Check if FB cookies are configured
+  // Derive mbasic URL from group input
   useEffect(() => {
-    fetch('/api/profile/facebook-cookies')
-      .then(r => r.json())
-      .then(d => setCookiesSet(d.connected ?? false))
-      .catch(() => setCookiesSet(false));
-  }, []);
+    if (!groupUrl.trim()) { setMbasicUrl(''); return; }
+    let slug = groupUrl.trim()
+      .replace(/^https?:\/\/(www\.|m\.|mbasic\.)?facebook\.com\/groups\//i, '')
+      .replace(/^https?:\/\/fb\.com\/groups\//i, '')
+      .replace(/[/?#].*$/, '');
+    setMbasicUrl(slug ? `https://mbasic.facebook.com/groups/${slug}` : '');
+  }, [groupUrl]);
 
-  const handleSearch = async (e: React.FormEvent) => {
+  const goToPaste = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!groupInput.trim()) return;
+    if (mbasicUrl) setStep('paste');
+  };
+
+  const analyze = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pastedHtml.trim()) return;
     setLoading(true);
     setError('');
-    setLeads([]);
-    setHasSearched(true);
     try {
       const res = await fetch('/api/facebook-groups', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ groupInput: groupInput.trim() }),
+        body: JSON.stringify({ html: pastedHtml }),
       });
       const data = await res.json();
-      if (!res.ok) {
-        setError(res.status === 401 ? 'Přihlaste se prosím.' : data.error || 'Chyba.');
+      if (!res.ok || data.error) {
+        setError(data.error || 'Chyba při analýze.');
         return;
       }
-      if (data.error) {
-        setError(data.error);
-        if (data._debug) setDebug(data._debug);
-        return;
-      }
-      setDebug(null);
       setLeads(data.leads ?? []);
+      setTotal(data.total ?? 0);
+      setStep('results');
     } finally {
       setLoading(false);
     }
@@ -130,9 +133,9 @@ export default function FacebookFinderPage() {
   return (
     <div className="min-h-screen bg-surface pt-16">
 
-      {/* ── Header ── */}
+      {/* Header */}
       <div className="border-b border-ink/5 bg-surface">
-        <div className="max-w-4xl mx-auto px-4 py-8">
+        <div className="max-w-3xl mx-auto px-4 py-8">
           <div className="flex items-center gap-3 mb-2">
             <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-[#1877F2] text-white shadow-sm">
               <FbIcon size={18} />
@@ -140,189 +143,227 @@ export default function FacebookFinderPage() {
             <h1 className="text-2xl font-bold text-ink">Facebook Finder</h1>
           </div>
           <p className="text-ink-muted text-sm">
-            Zadej obor a město — najdeme Facebook stránky podnikatelů v tomto oboru, kteří zatím nemají web.
+            Najde lidi ve Facebook skupině, kteří nemají web — ideální klienti pro tvorbu webu.
           </p>
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto px-4 py-6">
+      <div className="max-w-3xl mx-auto px-4 py-6">
 
-        {/* ── Cookies missing banner ── */}
-        {cookiesSet === false && (
-          <div className="rounded-xl bg-yellow-50 border border-yellow-200 px-4 py-3 mb-5 flex items-center justify-between gap-3">
-            <p className="text-sm text-yellow-800">
-              Pro vyhledávání v Facebook skupinách je potřeba nastavit <strong>Facebook cookies</strong>.
-            </p>
-            <a href={`/${locale}/profile`} className="shrink-0 text-xs font-semibold text-yellow-800 underline underline-offset-2">
-              Nastavit v Profilu →
-            </a>
-          </div>
-        )}
-
-        {/* ── Search form ── */}
-        <form onSubmit={handleSearch} className="card mb-6">
-          <div className="flex gap-3 items-end">
-            <div className="flex-1">
-              <label className="label"><FbIcon /> Odkaz nebo název skupiny</label>
-              <input
-                className="input"
-                placeholder="facebook.com/groups/nazevskupiny"
-                value={groupInput}
-                onChange={e => setGroupInput(e.target.value)}
-                required
-              />
-              <p className="text-[11px] text-ink-faint mt-1.5">
-                Funguje pro skupiny, do kterých máš přístup přes svůj Facebook účet.
-              </p>
+        {/* Step indicator */}
+        <div className="flex items-center gap-2 mb-6 text-xs">
+          {(['url', 'paste', 'results'] as Step[]).map((s, i) => (
+            <div key={s} className="flex items-center gap-2">
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-[10px] ${
+                step === s ? 'bg-[#1877F2] text-white' :
+                (['url','paste','results'].indexOf(step) > i) ? 'bg-emerald-500 text-white' :
+                'bg-ink/10 text-ink-faint'
+              }`}>{i + 1}</div>
+              <span className={step === s ? 'text-ink font-medium' : 'text-ink-faint'}>
+                {s === 'url' ? 'Odkaz na skupinu' : s === 'paste' ? 'Vložit zdroják' : 'Výsledky'}
+              </span>
+              {i < 2 && <span className="text-ink-faint mx-1">→</span>}
             </div>
+          ))}
+        </div>
+
+        {/* ── STEP 1: Enter group URL ── */}
+        {step === 'url' && (
+          <form onSubmit={goToPaste} className="card">
+            <h2 className="font-semibold text-ink mb-1">Krok 1 — Zadej odkaz na skupinu</h2>
+            <p className="text-sm text-ink-muted mb-4">
+              Zkopíruj URL z adresního řádku, když máš skupinu otevřenou.
+            </p>
+            <input
+              className="input mb-3"
+              placeholder="facebook.com/groups/nazevskupiny"
+              value={groupUrl}
+              onChange={e => setGroupUrl(e.target.value)}
+              required
+            />
+            {mbasicUrl && (
+              <div className="bg-surface-subtle rounded-xl px-4 py-3 mb-4 text-sm">
+                <p className="text-ink-faint text-xs mb-1">Budeme pracovat s touto adresou:</p>
+                <code className="text-brand-600 break-all text-xs">{mbasicUrl}</code>
+              </div>
+            )}
             <button
               type="submit"
-              disabled={loading || !groupInput.trim() || cookiesSet === false}
-              className="shrink-0 h-[42px] px-5 rounded-xl font-semibold text-sm text-white flex items-center gap-2 transition-all disabled:opacity-50"
+              disabled={!mbasicUrl}
+              className="h-[42px] px-5 rounded-xl font-semibold text-sm text-white flex items-center gap-2 disabled:opacity-50"
               style={{ backgroundColor: '#1877F2' }}
             >
-              {loading ? (
-                <>
-                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-                  </svg>
-                  Načítám…
-                </>
-              ) : (
-                <><Search size={15} /> Hledat</>
-              )}
+              Pokračovat →
             </button>
-          </div>
-
-          {loading && (
-            <div className="mt-4 flex items-center gap-2 text-sm text-[#1877F2] bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
-              <svg className="animate-spin h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-              </svg>
-              Načítám členy skupiny a kontroluji profily… může trvat 30–60 sekund.
-            </div>
-          )}
-        </form>
-
-        {/* ── Error ── */}
-        {error && (
-          <div className="rounded-xl bg-red-50 border border-red-200 text-red-700 px-4 py-3 text-sm mb-2">
-            {error}
-          </div>
+          </form>
         )}
 
-        {/* ── Debug info (copy & send to developer) ── */}
-        {debug && (
-          <div className="rounded-xl bg-gray-50 border border-gray-200 px-4 py-3 mb-4 text-xs text-gray-600">
-            <p className="font-semibold mb-1">Debug info (pošli vývojáři):</p>
-            <p>HTML délka: {debug.htmlLen} znaků</p>
-            <pre className="mt-2 whitespace-pre-wrap break-all bg-white border border-gray-100 rounded p-2 text-[10px] select-all max-h-48 overflow-auto">
-              {debug.htmlSample}
-            </pre>
-          </div>
-        )}
+        {/* ── STEP 2: Open + paste source ── */}
+        {step === 'paste' && (
+          <form onSubmit={analyze} className="space-y-4">
+            <div className="card">
+              <h2 className="font-semibold text-ink mb-3">Krok 2 — Otevři skupinu a zkopíruj zdrojový kód</h2>
 
-        {/* ── Results ── */}
-        {leads.length > 0 && (
-          <>
-            <div className="flex items-center gap-2 mb-4">
-              <span className="text-sm text-ink-muted">
-                Nalezeno <strong className="text-ink">{leads.length}</strong> přispěvatelů bez webu – seřazeno podle aktivity
-              </span>
-            </div>
-
-            <div className="space-y-3">
-              {leads.map((lead, i) => (
-                <div key={i} className="card p-0 overflow-hidden hover:shadow-card-hover transition-shadow">
-                  <div className="flex items-start gap-4 p-5">
-
-                    {/* Rank + activity circle */}
-                    <div className="flex flex-col items-center gap-1 shrink-0">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm ${
-                        lead.activityScore >= 80 ? 'bg-emerald-100 text-emerald-600' :
-                        lead.activityScore >= 55 ? 'bg-yellow-100 text-yellow-700' :
-                        'bg-orange-100 text-orange-600'
-                      }`}>
-                        <Zap size={16} />
-                      </div>
-                      <span className="text-[10px] text-ink-faint font-medium">#{i + 1}</span>
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      {/* Name + FB link */}
-                      <div className="flex items-start justify-between gap-2">
-                        <h3 className="font-semibold text-ink">{lead.name}</h3>
-                        <a
-                          href={lead.facebookPageUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          title="Otevřít Facebook profil"
-                          className="shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-[#1877F2]/10 text-[#1877F2] hover:bg-[#1877F2]/20 transition-colors"
-                        >
-                          <FbIcon size={11} /> Profil <ExternalLink size={10} />
-                        </a>
-                      </div>
-
-                      {/* Badges */}
-                      <div className="flex flex-wrap gap-2 mt-3 items-center">
-                        {/* No website */}
-                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">
-                          <Globe size={10} /> Bez webu
-                        </span>
-
-                        {/* Activity */}
-                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-                          lead.activityScore >= 80 ? 'bg-emerald-100 text-emerald-700' :
-                          lead.activityScore >= 55 ? 'bg-yellow-100 text-yellow-700' :
-                          'bg-orange-100 text-orange-700'
-                        }`}>
-                          <Zap size={10} /> {lead.activityLabel}
-                        </span>
-
-                        {/* Post count */}
-                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-ink/5 text-ink-muted">
-                          <Users size={10} />
-                          {lead.postCount} {lead.postCount === 1 ? 'příspěvek' : lead.postCount < 5 ? 'příspěvky' : 'příspěvků'} ve skupině
-                        </span>
-
-                        {/* Page badge */}
-                        {lead.isPage && (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-[#1877F2]/10 text-[#1877F2]">
-                            <FbIcon size={10} /> Firemní stránka
-                          </span>
-                        )}
-                      </div>
-                    </div>
+              <div className="space-y-3">
+                <div className="flex items-start gap-3 p-3 rounded-xl bg-surface-subtle">
+                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[#1877F2] text-white text-xs font-bold flex items-center justify-center">1</span>
+                  <div>
+                    <p className="text-sm font-medium text-ink">Otevři skupinu v prohlížeči</p>
+                    <a
+                      href={mbasicUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 mt-1 text-xs text-[#1877F2] hover:underline"
+                    >
+                      <ExternalLink size={11} /> {mbasicUrl}
+                    </a>
+                    <p className="text-xs text-ink-faint mt-0.5">Musíš být přihlášen a člen skupiny.</p>
                   </div>
-
-                  <MessageBox lead={lead} />
                 </div>
-              ))}
+
+                <div className="flex items-start gap-3 p-3 rounded-xl bg-surface-subtle">
+                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[#1877F2] text-white text-xs font-bold flex items-center justify-center">2</span>
+                  <div>
+                    <p className="text-sm font-medium text-ink">Zobraz zdrojový kód stránky</p>
+                    <p className="text-xs text-ink-faint mt-0.5">
+                      <strong>Mac:</strong> Cmd+Option+U &nbsp;|&nbsp; <strong>Windows:</strong> Ctrl+U
+                    </p>
+                    <p className="text-xs text-ink-faint">Otevře se nová záložka se zdrojovým kódem.</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3 p-3 rounded-xl bg-surface-subtle">
+                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[#1877F2] text-white text-xs font-bold flex items-center justify-center">3</span>
+                  <div>
+                    <p className="text-sm font-medium text-ink">Označ vše a zkopíruj</p>
+                    <p className="text-xs text-ink-faint mt-0.5">
+                      <strong>Mac:</strong> Cmd+A pak Cmd+C &nbsp;|&nbsp; <strong>Windows:</strong> Ctrl+A pak Ctrl+C
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3 p-3 rounded-xl bg-surface-subtle">
+                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[#1877F2] text-white text-xs font-bold flex items-center justify-center">4</span>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-ink mb-2">Vlož zdrojový kód sem</p>
+                    <textarea
+                      className="input font-mono text-xs resize-none"
+                      rows={6}
+                      placeholder="Vlož sem zkopírovaný zdrojový kód (Cmd+V nebo Ctrl+V)…"
+                      value={pastedHtml}
+                      onChange={e => setPastedHtml(e.target.value)}
+                      required
+                    />
+                    {pastedHtml && (
+                      <p className="text-[11px] text-emerald-600 mt-1">
+                        ✓ {pastedHtml.length.toLocaleString()} znaků vloženo
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
-          </>
+
+            {error && (
+              <div className="rounded-xl bg-red-50 border border-red-200 text-red-700 px-4 py-3 text-sm">
+                {error}
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                type="submit"
+                disabled={loading || !pastedHtml.trim()}
+                className="h-[42px] px-6 rounded-xl font-semibold text-sm text-white flex items-center gap-2 disabled:opacity-50"
+                style={{ backgroundColor: '#1877F2' }}
+              >
+                {loading ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                    </svg>
+                    Analyzuji…
+                  </>
+                ) : (
+                  <><Search size={15} /> Najít lidi bez webu</>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setStep('url'); setPastedHtml(''); setError(''); }}
+                className="btn-outline h-[42px]"
+              >
+                ← Zpět
+              </button>
+            </div>
+          </form>
         )}
 
-        {/* ── No results after search ── */}
-        {hasSearched && !loading && !error && leads.length === 0 && (
-          <div className="card text-center py-16 text-ink-faint">
-            <Users size={40} className="mx-auto mb-3 opacity-20" />
-            <p className="font-medium text-ink-muted mb-1">Žádní přispěvatelé bez webu nenalezeni</p>
-            <p className="text-sm">Zkus jinou skupinu, nebo skupina může být soukromá.</p>
-          </div>
-        )}
-
-        {/* ── Initial empty state ── */}
-        {!hasSearched && (
-          <div className="card text-center py-16 text-ink-faint border-dashed">
-            <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-[#1877F2]/10 mx-auto mb-4">
-              <FbIcon size={28} />
+        {/* ── STEP 3: Results ── */}
+        {step === 'results' && (
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <p className="text-sm text-ink-muted">
+                  Z <strong className="text-ink">{total}</strong> přispěvatelů nemá web{' '}
+                  <strong className="text-ink">{leads.length}</strong>
+                </p>
+              </div>
+              <button
+                onClick={() => { setStep('url'); setLeads([]); setPastedHtml(''); setGroupUrl(''); }}
+                className="btn-outline btn-sm"
+              >
+                Nové hledání
+              </button>
             </div>
-            <p className="font-medium text-ink-muted mb-1">Zadej odkaz na Facebook skupinu</p>
-            <p className="text-sm max-w-sm mx-auto">
-              např. <strong className="text-ink">facebook.com/groups/instalateriprahaaoko</strong> — najdeme členy bez webu.
-            </p>
+
+            {leads.length === 0 ? (
+              <div className="card text-center py-16 text-ink-faint">
+                <Users size={40} className="mx-auto mb-3 opacity-20" />
+                <p className="font-medium text-ink-muted mb-1">Všichni přispěvatelé mají web</p>
+                <p className="text-sm">Zkus jinou skupinu.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {leads.map((lead, i) => (
+                  <div key={i} className="card p-0 overflow-hidden hover:shadow-card-hover transition-shadow">
+                    <div className="flex items-start gap-4 p-5">
+                      <div className="flex flex-col items-center gap-1 shrink-0">
+                        <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-[#1877F2]/10 text-[#1877F2]">
+                          <Zap size={16} />
+                        </div>
+                        <span className="text-[10px] text-ink-faint">#{i + 1}</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <h3 className="font-semibold text-ink">{lead.name}</h3>
+                          <a
+                            href={lead.facebookPageUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-[#1877F2]/10 text-[#1877F2] hover:bg-[#1877F2]/20 transition-colors"
+                          >
+                            <FbIcon size={11} /> Profil <ExternalLink size={10} />
+                          </a>
+                        </div>
+                        <div className="flex flex-wrap gap-2 mt-3">
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">
+                            <Globe size={10} /> Bez webu
+                          </span>
+                          {lead.postCount > 1 && (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-ink/5 text-ink-muted">
+                              <Users size={10} /> {lead.postCount}× přispěl
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <MessageBox lead={lead} />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
