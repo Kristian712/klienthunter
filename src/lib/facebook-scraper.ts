@@ -12,191 +12,226 @@ export interface FbLead {
   activityLabel: string;
 }
 
-const MBASIC = 'https://mbasic.facebook.com';
-const MOBILE_UA =
-  'Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36';
+const BROWSER_UA =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
 
 function sleep(ms: number) {
   return new Promise(r => setTimeout(r, ms));
 }
 
-async function fetchMbasic(url: string): Promise<string | null> {
+// ── DDG HTML search ───────────────────────────────────────────────────────────
+
+async function ddgSearch(query: string): Promise<string | null> {
   try {
-    const res = await axios.get(url, {
-      timeout: 10_000,
-      headers: {
-        'User-Agent': MOBILE_UA,
-        Accept: 'text/html,application/xhtml+xml',
-        'Accept-Language': 'cs,sk;q=0.9,en;q=0.8',
-      },
-      maxContentLength: 1_000_000,
-      maxRedirects: 5,
-    });
+    const res = await axios.post(
+      'https://html.duckduckgo.com/html/',
+      new URLSearchParams({ q: query, kl: 'cs-cz' }).toString(),
+      {
+        headers: {
+          'User-Agent': BROWSER_UA,
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Accept: 'text/html,application/xhtml+xml',
+          'Accept-Language': 'cs,en;q=0.9',
+        },
+        timeout: 12_000,
+        maxRedirects: 3,
+      }
+    );
     return typeof res.data === 'string' ? res.data : null;
   } catch {
     return null;
   }
 }
 
-function normalizeGroupUrl(input: string): string {
-  let slug = input.trim();
-  slug = slug.replace(/^https?:\/\/(www\.|m\.|mbasic\.)?facebook\.com\/groups\//i, '');
-  slug = slug.replace(/^https?:\/\/fb\.com\/groups\//i, '');
-  slug = slug.replace(/[/?#].*$/, '');
-  return `${MBASIC}/groups/${slug}`;
+// ── Parse FB profile/page paths out of DDG result HTML ───────────────────────
+
+interface DdgResult {
+  title: string;
+  snippet: string;
+  fbPath: string; // e.g. /JanNovakInstalace or /profile.php?id=123
 }
 
-function isLoginPage(html: string): boolean {
-  return (
-    html.includes('id="login_form"') ||
-    (html.includes('name="email"') && html.includes('name="pass"')) ||
-    html.includes('/login/?next=')
-  );
+function parseDdgResults(html: string, skipGroupPath: string): DdgResult[] {
+  const results: DdgResult[] = [];
+
+  // DDG wraps links in /l/?uddg=ENCODED_URL – extract the encoded URL
+  const linkRe = /uddg=(https?%3A%2F%2F(?:www\.)?facebook\.com%2F[^&"'\s]+)/gi;
+  // Also catch plain facebook.com URLs in visible text
+  const plainRe = /(?:https?:\/\/)?(?:www\.)?facebook\.com\/([\w.]+(?:\/[\w.]+)*)/gi;
+
+  // Extract title + snippet pairs (DDG uses class="result__a" for title, result__snippet for body)
+  const blockRe = /<a[^>]+class="result__a"[^>]*>([^<]+)<\/a>[\s\S]{0,800}?<a[^>]+class="result__snippet"[^>]*>([\s\S]*?)<\/a>/gi;
+
+  // Collect result blocks
+  const blocks: { title: string; snippet: string; block: string }[] = [];
+  let bm: RegExpExecArray | null;
+  while ((bm = blockRe.exec(html)) !== null) {
+    blocks.push({
+      title: bm[1].replace(/<[^>]+>/g, '').trim(),
+      snippet: bm[2].replace(/<[^>]+>/g, '').trim(),
+      block: bm[0],
+    });
+  }
+
+  const seen = new Set<string>();
+
+  for (const { title, snippet, block } of blocks) {
+    // Try to extract FB URL from the block
+    let fbPath: string | null = null;
+
+    // Priority: uddg encoded URL
+    const um = linkRe.exec(block);
+    linkRe.lastIndex = 0;
+    if (um) {
+      try {
+        const decoded = decodeURIComponent(um[1]);
+        const u = new URL(decoded);
+        fbPath = u.pathname + (u.search || '');
+      } catch { /* skip */ }
+    }
+
+    // Fallback: plain fb URL in block text
+    if (!fbPath) {
+      const pm = plainRe.exec(block);
+      plainRe.lastIndex = 0;
+      if (pm) fbPath = '/' + pm[1];
+    }
+
+    if (!fbPath) continue;
+
+    // Normalise profile.php?id=NNN
+    if (fbPath.includes('profile.php')) {
+      const idMatch = fbPath.match(/id=(\d+)/);
+      if (idMatch) fbPath = `/profile.php?id=${idMatch[1]}`;
+      else continue;
+    } else {
+      // Keep only first path segment (the page/profile slug)
+      const parts = fbPath.replace(/\/$/, '').split('/').filter(Boolean);
+      if (parts.length === 0) continue;
+      fbPath = '/' + parts[0];
+    }
+
+    // Skip the group itself and generic FB paths
+    if (
+      fbPath === skipGroupPath ||
+      /^\/(groups|search|hashtag|pages|events|marketplace|login|register|home)$/i.test(fbPath)
+    ) continue;
+
+    if (seen.has(fbPath)) continue;
+    seen.add(fbPath);
+
+    results.push({ title, snippet, fbPath });
+  }
+
+  return results;
 }
 
-// Extract unique post authors from mbasic group feed HTML using regex
-function parseAuthors(html: string): Array<{ name: string; profilePath: string; postCount: number }> {
-  const seen = new Map<string, { name: string; profilePath: string; postCount: number }>();
+// ── Check if a person has a website via DDG ───────────────────────────────────
 
-  // mbasic renders author names in <h3><a href="...">Name</a></h3> or <strong><a href="...">Name</a></strong>
-  const patterns = [
-    /<h3[^>]*><a\s+href="([^"]+)"[^>]*>([^<]+)<\/a>/gi,
-    /<strong[^>]*><a\s+href="([^"]+)"[^>]*>([^<]+)<\/a><\/strong>/gi,
-  ];
+async function checkHasWebsite(name: string, fbPath: string): Promise<{ hasWebsite: boolean; website?: string }> {
+  // Search for the name excluding social platforms — if a real website exists, it'll surface
+  const query = `"${name}" -site:facebook.com -site:instagram.com -site:linkedin.com -site:tiktok.com`;
+  const html = await ddgSearch(query);
+  if (!html) return { hasWebsite: false };
 
-  for (const pattern of patterns) {
-    let m: RegExpExecArray | null;
-    while ((m = pattern.exec(html)) !== null) {
-      let href = m[1];
-      const name = m[2].trim();
-
-      if (!name || !href) continue;
-
-      // Decode HTML entities in href
-      href = href.replace(/&amp;/g, '&');
-
-      // Normalise: strip query params except for profile.php?id=
-      if (href.includes('profile.php')) {
-        const idMatch = href.match(/id=(\d+)/);
-        if (idMatch) href = `/profile.php?id=${idMatch[1]}`;
-        else continue;
-      } else {
-        // Keep only the path
-        try {
-          const u = href.startsWith('http') ? new URL(href) : new URL(href, 'https://mbasic.facebook.com');
-          href = u.pathname;
-        } catch {
-          href = href.replace(/\?.*$/, '').replace(/#.*$/, '');
-        }
-      }
-
-      // Skip group/search/page/hashtag paths and root
-      if (!href || href === '/' || /\/(groups|search|hashtag|pages|events|marketplace)\//i.test(href)) continue;
-      // Skip paths with only digits (group IDs)
-      if (/^\/\d+$/.test(href)) continue;
-
-      if (!seen.has(href)) {
-        seen.set(href, { name, profilePath: href, postCount: 1 });
-      } else {
-        seen.get(href)!.postCount++;
-      }
+  // Look for a result URL that isn't social and looks like a real website
+  const urlRe = /class="result__url"[^>]*>([^<]+)</gi;
+  let m: RegExpExecArray | null;
+  while ((m = urlRe.exec(html)) !== null) {
+    const url = m[1].trim().toLowerCase();
+    if (
+      url &&
+      !url.includes('facebook.com') &&
+      !url.includes('instagram.com') &&
+      !url.includes('linkedin.com') &&
+      !url.includes('twitter.com') &&
+      !url.includes('youtube.com') &&
+      url.includes('.') &&
+      url.length > 6
+    ) {
+      return { hasWebsite: true, website: url.startsWith('http') ? url : 'https://' + url };
     }
   }
 
-  return Array.from(seen.values());
+  return { hasWebsite: false };
 }
 
-// Fetch profile About page and extract website + page detection
-async function fetchProfileData(
-  profilePath: string
-): Promise<{ hasWebsite: boolean; website?: string; isPage: boolean }> {
-  const aboutUrl = `${MBASIC}${profilePath}/about`;
-  const html = await fetchMbasic(aboutUrl);
-  if (!html || isLoginPage(html)) {
-    return { hasWebsite: false, isPage: false };
-  }
+// ── Normalise group input to slug ─────────────────────────────────────────────
 
-  // Detect Facebook Pages by common page-only keywords
-  const isPage =
-    /kategorie|category|podnikání|business|page_info|fanpage/i.test(html) &&
-    !html.includes('timeline_profile_cover');
-
-  // mbasic wraps external links through l.facebook.com/l.php?u=ENCODED_URL
-  let website: string | undefined;
-  const externalLinkRe = /href="https?:\/\/(?:l|lm)\.facebook\.com\/l\.php\?u=([^"&]+)/gi;
-  let em: RegExpExecArray | null;
-  while ((em = externalLinkRe.exec(html)) !== null) {
-    try {
-      const decoded = decodeURIComponent(em[1]);
-      if (!decoded.includes('facebook.com') && decoded.startsWith('http')) {
-        website = decoded;
-        break;
-      }
-    } catch { /* ignore */ }
-  }
-
-  return { hasWebsite: Boolean(website), website, isPage };
+function extractGroupSlug(input: string): string {
+  let s = input.trim();
+  s = s.replace(/^https?:\/\/(www\.|m\.|mbasic\.)?facebook\.com\/groups\//i, '');
+  s = s.replace(/^https?:\/\/fb\.com\/groups\//i, '');
+  s = s.replace(/[/?#].*$/, '');
+  return s;
 }
 
-function activityScore(postCount: number): { score: number; label: string } {
-  if (postCount >= 5) return { score: 95, label: 'Velmi aktivní' };
-  if (postCount >= 3) return { score: 75, label: 'Aktivní' };
-  if (postCount >= 2) return { score: 55, label: 'Středně aktivní' };
-  return { score: 30, label: 'Méně aktivní' };
+function activityLabel(rank: number, total: number): { score: number; label: string } {
+  const pct = 1 - rank / total;
+  if (pct > 0.7) return { score: 90, label: 'Velmi aktivní' };
+  if (pct > 0.4) return { score: 65, label: 'Aktivní' };
+  return { score: 35, label: 'Méně aktivní' };
 }
+
+// ── Main export ───────────────────────────────────────────────────────────────
 
 export async function scrapeFacebookGroup(
   groupInput: string
 ): Promise<{ leads: FbLead[]; error?: string }> {
-  const groupUrl = normalizeGroupUrl(groupInput);
-  const html = await fetchMbasic(groupUrl);
+  const slug = extractGroupSlug(groupInput);
+  if (!slug) return { leads: [], error: 'Zadej platný odkaz nebo název skupiny.' };
 
-  if (!html) {
-    return { leads: [], error: 'Skupinu se nepodařilo načíst. Zkontroluj název nebo odkaz.' };
-  }
+  // Step 1: search DDG for posts/members in this group
+  const html = await ddgSearch(`site:facebook.com/groups/${slug}`);
+  if (!html) return { leads: [], error: 'Vyhledávání selhalo – zkus to znovu.' };
 
-  if (isLoginPage(html)) {
+  // Step 2: parse FB profiles from results
+  const groupFbPath = `/groups/${slug}`;
+  const ddgResults = parseDdgResults(html, groupFbPath);
+
+  if (ddgResults.length === 0) {
     return {
       leads: [],
-      error: 'Tato skupina je soukromá – přístup bez přihlášení není možný. Zkus veřejnou skupinu.',
+      error: 'Skupina nebyla nalezena nebo je soukromá. Zkontroluj název a ujisti se, že je skupina veřejná.',
     };
   }
 
-  const authors = parseAuthors(html);
-
-  if (authors.length === 0) {
-    return {
-      leads: [],
-      error: 'Ve skupině nebyli nalezeni žádní přispěvatelé. Skupina může být soukromá nebo prázdná.',
-    };
-  }
-
-  // Check up to 30 most active authors
-  const top = authors.sort((a, b) => b.postCount - a.postCount).slice(0, 30);
-
+  // Step 3: for each profile, check website via DDG (max 20)
+  const top = ddgResults.slice(0, 20);
   const leads: FbLead[] = [];
 
-  for (const author of top) {
-    await sleep(400);
-    const profile = await fetchProfileData(author.profilePath);
-    const { score, label } = activityScore(author.postCount);
+  for (let i = 0; i < top.length; i++) {
+    const r = top[i];
+    await sleep(600); // polite delay between DDG requests
+    const { hasWebsite, website } = await checkHasWebsite(r.title, r.fbPath);
+    const { score, label } = activityLabel(i, top.length);
+
+    // Detect if it's a Page (has a category-like snippet or business keywords)
+    const isPage = /stránka|fanpage|page|podnikání|service|services|firma|studio|salon/i.test(
+      r.snippet + r.title
+    );
 
     leads.push({
-      name: author.name,
-      profileUrl: author.profilePath,
-      facebookPageUrl: `https://www.facebook.com${author.profilePath}`,
-      hasWebsite: profile.hasWebsite,
-      website: profile.website,
-      isPage: profile.isPage,
-      postCount: author.postCount,
+      name: r.title,
+      profileUrl: r.fbPath,
+      facebookPageUrl: `https://www.facebook.com${r.fbPath}`,
+      hasWebsite,
+      website,
+      isPage,
+      postCount: 1,
       activityScore: score,
       activityLabel: label,
     });
   }
 
-  const filtered = leads
-    .filter(l => !l.hasWebsite)
-    .sort((a, b) => b.activityScore - a.activityScore);
+  const noWebsite = leads.filter(l => !l.hasWebsite);
 
-  return { leads: filtered };
+  if (noWebsite.length === 0 && leads.length > 0) {
+    return {
+      leads: [],
+      error: 'Všichni nalezení přispěvatelé pravděpodobně web mají. Zkus jinou skupinu.',
+    };
+  }
+
+  return { leads: noWebsite };
 }
