@@ -81,7 +81,8 @@ function MessageBox({ lead }: { lead: FbLead }) {
 export default function FacebookFinderPage() {
   const locale = useLocale();
 
-  const [groupInput, setGroupInput]   = useState('');
+  const [niche, setNiche]             = useState('');
+  const [location, setLocation]       = useState('');
   const [leads, setLeads]             = useState<FbLead[]>([]);
   const [loading, setLoading]         = useState(false);
   const [error, setError]             = useState('');
@@ -89,7 +90,8 @@ export default function FacebookFinderPage() {
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!groupInput.trim()) return;
+    const query = [niche.trim(), location.trim()].filter(Boolean).join(' ');
+    if (!query) return;
     setLoading(true);
     setError('');
     setLeads([]);
@@ -98,13 +100,11 @@ export default function FacebookFinderPage() {
       const res = await fetch('/api/facebook-groups', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ groupInput: groupInput.trim() }),
+        body: JSON.stringify({ groupInput: query }),
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(res.status === 401
-          ? 'Přihlaste se prosím.'
-          : data.error || 'Chyba při načítání skupiny.');
+        setError(res.status === 401 ? 'Přihlaste se prosím.' : data.error || 'Chyba při hledání.');
         return;
       }
       if (data.error) { setError(data.error); return; }
@@ -127,7 +127,7 @@ export default function FacebookFinderPage() {
             <h1 className="text-2xl font-bold text-ink">Facebook Finder</h1>
           </div>
           <p className="text-ink-muted text-sm">
-            Zadej odkaz nebo název veřejné Facebook skupiny. Aplikace najde aktivní přispěvatele, kteří nemají webové stránky – ideální potenciální klienti pro tvorbu webu.
+            Zadej obor a město — najdeme Facebook stránky podnikatelů v tomto oboru, kteří zatím nemají web.
           </p>
         </div>
       </div>
@@ -136,26 +136,30 @@ export default function FacebookFinderPage() {
 
         {/* ── Search form ── */}
         <form onSubmit={handleSearch} className="card mb-6">
-          <div className="flex gap-3 items-end">
-            <div className="flex-1">
-              <label className="label">
-                <FbIcon /> Odkaz nebo název skupiny
-              </label>
+          <div className="grid sm:grid-cols-5 gap-3 items-end">
+            <div className="sm:col-span-2">
+              <label className="label"><FbIcon /> Obor / profese</label>
               <input
                 className="input"
-                placeholder="facebook.com/groups/nazevskupiny  nebo jen nazevskupiny"
-                value={groupInput}
-                onChange={e => setGroupInput(e.target.value)}
+                placeholder="instalatér, kadeřník, malíř…"
+                value={niche}
+                onChange={e => setNiche(e.target.value)}
                 required
               />
-              <p className="text-[11px] text-ink-faint mt-1.5">
-                Funguje pouze pro veřejné skupiny. Soukromé skupiny nejsou přístupné bez přihlášení.
-              </p>
+            </div>
+            <div className="sm:col-span-2">
+              <label className="label">Město / region</label>
+              <input
+                className="input"
+                placeholder="Praha, Brno, Ostrava…"
+                value={location}
+                onChange={e => setLocation(e.target.value)}
+              />
             </div>
             <button
               type="submit"
-              disabled={loading || !groupInput.trim()}
-              className="shrink-0 h-[42px] px-5 rounded-xl font-semibold text-sm text-white flex items-center gap-2 transition-all disabled:opacity-50"
+              disabled={loading || !niche.trim()}
+              className="h-[42px] px-5 rounded-xl font-semibold text-sm text-white flex items-center justify-center gap-2 transition-all disabled:opacity-50"
               style={{ backgroundColor: '#1877F2' }}
             >
               {loading ? (
@@ -164,7 +168,7 @@ export default function FacebookFinderPage() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
                   </svg>
-                  Načítám…
+                  Hledám…
                 </>
               ) : (
                 <><Search size={15} /> Hledat</>
@@ -178,7 +182,7 @@ export default function FacebookFinderPage() {
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
               </svg>
-              Prohledávám skupinu a kontroluji profily… může trvat 30–60 sekund.
+              Hledám Facebook stránky a kontroluji weby… může trvat 30–60 sekund.
             </div>
           )}
         </form>
@@ -285,9 +289,9 @@ export default function FacebookFinderPage() {
             <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-[#1877F2]/10 mx-auto mb-4">
               <FbIcon size={28} />
             </div>
-            <p className="font-medium text-ink-muted mb-1">Zadej odkaz nebo název Facebook skupiny výše</p>
+            <p className="font-medium text-ink-muted mb-1">Zadej obor a město výše</p>
             <p className="text-sm max-w-sm mx-auto">
-              Najdeš aktivní podnikatele a živnostníky, kteří přispívají do skupiny, ale stále nemají web.
+              např. <strong className="text-ink">instalatér Praha</strong> nebo <strong className="text-ink">kadeřník Brno</strong> — najdeme Facebook stránky bez webu.
             </p>
           </div>
         )}
