@@ -8,15 +8,15 @@ import { buildGreeting } from '@/lib/czech-vocative';
 
 function generateMessage(lead: FirmyLead, query: string): string {
   const greeting = buildGreeting(lead.name);
-  return `${greeting}
+  return `${greeting} 👋
 
-viděl jsem že nabízíte ${query}, ale zákazníci vás na Googlu nenajdou.
+jsem Kristián a dělám weby na míru – moderní, rychlé a dobře vypadající na mobilu i počítači.
 
-Dělám weby přesně pro živnostníky jako jste vy – rychle, za rozumnou cenu.
+Váš záznam jsem našel na Firmy.cz – vidím že nabízíte ${query} a zatím web nemáte. Web může být váš nejlepší obchodní zástupce – pracuje 24/7 a přivádí zákazníky. Rád vám zdarma ukážu jak by mohl vypadat – bez závazků.
 
-Ukázky na webovkyvanek.cz. Měl byste zájem?
+Třeba znáte i někoho komu by se web hodil – budu za doporučení moc vděčný 🙏
 
-Kristián`;
+Kristián · https://webovkyvanek.cz/`;
 }
 
 function MessageBox({ lead, query }: { lead: FirmyLead; query: string }) {

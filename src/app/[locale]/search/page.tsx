@@ -280,38 +280,38 @@ function generateMessage(b: BusinessResult): string {
   const greeting = buildGreeting(b.name);
 
   if (!b.hasWebsite) {
-    return `${greeting}
+    return `${greeting} 👋
 
-viděl jsem vaši firmu na Google Maps – zákazníci vás hledají, ale web nemáte.
+jsem Kristián a dělám weby na míru – moderní, rychlé a dobře vypadající na mobilu i počítači.
 
-Dělám weby přesně pro živnostníky jako jste vy – rychle, za rozumnou cenu.
+Zaujalo mě, že zatím web nemáte. Web dnes může být jeden z nejlepších způsobů jak získat nové zákazníky. Rád vám zdarma ukážu jak by mohl vypadat – bez závazků.
 
-Ukázky na webovkyvanek.cz. Měl byste zájem?
+Třeba znáte i někoho komu by se web hodil – budu za doporučení moc vděčný 🙏
 
-Kristián`;
+Kristián · https://webovkyvanek.cz/`;
   }
 
   if (b.websiteIsOld) {
-    return `${greeting}
+    return `${greeting} 👋
 
-narazil jsem na váš web – myslím, že by si zasloužil osvěžení. Pomalejší načítání a starší design odvádí zákazníky.
+jsem Kristián a specializuji se na moderní weby.
 
-Dělám moderní weby pro živnostníky – rychle, za rozumnou cenu.
+Narazil jsem na váš web – myslím, že by si zasloužil osvěžení. Rychlejší načítání, aktuální design a správné zobrazení na mobilu. Rád vám zdarma ukážu jak by mohl nový vypadat – žádný závazek.
 
-Ukázky na webovkyvanek.cz. Měl byste zájem?
+Třeba znáte i někoho pro koho by nový web byl přínos – budu za doporučení moc rád 🙏
 
-Kristián`;
+Kristián · https://webovkyvanek.cz/`;
   }
 
-  return `${greeting}
+  return `${greeting} 👋
 
-narazil jsem na váš web a napadlo mě, že by mohl fungovat lépe – rychlejší načítání, modernější design, lepší zobrazení na mobilu.
+jsem Kristián a specializuji se na moderní weby.
 
-Dělám weby pro živnostníky – rychle, za rozumnou cenu.
+Narazil jsem na váš web – myslím, že by si zasloužil osvěžení. Rychlejší načítání, aktuální design a správné zobrazení na mobilu. Rád vám zdarma ukážu jak by mohl nový vypadat – žádný závazek.
 
-Ukázky na webovkyvanek.cz. Měl byste zájem?
+Třeba znáte i někoho pro koho by nový web byl přínos – budu za doporučení moc rád 🙏
 
-Kristián`;
+Kristián · https://webovkyvanek.cz/`;
 }
 
 function MessageBox({ b }: { b: BusinessResult }) {
