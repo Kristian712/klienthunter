@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useLocale } from 'next-intl';
 import {
   Search, Globe, Users, ExternalLink,
@@ -89,11 +89,12 @@ export default function FacebookFinderPage() {
   const [cookiesSet, setCookiesSet]   = useState<boolean | null>(null);
 
   // Check if FB cookies are configured
-  useState(() => {
+  useEffect(() => {
     fetch('/api/profile/facebook-cookies')
       .then(r => r.json())
-      .then(d => setCookiesSet(d.connected ?? false));
-  });
+      .then(d => setCookiesSet(d.connected ?? false))
+      .catch(() => setCookiesSet(false));
+  }, []);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
