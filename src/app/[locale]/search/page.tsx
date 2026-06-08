@@ -5,44 +5,54 @@ import { useTranslations, useLocale } from 'next-intl';
 import {
   Search, Download, Globe, Users, Star, ExternalLink,
   Phone, Mail, MapPin, SlidersHorizontal, X, Clock, ChevronDown, Check, Send,
+  FileText, Table2,
 } from 'lucide-react';
 
-// ── Regions – global ─────────────────────────────────────────────────────────
-// Top CZ regions by number of businesses without digital presence (analysis):
-// 1. Moravskoslezský – industrial tradition, low digitisation
-// 2. Jihočeský – rural, many trades & craft shops
-// 3. Ústecký – economically weaker, less digital adoption
+// ── Regions ───────────────────────────────────────────────────────────────────
 
 const REGIONS = [
-  { group: '🇨🇿 Česká republika', items: [
-    { value: 'Praha, Czech Republic',               label: 'Praha' },
-    { value: 'Ostrava, Moravskoslezský kraj',        label: 'Ostrava / Moravskoslezský kraj' },
-    { value: 'České Budějovice, Jihočeský kraj',     label: 'Č. Budějovice / Jihočeský kraj' },
-    { value: 'Ústí nad Labem, Ústecký kraj',         label: 'Ústí nad Labem / Ústecký kraj' },
-    { value: 'Brno, Czech Republic',                 label: 'Brno' },
+  { group: '🇨🇿 Česká republika — kraje', items: [
+    { value: 'Celá ČR',                                    label: '🗺️ Celá ČR (všechny kraje)' },
+    { value: 'Praha, Czech Republic',                      label: 'Praha (Hlavní město Praha)' },
+    { value: 'Středočeský kraj, Czech Republic',           label: 'Středočeský kraj' },
+    { value: 'České Budějovice, Jihočeský kraj',           label: 'Jihočeský kraj' },
+    { value: 'Plzeň, Plzeňský kraj',                       label: 'Plzeňský kraj' },
+    { value: 'Karlovy Vary, Karlovarský kraj',             label: 'Karlovarský kraj' },
+    { value: 'Ústí nad Labem, Ústecký kraj',               label: 'Ústecký kraj' },
+    { value: 'Liberec, Liberecký kraj',                    label: 'Liberecký kraj' },
+    { value: 'Hradec Králové, Královéhradecký kraj',       label: 'Královéhradecký kraj' },
+    { value: 'Pardubice, Pardubický kraj',                 label: 'Pardubický kraj' },
+    { value: 'Jihlava, Kraj Vysočina',                     label: 'Kraj Vysočina' },
+    { value: 'Brno, Jihomoravský kraj',                    label: 'Jihomoravský kraj' },
+    { value: 'Olomouc, Olomoucký kraj',                    label: 'Olomoucký kraj' },
+    { value: 'Zlín, Zlínský kraj',                         label: 'Zlínský kraj' },
+    { value: 'Ostrava, Moravskoslezský kraj',              label: 'Moravskoslezský kraj' },
   ]},
-  { group: '🇸🇰 Slovensko', items: [
-    { value: 'Bratislava, Slovakia',  label: 'Bratislava' },
-    { value: 'Košice, Slovakia',      label: 'Košice' },
-    { value: 'Žilina, Slovakia',      label: 'Žilina' },
-    { value: 'Banská Bystrica, Slovakia', label: 'Banská Bystrica' },
-    { value: 'Prešov, Slovakia',      label: 'Prešov' },
+  { group: '🇸🇰 Slovensko — kraje', items: [
+    { value: 'Bratislava, Slovakia',                       label: 'Bratislavský kraj' },
+    { value: 'Trnava, Slovakia',                           label: 'Trnavský kraj' },
+    { value: 'Trenčín, Slovakia',                          label: 'Trenčianský kraj' },
+    { value: 'Nitra, Slovakia',                            label: 'Nitrianský kraj' },
+    { value: 'Žilina, Slovakia',                           label: 'Žilinský kraj' },
+    { value: 'Banská Bystrica, Slovakia',                  label: 'Banskobystrický kraj' },
+    { value: 'Prešov, Slovakia',                           label: 'Prešovský kraj' },
+    { value: 'Košice, Slovakia',                           label: 'Košický kraj' },
   ]},
   { group: '🇩🇪 Německo', items: [
-    { value: 'Berlin, Germany',  label: 'Berlín' },
-    { value: 'Munich, Germany',  label: 'Mnichov' },
-    { value: 'Hamburg, Germany', label: 'Hamburg' },
-    { value: 'Frankfurt, Germany', label: 'Frankfurt' },
+    { value: 'Berlin, Germany',   label: 'Berlín' },
+    { value: 'Munich, Germany',   label: 'Mnichov' },
+    { value: 'Hamburg, Germany',  label: 'Hamburg' },
+    { value: 'Frankfurt, Germany',label: 'Frankfurt' },
   ]},
   { group: '🇦🇹 Rakousko', items: [
-    { value: 'Vienna, Austria', label: 'Vídeň' },
-    { value: 'Graz, Austria',   label: 'Graz' },
-    { value: 'Linz, Austria',   label: 'Linz' },
+    { value: 'Vienna, Austria',   label: 'Vídeň' },
+    { value: 'Graz, Austria',     label: 'Graz' },
+    { value: 'Linz, Austria',     label: 'Linz' },
   ]},
   { group: '🇬🇧 Velká Británie', items: [
-    { value: 'London, UK',     label: 'Londýn' },
-    { value: 'Manchester, UK', label: 'Manchester' },
-    { value: 'Birmingham, UK', label: 'Birmingham' },
+    { value: 'London, UK',        label: 'Londýn' },
+    { value: 'Manchester, UK',    label: 'Manchester' },
+    { value: 'Birmingham, UK',    label: 'Birmingham' },
   ]},
   { group: '🇺🇸 USA', items: [
     { value: 'New York, USA',     label: 'New York' },
@@ -51,110 +61,187 @@ const REGIONS = [
     { value: 'Houston, USA',      label: 'Houston' },
   ]},
   { group: '🇵🇱 Polsko', items: [
-    { value: 'Warsaw, Poland',  label: 'Varšava' },
-    { value: 'Krakow, Poland',  label: 'Krakov' },
-    { value: 'Wroclaw, Poland', label: 'Wroclaw' },
+    { value: 'Warsaw, Poland',    label: 'Varšava' },
+    { value: 'Krakow, Poland',    label: 'Krakov' },
+    { value: 'Wroclaw, Poland',   label: 'Wroclaw' },
   ]},
 ];
 
-// Each industry has a search value (English, for Google Places API)
-// and labels per locale
+// ── Industries ────────────────────────────────────────────────────────────────
+
 const INDUSTRIES: Record<string, { group: string; items: { value: string; label: string }[] }[]> = {
   cs: [
     { group: '🔧 Řemesla', items: [
-      { value: 'plumber',      label: 'Instalatér' },
-      { value: 'electrician',  label: 'Elektrikář' },
-      { value: 'carpenter',    label: 'Tesař / Truhlář' },
-      { value: 'painter',      label: 'Malíř pokojů' },
-      { value: 'roofer',       label: 'Pokrývač' },
-      { value: 'landscaper',   label: 'Zahradník' },
+      { value: 'plumber',          label: 'Instalatér' },
+      { value: 'electrician',      label: 'Elektrikář' },
+      { value: 'carpenter',        label: 'Tesař / Truhlář' },
+      { value: 'painter',          label: 'Malíř pokojů' },
+      { value: 'roofer',           label: 'Pokrývač' },
+      { value: 'landscaper',       label: 'Zahradník' },
+      { value: 'locksmith',        label: 'Zámečník' },
+      { value: 'glazier',          label: 'Sklenář' },
+      { value: 'chimney sweep',    label: 'Kominík' },
     ]},
     { group: '🍕 Jídlo & pití', items: [
-      { value: 'restaurant',   label: 'Restaurace' },
-      { value: 'cafe',         label: 'Kavárna' },
-      { value: 'bakery',       label: 'Pekárna' },
-      { value: 'butcher shop', label: 'Řeznictví' },
+      { value: 'restaurant',       label: 'Restaurace' },
+      { value: 'cafe',             label: 'Kavárna' },
+      { value: 'bakery',           label: 'Pekárna' },
+      { value: 'butcher shop',     label: 'Řeznictví' },
     ]},
-    { group: '💇 Krása', items: [
-      { value: 'hair salon',    label: 'Kadeřnictví' },
-      { value: 'beauty salon',  label: 'Kosmetický salon' },
-      { value: 'nail studio',   label: 'Nehtové studio' },
-      { value: 'massage',       label: 'Masáže' },
+    { group: '💇 Krása & wellness', items: [
+      { value: 'hair salon',       label: 'Kadeřnictví' },
+      { value: 'beauty salon',     label: 'Kosmetický salon' },
+      { value: 'nail studio',      label: 'Nehtové studio' },
+      { value: 'massage',          label: 'Masáže' },
+      { value: 'yoga studio',      label: 'Jóga studio' },
     ]},
     { group: '🚗 Auto', items: [
-      { value: 'car repair',    label: 'Autoservis' },
-      { value: 'tire shop',     label: 'Pneuservis' },
+      { value: 'car repair',       label: 'Autoservis' },
+      { value: 'tire shop',        label: 'Pneuservis' },
     ]},
-    { group: '📋 Služby', items: [
-      { value: 'accountant',    label: 'Účetní' },
-      { value: 'photographer',  label: 'Fotograf' },
+    { group: '🏥 Zdravotnictví', items: [
+      { value: 'general practitioner', label: 'Praktický lékař' },
+      { value: 'dentist',          label: 'Zubař' },
+      { value: 'physiotherapist',  label: 'Fyzioterapeut' },
+      { value: 'pharmacy',         label: 'Lékárna' },
+      { value: 'optician',         label: 'Optika' },
+      { value: 'veterinarian',     label: 'Veterinář' },
+    ]},
+    { group: '⚖️ Právní & finance', items: [
+      { value: 'lawyer',           label: 'Právník / Advokát' },
+      { value: 'accountant',       label: 'Účetní' },
+      { value: 'real estate agency', label: 'Realitní kancelář' },
+    ]},
+    { group: '🎓 Vzdělávání & sport', items: [
+      { value: 'driving school',   label: 'Autoškola' },
+      { value: 'language school',  label: 'Jazyková škola' },
+      { value: 'gym',              label: 'Fitness centrum' },
+      { value: 'personal trainer', label: 'Osobní trenér' },
+    ]},
+    { group: '📋 Ostatní služby', items: [
+      { value: 'photographer',     label: 'Fotograf' },
       { value: 'cleaning service', label: 'Úklid' },
-      { value: 'veterinarian',  label: 'Veterinář' },
+      { value: 'florist',          label: 'Květinářství' },
+      { value: 'tailor',           label: 'Krejčí' },
     ]},
   ],
   sk: [
     { group: '🔧 Remeslá', items: [
-      { value: 'plumber',      label: 'Inštalatér' },
-      { value: 'electrician',  label: 'Elektrikár' },
-      { value: 'carpenter',    label: 'Tesár / Stolár' },
-      { value: 'painter',      label: 'Maliar' },
-      { value: 'roofer',       label: 'Pokrývač' },
-      { value: 'landscaper',   label: 'Záhradník' },
+      { value: 'plumber',          label: 'Inštalatér' },
+      { value: 'electrician',      label: 'Elektrikár' },
+      { value: 'carpenter',        label: 'Tesár / Stolár' },
+      { value: 'painter',          label: 'Maliar' },
+      { value: 'roofer',           label: 'Pokrývač' },
+      { value: 'landscaper',       label: 'Záhradník' },
+      { value: 'locksmith',        label: 'Zámočník' },
     ]},
     { group: '🍕 Jedlo & pitie', items: [
-      { value: 'restaurant',   label: 'Reštaurácia' },
-      { value: 'cafe',         label: 'Kaviareň' },
-      { value: 'bakery',       label: 'Pekáreň' },
-      { value: 'butcher shop', label: 'Mäsiarstvo' },
+      { value: 'restaurant',       label: 'Reštaurácia' },
+      { value: 'cafe',             label: 'Kaviareň' },
+      { value: 'bakery',           label: 'Pekáreň' },
+      { value: 'butcher shop',     label: 'Mäsiarstvo' },
     ]},
-    { group: '💇 Krása', items: [
-      { value: 'hair salon',    label: 'Kaderníctvo' },
-      { value: 'beauty salon',  label: 'Kozmetický salón' },
-      { value: 'nail studio',   label: 'Nechtové štúdio' },
-      { value: 'massage',       label: 'Masáže' },
+    { group: '💇 Krása & wellness', items: [
+      { value: 'hair salon',       label: 'Kaderníctvo' },
+      { value: 'beauty salon',     label: 'Kozmetický salón' },
+      { value: 'nail studio',      label: 'Nechtové štúdio' },
+      { value: 'massage',          label: 'Masáže' },
     ]},
     { group: '🚗 Auto', items: [
-      { value: 'car repair',    label: 'Autoservis' },
-      { value: 'tire shop',     label: 'Pneuservis' },
+      { value: 'car repair',       label: 'Autoservis' },
+      { value: 'tire shop',        label: 'Pneuservis' },
     ]},
-    { group: '📋 Služby', items: [
-      { value: 'accountant',    label: 'Účtovník' },
-      { value: 'photographer',  label: 'Fotograf' },
+    { group: '🏥 Zdravotníctvo', items: [
+      { value: 'general practitioner', label: 'Praktický lekár' },
+      { value: 'dentist',          label: 'Zubár' },
+      { value: 'physiotherapist',  label: 'Fyzioterapeut' },
+      { value: 'veterinarian',     label: 'Veterinár' },
+    ]},
+    { group: '⚖️ Právne & financie', items: [
+      { value: 'lawyer',           label: 'Advokát' },
+      { value: 'accountant',       label: 'Účtovník' },
+      { value: 'real estate agency', label: 'Realitná kancelária' },
+    ]},
+    { group: '📋 Iné služby', items: [
+      { value: 'photographer',     label: 'Fotograf' },
       { value: 'cleaning service', label: 'Upratovanie' },
-      { value: 'veterinarian',  label: 'Veterinár' },
+      { value: 'gym',              label: 'Fitnescentrum' },
+      { value: 'driving school',   label: 'Autoškola' },
     ]},
   ],
   en: [
     { group: '🔧 Trades', items: [
-      { value: 'plumber',      label: 'Plumber' },
-      { value: 'electrician',  label: 'Electrician' },
-      { value: 'carpenter',    label: 'Carpenter' },
-      { value: 'painter',      label: 'Painter' },
-      { value: 'roofer',       label: 'Roofer' },
-      { value: 'landscaper',   label: 'Landscaper' },
+      { value: 'plumber',          label: 'Plumber' },
+      { value: 'electrician',      label: 'Electrician' },
+      { value: 'carpenter',        label: 'Carpenter' },
+      { value: 'painter',          label: 'Painter' },
+      { value: 'roofer',           label: 'Roofer' },
+      { value: 'landscaper',       label: 'Landscaper' },
+      { value: 'locksmith',        label: 'Locksmith' },
     ]},
     { group: '🍕 Food & drink', items: [
-      { value: 'restaurant',   label: 'Restaurant' },
-      { value: 'cafe',         label: 'Cafe' },
-      { value: 'bakery',       label: 'Bakery' },
-      { value: 'butcher shop', label: 'Butcher' },
+      { value: 'restaurant',       label: 'Restaurant' },
+      { value: 'cafe',             label: 'Cafe' },
+      { value: 'bakery',           label: 'Bakery' },
+      { value: 'butcher shop',     label: 'Butcher' },
     ]},
-    { group: '💇 Beauty', items: [
-      { value: 'hair salon',    label: 'Hair salon' },
-      { value: 'beauty salon',  label: 'Beauty salon' },
-      { value: 'nail studio',   label: 'Nail studio' },
-      { value: 'massage',       label: 'Massage' },
+    { group: '💇 Beauty & wellness', items: [
+      { value: 'hair salon',       label: 'Hair salon' },
+      { value: 'beauty salon',     label: 'Beauty salon' },
+      { value: 'nail studio',      label: 'Nail studio' },
+      { value: 'massage',          label: 'Massage' },
     ]},
     { group: '🚗 Auto', items: [
-      { value: 'car repair',    label: 'Car repair' },
-      { value: 'tire shop',     label: 'Tire shop' },
+      { value: 'car repair',       label: 'Car repair' },
+      { value: 'tire shop',        label: 'Tire shop' },
+    ]},
+    { group: '🏥 Healthcare', items: [
+      { value: 'general practitioner', label: 'GP / Doctor' },
+      { value: 'dentist',          label: 'Dentist' },
+      { value: 'physiotherapist',  label: 'Physiotherapist' },
+      { value: 'veterinarian',     label: 'Vet' },
+    ]},
+    { group: '⚖️ Legal & finance', items: [
+      { value: 'lawyer',           label: 'Lawyer' },
+      { value: 'accountant',       label: 'Accountant' },
+      { value: 'real estate agency', label: 'Real estate agency' },
     ]},
     { group: '📋 Services', items: [
-      { value: 'accountant',    label: 'Accountant' },
-      { value: 'photographer',  label: 'Photographer' },
+      { value: 'photographer',     label: 'Photographer' },
       { value: 'cleaning service', label: 'Cleaning service' },
-      { value: 'veterinarian',  label: 'Veterinarian' },
+      { value: 'gym',              label: 'Gym' },
+      { value: 'driving school',   label: 'Driving school' },
     ]},
+  ],
+};
+
+// Popular categories shown as quick chips (localized)
+const POPULAR_CHIPS: Record<string, { value: string; label: string; emoji: string }[]> = {
+  cs: [
+    { value: 'hair salon',    label: 'Kadeřnictví',  emoji: '💇' },
+    { value: 'restaurant',    label: 'Restaurace',   emoji: '🍕' },
+    { value: 'car repair',    label: 'Autoservis',   emoji: '🔧' },
+    { value: 'plumber',       label: 'Instalatér',   emoji: '🪛' },
+    { value: 'dentist',       label: 'Zubař',        emoji: '🦷' },
+    { value: 'real estate agency', label: 'Reality', emoji: '🏠' },
+    { value: 'lawyer',        label: 'Právník',      emoji: '⚖️' },
+    { value: 'electrician',   label: 'Elektrikář',   emoji: '⚡' },
+  ],
+  sk: [
+    { value: 'hair salon',    label: 'Kaderníctvo',  emoji: '💇' },
+    { value: 'restaurant',    label: 'Reštaurácia',  emoji: '🍕' },
+    { value: 'car repair',    label: 'Autoservis',   emoji: '🔧' },
+    { value: 'plumber',       label: 'Inštalatér',   emoji: '🪛' },
+    { value: 'dentist',       label: 'Zubár',        emoji: '🦷' },
+    { value: 'electrician',   label: 'Elektrikár',   emoji: '⚡' },
+  ],
+  en: [
+    { value: 'hair salon',    label: 'Hair salon',   emoji: '💇' },
+    { value: 'restaurant',    label: 'Restaurant',   emoji: '🍕' },
+    { value: 'car repair',    label: 'Car repair',   emoji: '🔧' },
+    { value: 'plumber',       label: 'Plumber',      emoji: '🪛' },
+    { value: 'dentist',       label: 'Dentist',      emoji: '🦷' },
+    { value: 'electrician',   label: 'Electrician',  emoji: '⚡' },
   ],
 };
 
@@ -180,6 +267,7 @@ interface BusinessResult {
   reviewCount: number;
   rating?: number;
   googleMapsUrl?: string;
+  source?: string;
 }
 
 interface Filters {
@@ -205,7 +293,7 @@ function match(b: BusinessResult, f: Filters): boolean {
 
 const activeCount = (f: Filters) => Object.values(f).filter(v => v !== null).length;
 
-// ── Social media icons ────────────────────────────────────────────────────────
+// ── Icons ─────────────────────────────────────────────────────────────────────
 
 function FbIcon() {
   return <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>;
@@ -232,12 +320,8 @@ function SocialLinks({ b }: { b: BusinessResult }) {
       {b.hasFacebook && (
         <a
           href={b.facebookUrl ?? `https://www.facebook.com/search/results/?q=${encodeURIComponent(b.name ?? '')}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          title="Facebook"
-          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium
-                     bg-[#1877F2]/10 text-[#1877F2] ring-1 ring-[#1877F2]/30
-                     hover:bg-[#1877F2]/20 transition-colors"
+          target="_blank" rel="noopener noreferrer" title="Facebook"
+          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-[#1877F2]/10 text-[#1877F2] ring-1 ring-[#1877F2]/30 hover:bg-[#1877F2]/20 transition-colors"
         >
           <FbIcon /> Facebook
         </a>
@@ -245,12 +329,8 @@ function SocialLinks({ b }: { b: BusinessResult }) {
       {b.hasInstagram && (
         <a
           href={b.instagramUrl ?? `https://www.instagram.com/${encodeURIComponent(b.name ?? '')}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          title="Instagram"
-          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium
-                     bg-[#E1306C]/10 text-[#E1306C] ring-1 ring-[#E1306C]/30
-                     hover:bg-[#E1306C]/20 transition-colors"
+          target="_blank" rel="noopener noreferrer" title="Instagram"
+          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-[#E1306C]/10 text-[#E1306C] ring-1 ring-[#E1306C]/30 hover:bg-[#E1306C]/20 transition-colors"
         >
           <IgIcon /> Instagram
         </a>
@@ -258,12 +338,8 @@ function SocialLinks({ b }: { b: BusinessResult }) {
       {b.hasLinkedIn && (
         <a
           href={b.linkedInUrl ?? `https://www.linkedin.com/search/results/all/?keywords=${encodeURIComponent(b.name ?? '')}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          title="LinkedIn"
-          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium
-                     bg-[#0A66C2]/10 text-[#0A66C2] ring-1 ring-[#0A66C2]/30
-                     hover:bg-[#0A66C2]/20 transition-colors"
+          target="_blank" rel="noopener noreferrer" title="LinkedIn"
+          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-[#0A66C2]/10 text-[#0A66C2] ring-1 ring-[#0A66C2]/30 hover:bg-[#0A66C2]/20 transition-colors"
         >
           <LiIcon /> LinkedIn
         </a>
@@ -271,7 +347,6 @@ function SocialLinks({ b }: { b: BusinessResult }) {
     </span>
   );
 }
-
 
 function WebsiteScoreBadge({ score, isOld, note, isCs }: { score: number; isOld: boolean; note: string; isCs: boolean }) {
   if (!score || score === 50) return null;
@@ -290,7 +365,20 @@ function WebsiteScoreBadge({ score, isOld, note, isCs }: { score: number; isOld:
   return null;
 }
 
-// ── Main component ────────────────────────────────────────────────────────────
+function SourceBadge({ source }: { source?: string }) {
+  if (source === 'firmy') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-orange-50 text-orange-600 ring-1 ring-orange-200">
+        Firmy.cz
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-50 text-blue-600 ring-1 ring-blue-200">
+      Google Maps
+    </span>
+  );
+}
 
 function SendEmailButton({ businessId, email }: { businessId: string; email: string }) {
   const [status, setStatus] = useState<'idle'|'sending'|'sent'|'error'>('idle');
@@ -321,28 +409,32 @@ function SendEmailButton({ businessId, email }: { businessId: string; email: str
   );
 }
 
+// ── Main component ────────────────────────────────────────────────────────────
+
 export default function SearchPage() {
   const t = useTranslations('search');
   const locale = useLocale();
   const isCs = locale === 'cs';
 
   const [brevoConfigured, setBrevoConfigured] = useState(false);
+  const [userPlan, setUserPlan] = useState<string>('FREE');
 
   useEffect(() => {
     fetch('/api/profile/brevo').then(r => r.json()).then(d => setBrevoConfigured(d.configured ?? false)).catch(() => {});
+    fetch('/api/auth/me').then(r => r.json()).then(d => setUserPlan(d.user?.plan ?? 'FREE')).catch(() => {});
   }, []);
 
-  const [region, setRegion]           = useState('');
-  const [customRegion, setCustomRegion] = useState('');
-  const [industry, setIndustry]       = useState('');
+  const [region, setRegion]               = useState('');
+  const [customRegion, setCustomRegion]   = useState('');
+  const [industry, setIndustry]           = useState('');
   const [customIndustry, setCustomIndustry] = useState('');
-  const [filters, setFilters]         = useState<Filters>(EMPTY);
-  const [results, setResults]         = useState<BusinessResult[]>([]);
-  const [searchId, setSearchId]       = useState<string | null>(null);
-  const [loading, setLoading]         = useState(false);
-  const [loadingMsg, setLoadingMsg]   = useState('');
-  const [error, setError]             = useState('');
-  const [hasSearched, setHasSearched] = useState(false);
+  const [filters, setFilters]             = useState<Filters>(EMPTY);
+  const [results, setResults]             = useState<BusinessResult[]>([]);
+  const [searchId, setSearchId]           = useState<string | null>(null);
+  const [loading, setLoading]             = useState(false);
+  const [loadingMsg, setLoadingMsg]       = useState('');
+  const [error, setError]                 = useState('');
+  const [hasSearched, setHasSearched]     = useState(false);
 
   const effectiveRegion   = region === '__custom__'   ? customRegion   : region;
   const effectiveIndustry = industry === '__custom__' ? customIndustry : industry;
@@ -355,8 +447,11 @@ export default function SearchPage() {
   const cnt = (key: keyof Filters, val: boolean) =>
     results.filter(b => match(b, { ...EMPTY, [key]: val })).length;
 
+  const cntBoth = () =>
+    results.filter(b => !b.hasWebsite && !b.hasFacebook && !b.hasInstagram && !b.hasLinkedIn).length;
+
   const isWholeCzech = (r: string) =>
-    ['celá čr','cela cr'].includes(r.toLowerCase().trim());
+    ['celá čr', 'cela cr', 'celá cr'].includes(r.toLowerCase().trim());
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -368,7 +463,7 @@ export default function SearchPage() {
     setHasSearched(true);
     setLoadingMsg(isWholeCzech(effectiveRegion)
       ? (isCs ? 'Prohledávám všech 14 krajů… může trvat 1–2 minuty.' : 'Searching all 14 regions… may take 1–2 min.')
-      : '');
+      : isCs ? 'Hledám firmy z Google Maps i Firmy.cz…' : 'Searching Google Maps and Firmy.cz…');
     try {
       const res = await fetch('/api/search', {
         method: 'POST',
@@ -411,13 +506,16 @@ export default function SearchPage() {
     return n;
   };
 
+  const popularChips = POPULAR_CHIPS[locale] ?? POPULAR_CHIPS.en;
+  const isPro = userPlan === 'PRO' || userPlan === 'BUSINESS';
+
   return (
     <div className="min-h-screen bg-surface pt-16">
       <div className="border-b border-ink/5 bg-surface">
         <div className="max-w-6xl mx-auto px-4 py-8">
           <h1 className="text-2xl font-bold text-ink mb-1">{t('title')}</h1>
           <p className="text-ink-muted text-sm">
-            {isCs ? 'Vyber kraj a obor, nebo zvol Celá ČR pro celostátní vyhledávání' : 'Select a region and industry to find potential clients'}
+            {isCs ? 'Vyber kraj a obor — výsledky z Google Maps i Firmy.cz' : 'Select a region and industry to find potential clients'}
           </p>
         </div>
       </div>
@@ -449,7 +547,7 @@ export default function SearchPage() {
                       ))}
                     </optgroup>
                   ))}
-                  <option value="__custom__">{isCs ? '✏️ Jiný (zadat ručně)' : '✏️ Other (type manually)'}</option>
+                  <option value="__custom__">{isCs ? '✏️ Jiné město (zadat ručně)' : '✏️ Other (type manually)'}</option>
                 </select>
                 <ChevronDown size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none" />
               </div>
@@ -471,6 +569,26 @@ export default function SearchPage() {
                 <Search size={13} className="inline mr-1" />
                 {t('industry_label')}
               </label>
+
+              {/* Popular chips */}
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {popularChips.map(chip => (
+                  <button
+                    key={chip.value}
+                    type="button"
+                    onClick={() => setIndustry(chip.value)}
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
+                      industry === chip.value
+                        ? 'bg-brand-600 text-white border-brand-600'
+                        : 'bg-white border-ink/15 text-ink-muted hover:border-brand-400 hover:text-brand-600'
+                    }`}
+                  >
+                    <span>{chip.emoji}</span>
+                    {chip.label}
+                  </button>
+                ))}
+              </div>
+
               <div className="relative">
                 <select
                   className="input appearance-none pr-9 cursor-pointer"
@@ -479,7 +597,7 @@ export default function SearchPage() {
                   required={industry !== '__custom__'}
                 >
                   <option value="">
-                    {locale === 'cs' ? '— Vyberte obor —' : locale === 'sk' ? '— Vyberte odbor —' : '— Select industry —'}
+                    {locale === 'cs' ? '— Nebo vyberte obor —' : locale === 'sk' ? '— Alebo vyberte odbor —' : '— Or select industry —'}
                   </option>
                   {(INDUSTRIES[locale] ?? INDUSTRIES.en).map(group => (
                     <optgroup key={group.group} label={group.group}>
@@ -537,7 +655,72 @@ export default function SearchPage() {
 
         {results.length > 0 && (
           <>
-            {/* ── Filters ── */}
+            {/* ── Quick filters ── */}
+            <div className="mb-4">
+              <p className="text-[11px] font-semibold text-ink-faint uppercase tracking-wider mb-2 px-1">
+                {isCs ? '⚡ Rychlé filtry' : '⚡ Quick filters'}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => setFilters(f =>
+                    f.website === false && f.social === null
+                      ? EMPTY
+                      : { ...EMPTY, website: false }
+                  )}
+                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all ${
+                    filters.website === false && filters.social === null
+                      ? 'bg-red-600 text-white border-red-600 shadow-sm'
+                      : 'bg-white border-red-200 text-red-700 hover:bg-red-50'
+                  }`}
+                >
+                  <Globe size={14} />
+                  {isCs ? 'Jen bez webu' : 'No website'}
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                    filters.website === false && filters.social === null ? 'bg-white/25 text-white' : 'bg-red-100 text-red-700'
+                  }`}>{cnt('website', false)}</span>
+                </button>
+
+                <button
+                  onClick={() => setFilters(f =>
+                    f.social === false && f.website === null
+                      ? EMPTY
+                      : { ...EMPTY, social: false }
+                  )}
+                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all ${
+                    filters.social === false && filters.website === null
+                      ? 'bg-orange-500 text-white border-orange-500 shadow-sm'
+                      : 'bg-white border-orange-200 text-orange-700 hover:bg-orange-50'
+                  }`}
+                >
+                  <Users size={14} />
+                  {isCs ? 'Jen bez soc. sítí' : 'No social media'}
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                    filters.social === false && filters.website === null ? 'bg-white/25 text-white' : 'bg-orange-100 text-orange-700'
+                  }`}>{cnt('social', false)}</span>
+                </button>
+
+                <button
+                  onClick={() => setFilters(f =>
+                    f.website === false && f.social === false
+                      ? EMPTY
+                      : { ...EMPTY, website: false, social: false }
+                  )}
+                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all ${
+                    filters.website === false && filters.social === false
+                      ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
+                      : 'bg-white border-purple-200 text-purple-700 hover:bg-purple-50'
+                  }`}
+                >
+                  <Star size={14} />
+                  {isCs ? 'Bez webu i sítí' : 'No web & no social'}
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                    filters.website === false && filters.social === false ? 'bg-white/25 text-white' : 'bg-purple-100 text-purple-700'
+                  }`}>{cntBoth()}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* ── Detailed filters ── */}
             <div className="card mb-4 p-4">
               <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
                 <div className="flex items-center gap-2">
@@ -556,10 +739,26 @@ export default function SearchPage() {
                       <X size={12} />{isCs ? 'Resetovat' : 'Reset'}
                     </button>
                   )}
+                  {/* Export buttons */}
                   {searchId && (
-                    <button onClick={() => window.open(`/api/export/${searchId}`, '_blank')} className="btn-outline btn-sm gap-1.5">
-                      <Download size={13} />{t('export_excel')}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => window.open(`/api/export/${searchId}?format=csv`, '_blank')}
+                        className="btn-outline btn-sm gap-1.5"
+                        title={isCs ? 'Exportovat do CSV (pro CRM)' : 'Export to CSV (for CRM)'}
+                      >
+                        <FileText size={13} />{isCs ? 'CSV export' : 'CSV'}
+                      </button>
+                      {isPro && (
+                        <button
+                          onClick={() => window.open(`/api/export/${searchId}`, '_blank')}
+                          className="btn-outline btn-sm gap-1.5"
+                          title={isCs ? 'Exportovat do Excelu' : 'Export to Excel'}
+                        >
+                          <Table2 size={13} />{t('export_excel')}
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
@@ -625,16 +824,25 @@ export default function SearchPage() {
                         {/* Name + maps link */}
                         <div className="flex items-start justify-between gap-2">
                           <div>
-                            <h3 className="font-semibold text-ink">{b.name}</h3>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h3 className="font-semibold text-ink">{b.name}</h3>
+                              <SourceBadge source={b.source} />
+                            </div>
                             {b.address && (
                               <p className="text-xs text-ink-faint mt-0.5 flex items-center gap-1">
                                 <MapPin size={11} />{b.address}
                               </p>
                             )}
                           </div>
-                          {b.googleMapsUrl && (
+                          {b.googleMapsUrl && b.source !== 'firmy' && (
                             <a href={b.googleMapsUrl} target="_blank" rel="noopener noreferrer"
                                className="flex-shrink-0 btn-ghost btn-sm p-1.5" title="Otevřít v Google Maps">
+                              <ExternalLink size={13} />
+                            </a>
+                          )}
+                          {b.source === 'firmy' && b.googleMapsUrl && (
+                            <a href={b.googleMapsUrl} target="_blank" rel="noopener noreferrer"
+                               className="flex-shrink-0 btn-ghost btn-sm p-1.5 text-orange-500" title="Otevřít na Firmy.cz">
                               <ExternalLink size={13} />
                             </a>
                           )}
@@ -665,21 +873,17 @@ export default function SearchPage() {
 
                         {/* Badges row */}
                         <div className="flex flex-wrap gap-2 mt-3 items-center">
-                          {/* Website */}
                           <span className={b.hasWebsite ? 'badge-green' : 'badge-red'}>
                             <Globe size={10} />
                             {b.hasWebsite ? (isCs ? 'Má web' : 'Has website') : (isCs ? 'Bez webu' : 'No website')}
                           </span>
 
-                          {/* Website quality */}
                           {b.hasWebsite && (
                             <WebsiteScoreBadge score={b.websiteScore} isOld={b.websiteIsOld} note={b.websiteAgeNote} isCs={isCs} />
                           )}
 
-                          {/* Social media – icons or "no social" badge */}
                           <SocialLinks b={b} />
 
-                          {/* Rating */}
                           {b.rating != null && (
                             <span className={(b.rating ?? 5) < 3.5 ? 'badge-red' : b.reviewCount < 10 ? 'badge-yellow' : 'badge-green'}>
                               <Star size={10} />
@@ -703,7 +907,6 @@ export default function SearchPage() {
                         </div>
                       )}
                     </div>
-
                   </div>
                 );
               })}
@@ -727,7 +930,7 @@ export default function SearchPage() {
           <div className="card text-center py-16 text-ink-faint border-dashed">
             <Search size={40} className="mx-auto mb-3 opacity-20" />
             <p className="font-medium text-ink-muted mb-1">{isCs ? 'Vyber kraj a obor výše' : 'Select region and industry above'}</p>
-            <p className="text-sm">{isCs ? 'např. Praha + Instalatér, nebo Celá ČR + Kadeřnictví' : 'e.g. London + Plumber'}</p>
+            <p className="text-sm">{isCs ? 'např. Jihomoravský kraj + Instalatér, nebo Celá ČR + Kadeřnictví' : 'e.g. London + Plumber'}</p>
           </div>
         )}
       </div>

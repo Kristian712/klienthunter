@@ -46,7 +46,6 @@ async function fetchPage(
       const firmyUrl = nameEl.attr('href') ?? '';
       if (!name || !firmyUrl) return;
 
-      // Website button: class="btn btn-black" or class="btn btn-primary"
       const webAnchor = $(el).find('a.btn-black, a[title="Web"]').first();
       const hasWebsite = webAnchor.length > 0;
       let website: string | undefined;
@@ -73,19 +72,17 @@ async function fetchPage(
 export async function searchFirmy(
   query: string,
   region: string,
+  options: { onlyNoWebsite?: boolean; maxPages?: number } = {},
 ): Promise<{ leads: FirmyLead[]; total: number; error?: string }> {
+  const { onlyNoWebsite = true, maxPages = 20 } = options;
   if (!query.trim()) return { leads: [], total: 0, error: 'Zadej obor.' };
 
-  // Fetch pages in batches to avoid overwhelming the server
-  // but stop early once we hit empty pages
-  const MAX_PAGES = 20;
   const BATCH = 5;
-
   const seen = new Set<string>();
   const all: FirmyLead[] = [];
 
-  for (let start = 1; start <= MAX_PAGES; start += BATCH) {
-    const batch = Array.from({ length: BATCH }, (_, i) => start + i).filter(p => p <= MAX_PAGES);
+  for (let start = 1; start <= maxPages; start += BATCH) {
+    const batch = Array.from({ length: BATCH }, (_, i) => start + i).filter(p => p <= maxPages);
     const results = await Promise.all(batch.map(p => fetchPage(query, region, p)));
 
     let allEmpty = true;
@@ -99,7 +96,6 @@ export async function searchFirmy(
       }
     }
 
-    // If all pages in this batch were empty, no point fetching more
     if (allEmpty && start > 1) break;
   }
 
@@ -107,6 +103,6 @@ export async function searchFirmy(
     return { leads: [], total: 0, error: 'Žádné výsledky. Zkus jiný obor nebo region.' };
   }
 
-  const noWebsite = all.filter(l => !l.hasWebsite);
-  return { leads: noWebsite, total: all.length };
+  const leads = onlyNoWebsite ? all.filter(l => !l.hasWebsite) : all;
+  return { leads, total: all.length };
 }

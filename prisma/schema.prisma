@@ -68,6 +68,7 @@ model BusinessResult {
   rating        Float?
   googleMapsUrl String?
   category      String?
+  source        String   @default("google")
   rawData       Json?
   createdAt     DateTime @default(now())
 
