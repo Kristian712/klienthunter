@@ -4,10 +4,8 @@ import { useState, useCallback, useEffect } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import {
   Search, Download, Globe, Users, Star, ExternalLink,
-  Phone, Mail, MapPin, SlidersHorizontal, X, Clock, ChevronDown,
-  Copy, Check, ChevronUp, MessageSquare, Send,
+  Phone, Mail, MapPin, SlidersHorizontal, X, Clock, ChevronDown, Check, Send,
 } from 'lucide-react';
-import { buildGreeting } from '@/lib/czech-vocative';
 
 // ── Regions – global ─────────────────────────────────────────────────────────
 // Top CZ regions by number of businesses without digital presence (analysis):
@@ -274,93 +272,6 @@ function SocialLinks({ b }: { b: BusinessResult }) {
   );
 }
 
-// ── Personalized outreach message ────────────────────────────────────────────
-
-function generateMessage(b: BusinessResult): string {
-  const greeting = buildGreeting(b.name);
-
-  if (!b.hasWebsite) {
-    return `${greeting} 👋
-
-jsem Kristián a dělám weby na míru – moderní, rychlé a dobře vypadající na mobilu i počítači.
-
-Zaujalo mě, že zatím web nemáte. Web dnes může být jeden z nejlepších způsobů jak získat nové zákazníky. Rád vám zdarma ukážu jak by mohl vypadat – bez závazků.
-
-Třeba znáte i někoho komu by se web hodil – budu za doporučení moc vděčný 🙏
-
-Kristián · https://webovkyvanek.cz/`;
-  }
-
-  if (b.websiteIsOld) {
-    return `${greeting} 👋
-
-jsem Kristián a specializuji se na moderní weby.
-
-Narazil jsem na váš web – myslím, že by si zasloužil osvěžení. Rychlejší načítání, aktuální design a správné zobrazení na mobilu. Rád vám zdarma ukážu jak by mohl nový vypadat – žádný závazek.
-
-Třeba znáte i někoho pro koho by nový web byl přínos – budu za doporučení moc rád 🙏
-
-Kristián · https://webovkyvanek.cz/`;
-  }
-
-  return `${greeting} 👋
-
-jsem Kristián a specializuji se na moderní weby.
-
-Narazil jsem na váš web – myslím, že by si zasloužil osvěžení. Rychlejší načítání, aktuální design a správné zobrazení na mobilu. Rád vám zdarma ukážu jak by mohl nový vypadat – žádný závazek.
-
-Třeba znáte i někoho pro koho by nový web byl přínos – budu za doporučení moc rád 🙏
-
-Kristián · https://webovkyvanek.cz/`;
-}
-
-function MessageBox({ b }: { b: BusinessResult }) {
-  const [open, setOpen]     = useState(false);
-  const [copied, setCopied] = useState(false);
-  const message = generateMessage(b);
-
-  const copy = useCallback(async () => {
-    await navigator.clipboard.writeText(message);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }, [message]);
-
-  return (
-    <div className="border-t border-ink/5 mt-3">
-      <button
-        onClick={() => setOpen(v => !v)}
-        className="flex items-center gap-2 w-full px-5 py-2.5 text-xs font-medium text-ink-muted hover:text-brand-600 hover:bg-brand-50/50 transition-colors"
-      >
-        <MessageSquare size={13} />
-        {open ? 'Skrýt zprávu' : 'Zobrazit zprávu k odeslání'}
-        {open ? <ChevronUp size={13} className="ml-auto" /> : <ChevronDown size={13} className="ml-auto" />}
-      </button>
-
-      {open && (
-        <div className="px-5 pb-4">
-          <div className="relative bg-surface-subtle rounded-xl border border-ink/5 p-4">
-            <pre className="text-xs text-ink-muted whitespace-pre-wrap font-sans leading-relaxed">{message}</pre>
-            <button
-              onClick={copy}
-              className={`absolute top-3 right-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                copied
-                  ? 'bg-emerald-100 text-emerald-700'
-                  : 'bg-white border border-ink/10 text-ink-muted hover:text-brand-600 hover:border-brand-300 shadow-sm'
-              }`}
-            >
-              {copied
-                ? <span className="flex items-center gap-1"><Check size={12} /> Zkopírováno!</span>
-                : <span className="flex items-center gap-1"><Copy size={12} /> Kopírovat</span>}
-            </button>
-          </div>
-          <p className="text-[11px] text-ink-faint mt-2 flex items-center gap-1">
-            💡 Zkopíruj a pošli přes kontaktní formulář, email nebo Facebook zprávu.
-          </p>
-        </div>
-      )}
-    </div>
-  );
-}
 
 function WebsiteScoreBadge({ score, isOld, note, isCs }: { score: number; isOld: boolean; note: string; isCs: boolean }) {
   if (!score || score === 50) return null;
@@ -793,8 +704,6 @@ export default function SearchPage() {
                       )}
                     </div>
 
-                    {/* Personalized outreach message */}
-                    <MessageBox b={b} />
                   </div>
                 );
               })}

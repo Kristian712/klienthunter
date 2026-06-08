@@ -1,57 +1,9 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import { useLocale } from 'next-intl';
-import { Search, Phone, MapPin, ExternalLink, Globe, ChevronDown, ChevronUp, Copy, Check, MessageSquare } from 'lucide-react';
+import { Search, Phone, MapPin, ExternalLink, Globe } from 'lucide-react';
 import type { FirmyLead } from '@/lib/firmy-scraper';
-import { buildGreeting } from '@/lib/czech-vocative';
-
-function generateMessage(lead: FirmyLead, query: string): string {
-  const greeting = buildGreeting(lead.name);
-  return `${greeting} 👋
-
-jsem Kristián a dělám weby na míru – moderní, rychlé a dobře vypadající na mobilu i počítači.
-
-Váš záznam jsem našel na Firmy.cz – vidím že nabízíte ${query} a zatím web nemáte. Web může být váš nejlepší obchodní zástupce – pracuje 24/7 a přivádí zákazníky. Rád vám zdarma ukážu jak by mohl vypadat – bez závazků.
-
-Třeba znáte i někoho komu by se web hodil – budu za doporučení moc vděčný 🙏
-
-Kristián · https://webovkyvanek.cz/`;
-}
-
-function MessageBox({ lead, query }: { lead: FirmyLead; query: string }) {
-  const [open, setOpen] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const message = generateMessage(lead, query);
-  const copy = useCallback(async () => {
-    await navigator.clipboard.writeText(message);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }, [message]);
-
-  return (
-    <div className="border-t border-ink/5">
-      <button onClick={() => setOpen(v => !v)}
-        className="flex items-center gap-2 w-full px-5 py-2.5 text-xs font-medium text-ink-muted hover:text-brand-600 hover:bg-brand-50/50 transition-colors">
-        <MessageSquare size={13} />
-        {open ? 'Skrýt zprávu' : 'Zobrazit zprávu k odeslání'}
-        {open ? <ChevronUp size={13} className="ml-auto" /> : <ChevronDown size={13} className="ml-auto" />}
-      </button>
-      {open && (
-        <div className="px-5 pb-4">
-          <div className="relative bg-surface-subtle rounded-xl border border-ink/5 p-4">
-            <pre className="text-xs text-ink-muted whitespace-pre-wrap font-sans leading-relaxed">{message}</pre>
-            <button onClick={copy}
-              className={`absolute top-3 right-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${copied ? 'bg-emerald-100 text-emerald-700' : 'bg-white border border-ink/10 text-ink-muted hover:text-brand-600 hover:border-brand-300 shadow-sm'}`}>
-              {copied ? <><Check size={12} /> Zkopírováno!</> : <><Copy size={12} /> Kopírovat</>}
-            </button>
-          </div>
-          <p className="text-[11px] text-ink-faint mt-2">💡 Zkopíruj a pošli přes email nebo kontaktní formulář.</p>
-        </div>
-      )}
-    </div>
-  );
-}
 
 export default function FirmyPage() {
   const locale = useLocale();
@@ -63,7 +15,6 @@ export default function FirmyPage() {
   const [loading, setLoading]     = useState(false);
   const [error, setError]         = useState('');
   const [hasSearched, setHasSearched] = useState(false);
-  const [lastQuery, setLastQuery] = useState('');
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,7 +23,6 @@ export default function FirmyPage() {
     setError('');
     setLeads([]);
     setHasSearched(true);
-    setLastQuery(query.trim());
     try {
       const res = await fetch('/api/firmy', {
         method: 'POST',
@@ -162,7 +112,6 @@ export default function FirmyPage() {
                       </div>
                     </div>
                   </div>
-                  <MessageBox lead={lead} query={lastQuery} />
                 </div>
               ))}
             </div>
