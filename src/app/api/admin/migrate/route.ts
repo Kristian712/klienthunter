@@ -27,6 +27,14 @@ export async function POST(req: NextRequest) {
       results.push(`InviteCode.accessDurationMinutes: ${e}`);
     }
 
+    // Add source to BusinessResult
+    try {
+      await prisma.$executeRaw`ALTER TABLE "BusinessResult" ADD COLUMN IF NOT EXISTS "source" TEXT NOT NULL DEFAULT 'google'`;
+      results.push('BusinessResult.source: OK');
+    } catch (e) {
+      results.push(`BusinessResult.source: ${e}`);
+    }
+
     return NextResponse.json({ ok: true, results });
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });
