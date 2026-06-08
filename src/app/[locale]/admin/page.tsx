@@ -7,6 +7,7 @@ import { Crown, Shield, Users, RefreshCw, Ticket, Plus, Trash2, Copy, Check, Lin
 interface AdminUser {
   id: string; email: string; name?: string;
   plan: string; isAdmin: boolean; isVip: boolean;
+  accessExpiresAt?: string | null;
   createdAt: string; _count: { searches: number };
 }
 
@@ -70,6 +71,20 @@ export default function AdminPage() {
     if (res.ok) {
       setUsers(prev => prev.map(u => u.id === user.id ? { ...u, isVip: !u.isVip } : u));
       showToast(`VIP ${!user.isVip ? (isCs ? 'přidáno' : 'granted') : (isCs ? 'odebráno' : 'revoked')}: ${user.email}`);
+    }
+    setUpdating(null);
+  };
+
+  const toggleBlock = async (user: AdminUser) => {
+    const isBlocked = user.accessExpiresAt === '1970-01-01T00:00:00.000Z' || (!!user.accessExpiresAt && new Date(user.accessExpiresAt) < new Date());
+    setUpdating(user.id + '-block');
+    const res = await fetch(`/api/admin/users/${user.id}/block`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ blocked: !isBlocked }),
+    });
+    if (res.ok) {
+      setUsers(prev => prev.map(u => u.id === user.id ? { ...u, accessExpiresAt: !isBlocked ? null : '1970-01-01T00:00:00.000Z' } : u));
+      showToast(!isBlocked ? (isCs ? `Přístup obnoven: ${user.email}` : `Access restored: ${user.email}`) : (isCs ? `Zablokováno: ${user.email}` : `Blocked: ${user.email}`));
     }
     setUpdating(null);
   };
@@ -214,10 +229,13 @@ export default function AdminPage() {
                   <th>{isCs ? 'Vyhledávání' : 'Searches'}</th>
                   <th>{isCs ? 'Registrace' : 'Joined'}</th>
                   <th>VIP</th><th>Admin</th>
+                  <th>{isCs ? 'Přístup' : 'Access'}</th>
                 </tr></thead>
                 <tbody>
-                  {users.map(user => (
-                    <tr key={user.id}>
+                  {users.map(user => {
+                    const isBlocked = !!user.accessExpiresAt && new Date(user.accessExpiresAt) < new Date();
+                    return (
+                    <tr key={user.id} className={isBlocked ? 'opacity-50' : ''}>
                       <td>
                         <div className="font-medium text-ink">{user.name || '—'}</div>
                         <div className="text-xs text-ink-faint">{user.email}</div>
@@ -239,8 +257,17 @@ export default function AdminPage() {
                           {user.isAdmin ? 'Admin' : (isCs ? 'Přidat' : 'Grant')}
                         </button>
                       </td>
+                      <td>
+                        {!user.isAdmin && (
+                          <button onClick={() => toggleBlock(user)} disabled={updating === user.id + '-block'}
+                            className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-all ${isBlocked ? 'bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/25' : 'bg-red-500/10 text-red-400 hover:bg-red-500/20'}`}>
+                            {isBlocked ? (isCs ? '✓ Odblokovat' : '✓ Unblock') : (isCs ? '✕ Zablokovat' : '✕ Block')}
+                          </button>
+                        )}
+                      </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             )}

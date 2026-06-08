@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
       select: {
         id: true, email: true, name: true,
         plan: true, isAdmin: true, isVip: true,
-        createdAt: true,
+        accessExpiresAt: true, createdAt: true,
         _count: { select: { searches: true } },
       },
       orderBy: { createdAt: 'desc' },
