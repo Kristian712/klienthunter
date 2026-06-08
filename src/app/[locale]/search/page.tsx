@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import {
-  Search, Download, Globe, Users, Star, ExternalLink,
+  Search, Globe, Users, Star, ExternalLink,
   Phone, Mail, MapPin, SlidersHorizontal, X, Clock, ChevronDown, Check, Send,
-  FileText, Table2,
+  FileText, Table2, MessageSquare, Copy,
 } from 'lucide-react';
+import { buildGreeting } from '@/lib/czech-vocative';
 
 // ── Regions ───────────────────────────────────────────────────────────────────
 
@@ -377,6 +378,101 @@ function SourceBadge({ source }: { source?: string }) {
     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-50 text-blue-600 ring-1 ring-blue-200">
       Google Maps
     </span>
+  );
+}
+
+function generateMessage(b: BusinessResult, industry: string): string {
+  const greeting = buildGreeting(b.name);
+
+  if (b.source === 'firmy' || (!b.hasWebsite && b.source !== 'google')) {
+    return `${greeting} 👋
+
+jsem Kristián a dělám weby na míru – moderní, rychlé a dobře vypadající na mobilu i počítači.
+
+Váš záznam jsem našel na Firmy.cz – vidím že nabízíte ${industry || 'vaše služby'} a zatím web nemáte. Web může být váš nejlepší obchodní zástupce – pracuje 24/7 a přivádí zákazníky. Rád vám zdarma ukážu jak by mohl vypadat – bez závazků.
+
+Třeba znáte i někoho komu by se web hodil – budu za doporučení moc vděčný 🙏
+
+Kristián · https://webovkyvanek.cz/`;
+  }
+
+  if (!b.hasWebsite) {
+    return `${greeting} 👋
+
+jsem Kristián a dělám weby na míru – moderní, rychlé a dobře vypadající na mobilu i počítači.
+
+Zaujalo mě, že zatím web nemáte. Web dnes může být jeden z nejlepších způsobů jak získat nové zákazníky. Rád vám zdarma ukážu jak by mohl vypadat – bez závazků.
+
+Třeba znáte i někoho komu by se web hodil – budu za doporučení moc vděčný 🙏
+
+Kristián · https://webovkyvanek.cz/`;
+  }
+
+  if (b.websiteIsOld) {
+    return `${greeting} 👋
+
+jsem Kristián a specializuji se na moderní weby.
+
+Narazil jsem na váš web – myslím, že by si zasloužil osvěžení. Rychlejší načítání, aktuální design a správné zobrazení na mobilu. Rád vám zdarma ukážu jak by mohl nový vypadat – žádný závazek.
+
+Třeba znáte i někoho pro koho by nový web byl přínos – budu za doporučení moc rád 🙏
+
+Kristián · https://webovkyvanek.cz/`;
+  }
+
+  return `${greeting} 👋
+
+jsem Kristián a dělám weby na míru.
+
+Zaujala mě vaše firma – rád bych vám ukázal jak by mohl vypadat moderní web, který přivádí zákazníky. Zdarma, bez závazků.
+
+Kristián · https://webovkyvanek.cz/`;
+}
+
+function MessageBox({ b, industry }: { b: BusinessResult; industry: string }) {
+  const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const msg = generateMessage(b, industry);
+
+  const copy = () => {
+    navigator.clipboard.writeText(msg).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  return (
+    <div className="mt-3 border-t border-ink/5 pt-3">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-1.5 text-xs text-ink-faint hover:text-brand-600 transition-colors font-medium"
+      >
+        <MessageSquare size={12} />
+        {open ? 'Skrýt zprávu' : 'Zobrazit zprávu pro oslovení'}
+        <ChevronDown size={12} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="mt-2 relative">
+          <textarea
+            readOnly
+            value={msg}
+            rows={8}
+            className="w-full text-xs text-ink-muted bg-surface border border-ink/10 rounded-lg p-3 resize-none font-mono leading-relaxed"
+          />
+          <button
+            onClick={copy}
+            className={`absolute top-2 right-2 flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
+              copied
+                ? 'bg-emerald-100 text-emerald-700'
+                : 'bg-white border border-ink/15 text-ink-muted hover:text-ink hover:border-ink/30'
+            }`}
+          >
+            {copied ? <><Check size={11} /> Zkopírováno</> : <><Copy size={11} /> Kopírovat</>}
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -891,6 +987,11 @@ export default function SearchPage() {
                             </span>
                           )}
                         </div>
+
+                        {/* Outreach message */}
+                        {(b.source === 'firmy' || !b.hasWebsite || b.websiteIsOld) && (
+                          <MessageBox b={b} industry={effectiveIndustry} />
+                        )}
                       </div>
 
                       {/* Issues column (desktop) */}
