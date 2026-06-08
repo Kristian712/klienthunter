@@ -10,14 +10,20 @@ export interface JWTPayload {
   plan: string;
   isAdmin: boolean;
   isVip: boolean;
+  accessExpiresAt?: string;
 }
 
 export function signToken(payload: JWTPayload): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });
+  const expiresIn = payload.accessExpiresAt ? '1h' : '7d';
+  return jwt.sign(payload, JWT_SECRET, { expiresIn });
 }
 
 export function verifyToken(token: string): JWTPayload {
-  return jwt.verify(token, JWT_SECRET) as JWTPayload;
+  const payload = jwt.verify(token, JWT_SECRET) as JWTPayload;
+  if (payload.accessExpiresAt && new Date(payload.accessExpiresAt) < new Date()) {
+    throw new Error('Access expired');
+  }
+  return payload;
 }
 
 export async function hashPassword(password: string): Promise<string> {

@@ -12,17 +12,17 @@ const intlMiddleware = createMiddleware({
 // which has its own auth. Middleware JWT decode was causing silent redirects.
 const adminPaths = ['/admin'];
 
-function decodeJWT(token: string): { userId?: string; isAdmin?: boolean } | null {
+function decodeJWT(token: string): { userId?: string; isAdmin?: boolean; accessExpiresAt?: string } | null {
   try {
     const [, payload] = token.split('.');
     if (!payload) return null;
-    // Fix base64url → base64 and add required padding
     const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
     const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, '=');
     const json = atob(padded);
     const data = JSON.parse(json);
     if (!data.userId) return null;
     if (data.exp && data.exp < Date.now() / 1000) return null;
+    if (data.accessExpiresAt && new Date(data.accessExpiresAt) < new Date()) return null;
     return data;
   } catch {
     return null;

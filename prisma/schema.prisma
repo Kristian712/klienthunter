@@ -15,6 +15,7 @@ model User {
   plan             Plan      @default(FREE)
   isAdmin          Boolean   @default(false)
   isVip            Boolean   @default(false)
+  accessExpiresAt  DateTime?
   stripeCustomerId String?
   brevoApiKey      String?
   brevoSenderEmail String?
@@ -75,14 +76,15 @@ model BusinessResult {
 }
 
 model InviteCode {
-  id        String    @id @default(cuid())
-  code      String    @unique
-  note      String?
-  createdBy String
-  usedBy    String?
-  usedAt    DateTime?
-  expiresAt DateTime?
-  createdAt DateTime  @default(now())
+  id                    String    @id @default(cuid())
+  code                  String    @unique
+  note                  String?
+  createdBy             String
+  usedBy                String?
+  usedAt                DateTime?
+  expiresAt             DateTime?
+  accessDurationMinutes Int?
+  createdAt             DateTime  @default(now())
 
   creator    User  @relation("CreatedCodes", fields: [createdBy], references: [id], onDelete: Cascade)
   usedByUser User? @relation("UsedCode",    fields: [usedBy],    references: [id], onDelete: SetNull)

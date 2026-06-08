@@ -39,14 +39,15 @@ export async function POST(req: NextRequest) {
     if (!payload.isAdmin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
     const body = await req.json().catch(() => ({}));
-    const count     = Math.min(Number(body.count) || 1, 50);
-    const note      = body.note?.trim() || null;
-    const expiresAt = body.expiresAt ? new Date(body.expiresAt) : null;
+    const count                 = Math.min(Number(body.count) || 1, 50);
+    const note                  = body.note?.trim() || null;
+    const expiresAt             = body.expiresAt ? new Date(body.expiresAt) : null;
+    const accessDurationMinutes = body.accessDurationMinutes ? Number(body.accessDurationMinutes) : null;
 
     const created = await Promise.all(
       Array.from({ length: count }, () =>
         prisma.inviteCode.create({
-          data: { code: generateCode(), note, expiresAt, createdBy: payload.userId },
+          data: { code: generateCode(), note, expiresAt, accessDurationMinutes, createdBy: payload.userId },
         })
       )
     );

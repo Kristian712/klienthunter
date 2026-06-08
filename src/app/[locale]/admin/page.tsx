@@ -14,6 +14,7 @@ interface InviteCode {
   id: string; code: string; note?: string;
   createdAt: string; expiresAt?: string;
   usedAt?: string;
+  accessDurationMinutes?: number;
   creator:    { name?: string; email: string };
   usedByUser?: { name?: string; email: string };
 }
@@ -34,6 +35,7 @@ export default function AdminPage() {
   const [genCount, setGenCount]       = useState(1);
   const [genNote, setGenNote]         = useState('');
   const [genExpiry, setGenExpiry]     = useState('');
+  const [genAccessMinutes, setGenAccessMinutes] = useState<number | ''>('');
   const [generating, setGenerating]   = useState(false);
 
   // Copy state per code
@@ -90,12 +92,12 @@ export default function AdminPage() {
     setGenerating(true);
     const res = await fetch('/api/admin/invite-codes', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ count: genCount, note: genNote || undefined, expiresAt: genExpiry || undefined }),
+      body: JSON.stringify({ count: genCount, note: genNote || undefined, expiresAt: genExpiry || undefined, accessDurationMinutes: genAccessMinutes || undefined }),
     });
     const d = await res.json();
     if (res.ok) {
       setCodes(prev => [...(d.codes ?? []), ...prev]);
-      setGenNote(''); setGenExpiry('');
+      setGenNote(''); setGenExpiry(''); setGenAccessMinutes('');
       showToast(isCs ? `${d.codes.length} kódů vygenerováno` : `${d.codes.length} codes generated`);
     }
     setGenerating(false);
@@ -254,7 +256,7 @@ export default function AdminPage() {
                 <Plus size={16} className="text-brand-600" />
                 {isCs ? 'Vygenerovat nové kódy' : 'Generate new codes'}
               </h2>
-              <form onSubmit={generateCodes} className="grid sm:grid-cols-4 gap-3 items-end">
+              <form onSubmit={generateCodes} className="grid sm:grid-cols-5 gap-3 items-end">
                 <div>
                   <label className="label">{isCs ? 'Počet kódů' : 'Number of codes'}</label>
                   <input type="number" className="input" min={1} max={50} value={genCount}
@@ -264,6 +266,12 @@ export default function AdminPage() {
                   <label className="label">{isCs ? 'Poznámka (volitelné)' : 'Note (optional)'}</label>
                   <input type="text" className="input" placeholder={isCs ? 'např. pro Petra' : 'e.g. for John'}
                     value={genNote} onChange={e => setGenNote(e.target.value)} />
+                </div>
+                <div>
+                  <label className="label">{isCs ? 'Přístup (minuty)' : 'Access (minutes)'}</label>
+                  <input type="number" className="input" min={1} placeholder={isCs ? 'např. 30' : 'e.g. 30'}
+                    value={genAccessMinutes}
+                    onChange={e => setGenAccessMinutes(e.target.value ? Number(e.target.value) : '')} />
                 </div>
                 <div>
                   <label className="label">{isCs ? 'Platnost do (volitelné)' : 'Expires (optional)'}</label>
@@ -306,6 +314,7 @@ export default function AdminPage() {
                     <th>{isCs ? 'Poznámka' : 'Note'}</th>
                     <th>{isCs ? 'Stav' : 'Status'}</th>
                     <th>{isCs ? 'Použil' : 'Used by'}</th>
+                    <th>{isCs ? 'Přístup' : 'Access'}</th>
                     <th>{isCs ? 'Platnost' : 'Expires'}</th>
                     <th>{isCs ? 'Vytvořeno' : 'Created'}</th>
                     <th>{isCs ? 'Akce' : 'Actions'}</th>
@@ -330,6 +339,11 @@ export default function AdminPage() {
                           </td>
                           <td className="text-ink-faint text-xs">
                             {c.usedByUser ? (c.usedByUser.name || c.usedByUser.email) : '—'}
+                          </td>
+                          <td className="text-ink-faint text-xs">
+                            {c.accessDurationMinutes
+                              ? <span className="text-orange-500 font-medium">{c.accessDurationMinutes} min</span>
+                              : <span>∞</span>}
                           </td>
                           <td className="text-ink-faint text-xs">
                             {c.expiresAt ? new Date(c.expiresAt).toLocaleDateString(isCs ? 'cs-CZ' : 'en-US') : '∞'}

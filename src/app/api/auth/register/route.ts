@@ -42,10 +42,15 @@ export async function POST(req: NextRequest) {
 
     const hashedPassword = await hashPassword(password);
 
+    // Calculate access expiry from invite code duration
+    const accessExpiresAt = (!isAdmin && code.accessDurationMinutes)
+      ? new Date(Date.now() + code.accessDurationMinutes * 60 * 1000)
+      : null;
+
     // ── Create user + mark code as used in a transaction ──
     const user = await prisma.$transaction(async (tx) => {
       const newUser = await tx.user.create({
-        data: { email, password: hashedPassword, name, isAdmin },
+        data: { email, password: hashedPassword, name, isAdmin, accessExpiresAt },
       });
       await tx.inviteCode.update({
         where: { id: code.id },
@@ -60,6 +65,7 @@ export async function POST(req: NextRequest) {
       plan:    user.plan,
       isAdmin: user.isAdmin,
       isVip:   user.isVip,
+      accessExpiresAt: accessExpiresAt?.toISOString(),
     });
 
     const response = NextResponse.json({
