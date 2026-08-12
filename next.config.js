@@ -4,8 +4,9 @@ const withNextIntl = createNextIntlPlugin('./src/i18n.ts');
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Žádné externí obrázky – fotky firem měl jen Google Places, který jsme kvůli licenci vypnuli.
   images: {
-    domains: ['maps.googleapis.com', 'lh3.googleusercontent.com'],
+    domains: [],
   },
   experimental: {
     serverComponentsExternalPackages: ['cheerio', 'undici'],

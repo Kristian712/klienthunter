@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Target, Mail, Lock, User, ArrowRight, CheckCircle2, Ticket } from 'lucide-react';
+import { Mail, Lock, User, ArrowRight, Ticket } from 'lucide-react';
 import { saveUser } from '@/lib/client-auth';
 
 export default function RegisterPage() {
@@ -58,23 +58,21 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen flex pt-16">
       {/* Left panel */}
-      <div className="hidden lg:flex flex-col justify-between bg-[#07071a] w-[420px] shrink-0 p-10">
-        <Link href={`/${locale}`} className="flex items-center gap-2.5 font-bold text-lg text-white">
-          <span className="flex items-center justify-center w-8 h-8 rounded-xl bg-brand-600 shadow-glow">
-            <Target size={18} />
-          </span>
-          Klient<span className="text-brand-400">Hunter</span>
+      <div className="hidden lg:flex flex-col justify-between w-[420px] shrink-0 p-10 border-r border-line">
+        <Link href={`/${locale}`} className="font-extrabold text-[17px] tracking-tight">
+          KlientHunter<span className="text-accent">.</span>
         </Link>
-        <div className="space-y-4">
-          <p className="text-white font-semibold text-lg">{isCs ? 'Co získáš zdarma:' : 'What you get for free:'}</p>
-          {perks.map(p => (
-            <div key={p} className="flex items-center gap-3">
-              <CheckCircle2 size={18} className="text-brand-400 shrink-0" />
-              <span className="text-white/70 text-sm">{p}</span>
-            </div>
-          ))}
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-widest text-ink-faint mb-4">
+            {isCs ? 'Co získáš zdarma' : 'What you get for free'}
+          </p>
+          <ul className="divide-y divide-line border-y border-line">
+            {perks.map(p => (
+              <li key={p} className="py-3 text-sm text-ink">{p}</li>
+            ))}
+          </ul>
         </div>
-        <p className="text-white/20 text-xs">{isCs ? 'Přístup pouze na pozvánku.' : 'Invite-only access.'}</p>
+        <p className="text-xs text-ink-faint">{isCs ? 'Přístup pouze na pozvánku.' : 'Invite-only access.'}</p>
       </div>
 
       {/* Right form */}
@@ -93,7 +91,7 @@ export default function RegisterPage() {
               <label className="label flex items-center gap-1">
                 <Ticket size={13} />
                 {isCs ? 'Invite kód' : 'Invite code'}
-                <span className="text-red-500 ml-0.5">*</span>
+                <span className="text-accent ml-0.5">*</span>
               </label>
               <input
                 type="text"
@@ -139,7 +137,7 @@ export default function RegisterPage() {
             </div>
 
             {error && (
-              <div className="rounded-xl bg-red-50 border border-red-200 text-red-700 px-4 py-3 text-sm">{error}</div>
+              <div className="rounded-lg border border-ink px-4 py-3 text-sm font-medium text-ink">{error}</div>
             )}
 
             <button type="submit" disabled={loading} className="btn-primary w-full py-3 rounded-xl text-base">
@@ -158,7 +156,7 @@ export default function RegisterPage() {
 
           <p className="text-center text-sm text-ink-faint mt-6">
             {t('have_account')}{' '}
-            <Link href={`/${locale}/auth/login`} className="text-brand-600 font-medium hover:underline">
+            <Link href={`/${locale}/auth/login`} className="font-medium text-ink underline underline-offset-2 hover:text-accent transition-colors">
               {t('login_link')}
             </Link>
           </p>

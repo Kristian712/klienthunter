@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { useLocale } from 'next-intl';
-import { CheckCircle2, Zap } from 'lucide-react';
+import { Check } from 'lucide-react';
 
 const PLANS = [
   {
@@ -37,98 +37,68 @@ export default function PricingPage() {
   const isCs = locale === 'cs' || locale === 'sk';
 
   return (
-    <div className="min-h-screen bg-surface pt-16">
-      {/* Header */}
-      <section className="section bg-[#07071a] text-white text-center">
+    <div className="min-h-screen bg-white pt-14">
+      <section className="section pb-10">
         <div className="container">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-brand-600/15 border border-brand-500/25 text-brand-300 text-xs font-semibold mb-6">
-            <Zap size={12} className="fill-brand-400 text-brand-400" />
-            {isCs ? 'Jednoduchý ceník' : 'Simple pricing'}
-          </div>
-          <h1 className="text-4xl md:text-5xl font-extrabold mb-4 tracking-tight">
-            {isCs ? 'Vyberte si plán' : 'Choose your plan'}
+          <h1 className="display-sm max-w-3xl">
+            {isCs ? 'Ceník' : 'Pricing'}<span className="text-accent">.</span>
           </h1>
-          <p className="text-white/50 text-lg max-w-xl mx-auto">
-            {isCs ? 'Začněte zdarma, upgradujte až budete potřebovat více.' : 'Start free, upgrade when you need more.'}
+          <p className="mt-5 text-lg text-ink-muted max-w-xl">
+            {isCs
+              ? 'Začněte zdarma. Připlatíte si, teprve až vám hledání začne vydělávat.'
+              : 'Start free. Pay only once the search starts paying for itself.'}
           </p>
         </div>
       </section>
 
-      {/* Cards */}
-      <section className="section bg-surface-subtle">
+      <section className="px-5 pb-24">
         <div className="container">
-          <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+          <div className="grid md:grid-cols-3 border-t border-line">
             {PLANS.map(plan => (
               <div
                 key={plan.key}
-                className={`relative flex flex-col rounded-2xl border transition-all ${
-                  plan.highlight
-                    ? 'bg-brand-600 border-brand-500 shadow-glow'
-                    : 'bg-[rgb(var(--card-bg))] border-[rgb(var(--card-border)/0.08)] shadow-card'
+                className={`flex flex-col p-7 border-b border-line md:border-b-0 md:border-r last:md:border-r-0 ${
+                  plan.highlight ? 'border-t-[3px] border-t-accent -mt-[3px]' : ''
                 }`}
               >
-                {plan.highlight && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 bg-white text-brand-700 text-xs font-bold rounded-full shadow-sm border border-brand-100">
-                    {isCs ? '⭐ Nejoblíbenější' : '⭐ Most popular'}
-                  </div>
-                )}
+                <p className="text-xs font-semibold uppercase tracking-widest text-ink-faint">
+                  {isCs ? plan.name_cs : plan.name_en}
+                </p>
 
-                <div className="p-7 pb-0">
-                  <p className={`text-xs font-semibold uppercase tracking-widest mb-2 ${
-                    plan.highlight ? 'text-brand-200' : 'text-[rgb(var(--ink-faint))]'
-                  }`}>
-                    {isCs ? plan.name_cs : plan.name_en}
-                  </p>
-
-                  <div className="flex items-end gap-1 mb-1">
-                    <span className={`text-4xl font-extrabold ${plan.highlight ? 'text-white' : 'text-[rgb(var(--ink))]'}`}>
-                      {isCs ? plan.price_cs : plan.price_en}
-                    </span>
-                    <span className={`text-sm mb-1 ${plan.highlight ? 'text-brand-200' : 'text-[rgb(var(--ink-faint))]'}`}>
-                      {isCs ? '/měs' : '/mo'}
-                    </span>
-                  </div>
-
-                  <p className={`text-sm mb-6 ${plan.highlight ? 'text-brand-200' : 'text-[rgb(var(--ink-muted))]'}`}>
-                    {isCs ? plan.desc_cs : plan.desc_en}
-                  </p>
-
-                  <Link
-                    href={`/${locale}/auth/register`}
-                    className={`block text-center py-2.5 px-4 rounded-xl font-medium text-sm transition-all ${
-                      plan.highlight
-                        ? 'bg-white text-brand-700 hover:bg-brand-50'
-                        : 'bg-brand-600 text-white hover:bg-brand-500'
-                    }`}
-                  >
-                    {isCs ? 'Začít' : 'Get started'}
-                  </Link>
+                <div className="flex items-end gap-1.5 mt-4">
+                  <span className="tnum text-4xl font-extrabold tracking-tight">
+                    {isCs ? plan.price_cs : plan.price_en}
+                  </span>
+                  <span className="text-sm text-ink-faint mb-1.5">{isCs ? '/měs' : '/mo'}</span>
                 </div>
 
-                <div className={`p-7 mt-4 border-t ${
-                  plan.highlight ? 'border-brand-500/30' : 'border-[rgb(var(--ink)/0.06)]'
-                }`}>
-                  <ul className="space-y-3">
-                    {(isCs ? plan.features_cs : plan.features_en).map(f => (
-                      <li key={f} className="flex items-start gap-2.5 text-sm">
-                        <CheckCircle2 size={15} className={`shrink-0 mt-0.5 ${plan.highlight ? 'text-brand-200' : 'text-emerald-500'}`} />
-                        <span className={plan.highlight ? 'text-white/85' : 'text-[rgb(var(--ink-muted))]'}>{f}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                <p className="mt-2 text-sm text-ink-muted">{isCs ? plan.desc_cs : plan.desc_en}</p>
+
+                <Link
+                  href={`/${locale}/auth/register`}
+                  className={`mt-6 w-full text-center ${plan.highlight ? 'btn-primary' : 'btn-outline'}`}
+                >
+                  {isCs ? 'Začít' : 'Get started'}
+                </Link>
+
+                <ul className="mt-7 space-y-3 border-t border-line pt-6">
+                  {(isCs ? plan.features_cs : plan.features_en).map(f => (
+                    <li key={f} className="flex items-start gap-2.5 text-sm text-ink-muted">
+                      <Check size={14} className="shrink-0 mt-0.5 text-ink" />
+                      {f}
+                    </li>
+                  ))}
+                </ul>
               </div>
             ))}
           </div>
 
-          <div className="text-center mt-14">
-            <p className="text-sm" style={{ color: 'rgb(var(--ink-muted))' }}>
-              {isCs ? 'Máte otázky? Napište nám na ' : 'Have questions? Contact us at '}
-              <a href="mailto:krstnjanku@gmail.com" className="text-brand-500 hover:underline">
-                krstnjanku@gmail.com
-              </a>
-            </p>
-          </div>
+          <p className="mt-12 text-sm text-ink-muted">
+            {isCs ? 'Máte otázky? Napište na ' : 'Questions? Write to '}
+            <a href="mailto:krstnjanku@gmail.com" className="text-ink underline underline-offset-2 hover:text-accent transition-colors">
+              krstnjanku@gmail.com
+            </a>
+          </p>
         </div>
       </section>
     </div>

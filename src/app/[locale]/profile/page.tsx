@@ -33,10 +33,9 @@ export default function ProfilePage() {
   const [toast, setToast]       = useState('');
   const [error, setError]       = useState('');
 
+  // Only ever read now: the app no longer sends mail, so all that is left is letting a user
+  // who configured Brevo earlier delete the credentials we still hold.
   const [brevoConfigured, setBrevoConfigured] = useState(false);
-  const [brevoForm, setBrevoForm]             = useState({ apiKey: '', senderEmail: '' });
-  const [brevoSaving, setBrevoSaving]         = useState(false);
-  const [brevoOpen, setBrevoOpen]             = useState(false);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
 
@@ -51,27 +50,10 @@ export default function ProfilePage() {
     }).catch(() => {});
   }, []);
 
-  const saveBrevo = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setBrevoSaving(true);
-    const res = await fetch('/api/profile/brevo', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ apiKey: brevoForm.apiKey, senderEmail: brevoForm.senderEmail }),
-    });
-    if (res.ok) {
-      setBrevoConfigured(true);
-      setBrevoForm({ apiKey: '', senderEmail: '' });
-      setBrevoOpen(false);
-      showToast('Brevo nastaveno – emaily připraveny!');
-    }
-    setBrevoSaving(false);
-  };
-
   const deleteBrevo = async () => {
     await fetch('/api/profile/brevo', { method: 'DELETE' });
     setBrevoConfigured(false);
-    showToast('Brevo odebráno.');
+    showToast('Údaje smazány.');
   };
 
   const saveName = async () => {
@@ -113,7 +95,7 @@ export default function ProfilePage() {
 
   if (loading) return (
     <div className="min-h-screen pt-16 flex items-center justify-center">
-      <svg className="animate-spin h-6 w-6 text-brand-500" viewBox="0 0 24 24" fill="none">
+      <svg className="animate-spin h-6 w-6 text-ink-faint" viewBox="0 0 24 24" fill="none">
         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
       </svg>
@@ -131,7 +113,7 @@ export default function ProfilePage() {
   return (
     <div className="min-h-screen bg-surface-subtle pt-16">
       {toast && (
-        <div className="fixed top-20 right-4 z-50 bg-ink text-white text-sm px-4 py-3 rounded-xl shadow-card-hover animate-fade-in">
+        <div className="fixed top-20 right-4 z-50 bg-ink text-white text-sm px-4 py-3 rounded-lg animate-fade-in">
           {toast}
         </div>
       )}
@@ -141,7 +123,7 @@ export default function ProfilePage() {
         {/* Profile card */}
         <div className="card">
           <div className="flex items-start gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-brand-100 flex items-center justify-center text-brand-600 font-bold text-xl flex-shrink-0">
+            <div className="w-14 h-14 rounded-lg border border-line flex items-center justify-center font-extrabold text-xl shrink-0">
               {(user.name || user.email)[0].toUpperCase()}
             </div>
             <div className="flex-1">
@@ -151,7 +133,7 @@ export default function ProfilePage() {
                   <div className="flex items-center gap-2">
                     <input className="input py-1 text-lg font-bold w-48" value={nameVal}
                       onChange={e => setNameVal(e.target.value)} autoFocus />
-                    <button onClick={saveName} disabled={saving} className="p-1.5 rounded-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200">
+                    <button onClick={saveName} disabled={saving} className="p-1.5 rounded-lg bg-ink text-white hover:bg-ink/85 transition-colors">
                       <Check size={15} />
                     </button>
                     <button onClick={() => setEditName(false)} className="p-1.5 rounded-lg bg-ink/5 text-ink-faint hover:bg-ink/10">
@@ -180,7 +162,7 @@ export default function ProfilePage() {
                 </span>
                 {user.isVip && (
                   <span className="badge badge-yellow">
-                    <Crown size={11} className="fill-yellow-500" /> VIP
+                    <Crown size={11} /> VIP
                   </span>
                 )}
                 {user.isAdmin && (
@@ -205,7 +187,7 @@ export default function ProfilePage() {
             { label: isCs ? 'Plán' : 'Plan', value: PLAN_LABELS[user.plan] ?? user.plan, icon: <User size={18} /> },
           ].map(s => (
             <div key={s.label} className="card text-center">
-              <div className="flex justify-center mb-2 text-brand-500">{s.icon}</div>
+              <div className="flex justify-center mb-2 text-ink-faint">{s.icon}</div>
               <div className="text-2xl font-bold text-ink">{s.value}</div>
               <div className="text-xs text-ink-faint mt-1">{s.label}</div>
             </div>
@@ -239,7 +221,7 @@ export default function ProfilePage() {
                   value={pwForm.next}
                   onChange={e => setPwForm(p => ({ ...p, next: e.target.value }))} required />
               </div>
-              {error && <p className="text-red-600 text-sm">{error}</p>}
+              {error && <p className="text-sm font-medium text-ink">{error}</p>}
               <div className="flex gap-2">
                 <button type="submit" disabled={saving} className="btn-primary btn-sm">
                   {isCs ? 'Uložit' : 'Save'}
@@ -252,61 +234,26 @@ export default function ProfilePage() {
           )}
         </div>
 
-        {/* Brevo email */}
+        {/* Oslovovací e-maily */}
         <div className="card">
           <h2 className="font-semibold text-ink flex items-center gap-2 mb-1">
-            <Send size={16} className="text-brand-600" /> Automatické emaily (Brevo)
+            <Send size={16} className="text-ink-faint" /> Oslovovací e-maily
           </h2>
           <p className="text-xs text-ink-faint mb-4">
-            {brevoConfigured
-              ? 'Brevo je nastaveno. Tlačítko "Poslat email" je aktivní na stránce Vyhledávání.'
-              : 'Nastav Brevo a odesílej oslovovací emaily přímo z KlientHunteru – 300 emailů/den zdarma.'}
+            KlientHunter e-maily neodesílá. Připraví ti u každé firmy koncept, který zkopíruješ
+            nebo otevřeš ve své schránce a odešleš sám. Hromadné obchodní sdělení bez souhlasu
+            příjemce zakazuje § 7 zákona 480/2004 Sb. – pokuta až 10 000 000 Kč.
           </p>
 
-          {brevoConfigured ? (
+          {brevoConfigured && (
             <div className="flex items-center gap-3">
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
-                <Check size={11} /> Připojeno
+              <span className="text-xs text-ink-faint">
+                Z dřívějška máš uložené přihlašovací údaje k Brevo. Už se nepoužívají.
               </span>
-              <button onClick={deleteBrevo} className="text-xs text-red-500 hover:text-red-700 underline underline-offset-2">Odebrat</button>
+              <button onClick={deleteBrevo} className="text-xs text-ink-muted hover:text-accent underline underline-offset-2 transition-colors">
+                Smazat
+              </button>
             </div>
-          ) : (
-            <>
-              {!brevoOpen && (
-                <button onClick={() => setBrevoOpen(true)} className="btn-outline btn-sm">Nastavit Brevo</button>
-              )}
-              {brevoOpen && (
-                <>
-                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4 text-xs text-blue-700">
-                    <p className="font-semibold mb-1">Jak získat API klíč (2 minuty):</p>
-                    <ol className="space-y-1 list-decimal list-inside">
-                      <li>Zaregistruj se zdarma na <strong>brevo.com</strong></li>
-                      <li>Jdi do <strong>Settings → API Keys → Generate new API key</strong></li>
-                      <li>Zkopíruj klíč a vlož sem</li>
-                      <li>Email odesílatele musí být ověřen v Brevo (<strong>Settings → Senders</strong>)</li>
-                    </ol>
-                  </div>
-                  <form onSubmit={saveBrevo} className="space-y-3 max-w-lg">
-                    <div>
-                      <label className="label">Brevo API klíč</label>
-                      <input className="input font-mono text-sm" placeholder="xkeysib-..." value={brevoForm.apiKey}
-                        onChange={e => setBrevoForm(p => ({ ...p, apiKey: e.target.value }))} required autoComplete="off" />
-                    </div>
-                    <div>
-                      <label className="label">Ověřený email odesílatele</label>
-                      <input className="input" type="email" placeholder="tvuj@email.cz" value={brevoForm.senderEmail}
-                        onChange={e => setBrevoForm(p => ({ ...p, senderEmail: e.target.value }))} required />
-                    </div>
-                    <div className="flex gap-2">
-                      <button type="submit" disabled={brevoSaving} className="btn-primary btn-sm">
-                        {brevoSaving ? 'Ukládám…' : 'Uložit a aktivovat'}
-                      </button>
-                      <button type="button" onClick={() => setBrevoOpen(false)} className="btn-outline btn-sm">Zrušit</button>
-                    </div>
-                  </form>
-                </>
-              )}
-            </>
           )}
         </div>
 

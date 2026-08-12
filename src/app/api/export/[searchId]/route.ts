@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { exportToExcel } from '@/lib/excel-export';
+import { exportToExcel, WEBSITE_LABEL_CS } from '@/lib/excel-export';
+import { resolveStatus } from '@/lib/website-status';
 
 function toCsv(businesses: Parameters<typeof exportToExcel>[0]): string {
   const headers = [
-    'Název firmy', 'Telefon', 'Email', 'Adresa', 'Web',
+    'Název firmy', 'IČO', 'Telefon', 'Email', 'Adresa', 'Web',
     'Má web', 'Facebook', 'Instagram', 'LinkedIn',
-    'Recenze', 'Hodnocení', 'Google Maps', 'Zdroj',
+    'Plátce DPH', 'Nespolehlivý plátce',
+    'Recenze', 'Hodnocení', 'Zdroj',
   ];
 
   const escape = (v: unknown) => {
@@ -18,20 +20,25 @@ function toCsv(businesses: Parameters<typeof exportToExcel>[0]): string {
     return s;
   };
 
+  // NULL means the register was never asked — an empty cell, not a "NE".
+  const vat = (value: boolean | null | undefined) => (value == null ? '' : value ? 'ANO' : 'NE');
+
   const rows = businesses.map(b => [
     b.name,
+    b.ico ?? '',
     b.phone ?? '',
     b.email ?? '',
     b.address ?? '',
     b.website ?? '',
-    b.hasWebsite ? 'ANO' : 'NE',
+    WEBSITE_LABEL_CS[resolveStatus(b)],
     b.hasFacebook ? 'ANO' : 'NE',
     b.hasInstagram ? 'ANO' : 'NE',
     b.hasLinkedIn ? 'ANO' : 'NE',
+    vat(b.vatPayer),
+    vat(b.vatUnreliable),
     b.reviewCount,
     b.rating ?? '',
-    b.googleMapsUrl ?? '',
-    (b as any).source ?? 'google',
+    b.source,
   ].map(escape).join(','));
 
   return [headers.map(escape).join(','), ...rows].join('\n');

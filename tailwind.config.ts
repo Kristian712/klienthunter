@@ -1,5 +1,16 @@
 import type { Config } from 'tailwindcss';
 
+/**
+ * White, black, grey — and one accent.
+ *
+ * `brand` keeps its name and its 50–950 shape so existing markup keeps compiling, but every
+ * step is now the vermilion ramp. Anything that used to be brand-purple is therefore on the
+ * new accent automatically; `accent` is the alias to reach for in new code.
+ *
+ * `darkMode: 'class'` stays even though the app no longer has a dark theme. Tailwind's default
+ * is `media`, so removing this line would make any leftover `dark:` utility fire on a machine
+ * set to dark — the class simply never gets added now.
+ */
 const config: Config = {
   darkMode: 'class',
   content: [
@@ -11,18 +22,25 @@ const config: Config = {
     extend: {
       colors: {
         brand: {
-          50:  '#f0f0ff',
-          100: '#e4e4ff',
-          200: '#cdcbff',
-          300: '#aba8ff',
-          400: '#8278fd',
-          500: '#6152f8',
-          600: '#5232ed',
-          700: '#4525d9',
-          800: '#3a1fb6',
-          900: '#311c90',
-          950: '#1d0f5c',
+          50:  '#fff1ec',
+          100: '#ffdfd3',
+          200: '#ffc0ab',
+          300: '#ff9573',
+          400: '#ff6233',
+          500: '#f5450d',
+          600: '#e63900',
+          700: '#bf2e00',
+          800: '#991f00',
+          900: '#7a1c03',
+          950: '#420e03',
         },
+        accent: {
+          DEFAULT: '#e63900',
+          soft:    '#fff1ec',
+          ink:     '#bf2e00',
+        },
+        /** The only line colour in the app. Hairlines replace cards and shadows. */
+        line: '#e5e5e5',
         surface: {
           DEFAULT: 'rgb(var(--surface) / <alpha-value>)',
           subtle:  'rgb(var(--surface-subtle) / <alpha-value>)',
@@ -35,17 +53,21 @@ const config: Config = {
         },
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-        mono: ['JetBrains Mono', 'monospace'],
+        sans: ['var(--font-inter)', 'Inter', 'system-ui', 'sans-serif'],
+        mono: ['ui-monospace', 'SFMono-Regular', 'monospace'],
       },
-      boxShadow: {
-        'card':  '0 1px 3px 0 rgba(14,14,26,.06), 0 1px 2px -1px rgba(14,14,26,.06)',
-        'card-hover': '0 4px 16px 0 rgba(14,14,26,.10), 0 1px 4px -1px rgba(14,14,26,.08)',
-        'glow':  '0 0 40px -8px rgba(97,82,248,.45)',
-        'inner-brand': 'inset 0 1px 0 rgba(255,255,255,.12)',
+      borderRadius: {
+        // Nothing rounder than 8px anywhere. `xl`/`2xl` are remapped rather than removed so
+        // older markup cannot reintroduce the bubbly look.
+        lg:  '8px',
+        xl:  '8px',
+        '2xl': '8px',
+        '3xl': '8px',
       },
-      backgroundImage: {
-        'hero-grid': "url(\"data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%236152f8' fill-opacity='0.06'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E\")",
+      fontSize: {
+        // Fluid display sizes. The landing headline is meant to fill a third of the screen.
+        'display':    ['clamp(2.75rem, 9vw, 6.5rem)', { lineHeight: '0.9', letterSpacing: '-0.04em' }],
+        'display-sm': ['clamp(2rem, 5vw, 3.25rem)',   { lineHeight: '0.95', letterSpacing: '-0.03em' }],
       },
     },
   },

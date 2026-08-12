@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import Link from 'next/link';
-import { Target, Mail, Lock, ArrowRight } from 'lucide-react';
+import { Mail, Lock, ArrowRight } from 'lucide-react';
 import { saveUser } from '@/lib/client-auth';
 
 export default function LoginPage() {
@@ -38,15 +38,15 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex pt-16">
-      <div className="hidden lg:flex flex-col justify-between bg-[#07071a] w-[420px] shrink-0 p-10">
-        <Link href={`/${locale}`} className="flex items-center gap-2.5 font-bold text-lg text-white">
-          <span className="flex items-center justify-center w-8 h-8 rounded-xl bg-brand-600 shadow-glow">
-            <Target size={18} />
-          </span>
-          Klient<span className="text-brand-400">Hunter</span>
+      <div className="hidden lg:flex flex-col justify-between w-[420px] shrink-0 p-10 border-r border-line">
+        <Link href={`/${locale}`} className="font-extrabold text-[17px] tracking-tight">
+          KlientHunter<span className="text-accent">.</span>
         </Link>
-        <p className="text-white/30 text-sm italic leading-relaxed">
-          "KlientHunter mi ušetřil hodiny hledání."
+        <p className="display-sm leading-[0.9]">
+          {isCs ? 'Vítejte zpět' : 'Welcome back'}<span className="text-accent">.</span>
+        </p>
+        <p className="text-sm text-ink-faint">
+          {isCs ? 'Data z ARESu a OpenStreetMap.' : 'Data from ARES and OpenStreetMap.'}
         </p>
       </div>
 
@@ -73,8 +73,8 @@ export default function LoginPage() {
                   value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} required />
               </div>
             </div>
-            {error && <div className="rounded-xl bg-red-50 border border-red-200 text-red-700 px-4 py-3 text-sm">{error}</div>}
-            <button type="submit" disabled={loading} className="btn-primary w-full py-3 rounded-xl text-base">
+            {error && <div className="rounded-lg border border-ink px-4 py-3 text-sm font-medium text-ink">{error}</div>}
+            <button type="submit" disabled={loading} className="btn-primary btn-lg w-full">
               {loading ? (
                 <svg className="animate-spin h-5 w-5 mx-auto" viewBox="0 0 24 24" fill="none">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
@@ -89,7 +89,7 @@ export default function LoginPage() {
           </form>
           <p className="text-center text-sm text-ink-faint mt-6">
             {t('no_account')}{' '}
-            <Link href={`/${locale}/auth/register`} className="text-brand-600 font-medium hover:underline">
+            <Link href={`/${locale}/auth/register`} className="font-medium text-ink underline underline-offset-2 hover:text-accent transition-colors">
               {t('register_link')}
             </Link>
           </p>

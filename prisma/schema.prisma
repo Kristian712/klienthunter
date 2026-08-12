@@ -54,7 +54,17 @@ model BusinessResult {
   email         String?
   address       String?
   website       String?
+  // Czech company registration number. Present only for registry-sourced rows.
+  ico           String?
+  // Entry date from ARES. NULL for rows that never matched a registry record.
+  foundedAt     DateTime?
+  // From the VAT register. NULL means we never asked, not that the answer was no.
+  vatPayer      Boolean?
+  vatUnreliable Boolean?
   hasWebsite    Boolean  @default(false)
+  // NULL on rows written before three-state classification existed; readers fall back to hasWebsite.
+  websiteStatus String?
+  websiteEvidence String @default("")
   hasFacebook   Boolean  @default(false)
   hasInstagram  Boolean  @default(false)
   hasLinkedIn   Boolean  @default(false)
@@ -64,6 +74,10 @@ model BusinessResult {
   websiteIsOld  Boolean  @default(false)
   websiteScore  Int      @default(50)
   websiteAgeNote String  @default("")
+  // Time to first byte of the verified page, in ms. NULL when we never loaded it.
+  websiteMs     Int?
+  // How good a sales opportunity this lead is, 0-100. See src/lib/lead-score.ts.
+  leadScore     Int      @default(0)
   reviewCount   Int      @default(0)
   rating        Float?
   googleMapsUrl String?

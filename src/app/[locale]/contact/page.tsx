@@ -26,7 +26,7 @@ export default function ContactPage() {
     <div className="min-h-screen bg-surface-subtle pt-16">
       <div className="max-w-2xl mx-auto px-4 py-16">
         <div className="text-center mb-12">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-brand-100 text-brand-600 mb-4">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg border border-line text-ink mb-4">
             <Mail size={26} />
           </div>
           <h1 className="text-3xl font-bold text-ink mb-3">
@@ -39,7 +39,7 @@ export default function ContactPage() {
 
         {sent ? (
           <div className="card text-center py-12">
-            <CheckCircle2 size={48} className="mx-auto text-emerald-500 mb-4" />
+            <CheckCircle2 size={40} className="mx-auto text-accent mb-4" />
             <h2 className="text-xl font-semibold text-ink mb-2">
               {isCs ? 'Děkujeme!' : 'Thank you!'}
             </h2>
@@ -72,7 +72,7 @@ export default function ContactPage() {
             </button>
             <p className="text-xs text-ink-faint text-center">
               {isCs ? 'Nebo nás kontaktujte přímo: ' : 'Or contact us directly: '}
-              <a href="mailto:krstnjanku@gmail.com" className="text-brand-600">krstnjanku@gmail.com</a>
+              <a href="mailto:krstnjanku@gmail.com" className="text-ink underline underline-offset-2 hover:text-accent transition-colors">krstnjanku@gmail.com</a>
             </p>
           </form>
         )}

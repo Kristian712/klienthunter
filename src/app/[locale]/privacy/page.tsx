@@ -64,7 +64,9 @@ export default function PrivacyPage() {
             {isCs ? '6. Třetí strany' : '6. Third parties'}
           </h2>
           <ul className="list-disc list-inside space-y-1">
-            <li>Google Maps API – {isCs ? 'vyhledávání firem' : 'business search'}</li>
+            <li>ARES a živnostenský rejstřík (Ministerstvo financí ČR) – {isCs ? 'údaje o firmách' : 'business data'}</li>
+            <li>{isCs ? 'Registr plátců DPH (Finanční správa ČR)' : 'VAT payer register (Czech Tax Office)'} – {isCs ? 'ověření plátcovství' : 'VAT status'}</li>
+            <li>OpenStreetMap / Overpass – {isCs ? 'vyhledávání firem, © přispěvatelé OpenStreetMap (ODbL)' : 'business search, © OpenStreetMap contributors (ODbL)'}</li>
             <li>Neon (PostgreSQL) – {isCs ? 'uložení dat' : 'data storage'}</li>
             <li>Vercel – {isCs ? 'hosting aplikace' : 'app hosting'}</li>
           </ul>

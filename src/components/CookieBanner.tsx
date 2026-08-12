@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useLocale } from 'next-intl';
-import { Cookie, X } from 'lucide-react';
+import { Cookie } from 'lucide-react';
 
 export function CookieBanner() {
   const locale = useLocale();
@@ -52,22 +52,18 @@ export function CookieBanner() {
   };
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 p-4">
-      <div className="max-w-3xl mx-auto bg-[#07071a] border border-white/10 rounded-2xl p-5 shadow-card-hover flex flex-col sm:flex-row items-start sm:items-center gap-4">
-        <Cookie size={20} className="text-brand-400 shrink-0 mt-0.5 sm:mt-0" />
-        <p className="text-white/70 text-sm flex-1">
+    <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-line animate-fade-up">
+      <div className="max-w-5xl mx-auto px-5 py-4 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+        <Cookie size={16} className="shrink-0 text-ink-faint" />
+        <p className="flex-1 text-sm text-ink-muted">
           {t.text}{' '}
-          <Link href={`/${locale}/privacy`} className="text-brand-400 underline hover:text-brand-300">
+          <Link href={`/${locale}/privacy`} className="text-ink underline underline-offset-2 hover:text-accent transition-colors">
             {t.privacy}
           </Link>
         </p>
         <div className="flex gap-2 shrink-0">
-          <button onClick={decline} className="px-4 py-2 rounded-xl text-sm text-white/50 border border-white/10 hover:border-white/20 transition-colors">
-            {t.decline}
-          </button>
-          <button onClick={accept} className="px-4 py-2 rounded-xl text-sm bg-brand-600 text-white hover:bg-brand-700 transition-colors font-medium">
-            {t.accept}
-          </button>
+          <button onClick={decline} className="btn-outline btn-sm">{t.decline}</button>
+          <button onClick={accept} className="btn-primary btn-sm">{t.accept}</button>
         </div>
       </div>
     </div>

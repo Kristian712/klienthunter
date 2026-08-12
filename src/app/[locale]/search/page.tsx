@@ -3,17 +3,20 @@
 import { useState, useEffect } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import {
-  Search, Globe, Users, Star, ExternalLink,
-  Phone, Mail, MapPin, SlidersHorizontal, X, Clock, ChevronDown, Check, Send,
-  FileText, Table2, MessageSquare, Copy,
+  Search, Globe, Users, ExternalLink,
+  Phone, Mail, MapPin, X, Clock, ChevronDown, Check, Send,
+  FileText, Table2, MessageSquare, Copy, Smartphone, PhoneCall,
 } from 'lucide-react';
 import { buildGreeting } from '@/lib/czech-vocative';
+import { OSM_ATTRIBUTION } from '@/lib/attribution';
+import { LEAD_FILTERS, GROUP_LABELS, matchesAll, type FilterGroup } from '@/lib/lead-filters';
+import { LeadScore, GOOD_LEAD } from '@/components/LeadScore';
 
 // ── Regions ───────────────────────────────────────────────────────────────────
 
 const REGIONS = [
-  { group: '🇨🇿 Česká republika — kraje', items: [
-    { value: 'Celá ČR',                                    label: '🗺️ Celá ČR (všechny kraje)' },
+  { group: 'Česká republika — kraje', items: [
+    { value: 'Celá ČR',                                    label: 'Celá ČR (všechny kraje)' },
     { value: 'Praha, Czech Republic',                      label: 'Praha (Hlavní město Praha)' },
     { value: 'Středočeský kraj, Czech Republic',           label: 'Středočeský kraj' },
     { value: 'České Budějovice, Jihočeský kraj',           label: 'Jihočeský kraj' },
@@ -29,7 +32,7 @@ const REGIONS = [
     { value: 'Zlín, Zlínský kraj',                         label: 'Zlínský kraj' },
     { value: 'Ostrava, Moravskoslezský kraj',              label: 'Moravskoslezský kraj' },
   ]},
-  { group: '🇸🇰 Slovensko — kraje', items: [
+  { group: 'Slovensko — kraje', items: [
     { value: 'Bratislava, Slovakia',                       label: 'Bratislavský kraj' },
     { value: 'Trnava, Slovakia',                           label: 'Trnavský kraj' },
     { value: 'Trenčín, Slovakia',                          label: 'Trenčianský kraj' },
@@ -39,29 +42,29 @@ const REGIONS = [
     { value: 'Prešov, Slovakia',                           label: 'Prešovský kraj' },
     { value: 'Košice, Slovakia',                           label: 'Košický kraj' },
   ]},
-  { group: '🇩🇪 Německo', items: [
+  { group: 'Německo', items: [
     { value: 'Berlin, Germany',   label: 'Berlín' },
     { value: 'Munich, Germany',   label: 'Mnichov' },
     { value: 'Hamburg, Germany',  label: 'Hamburg' },
     { value: 'Frankfurt, Germany',label: 'Frankfurt' },
   ]},
-  { group: '🇦🇹 Rakousko', items: [
+  { group: 'Rakousko', items: [
     { value: 'Vienna, Austria',   label: 'Vídeň' },
     { value: 'Graz, Austria',     label: 'Graz' },
     { value: 'Linz, Austria',     label: 'Linz' },
   ]},
-  { group: '🇬🇧 Velká Británie', items: [
+  { group: 'Velká Británie', items: [
     { value: 'London, UK',        label: 'Londýn' },
     { value: 'Manchester, UK',    label: 'Manchester' },
     { value: 'Birmingham, UK',    label: 'Birmingham' },
   ]},
-  { group: '🇺🇸 USA', items: [
+  { group: 'USA', items: [
     { value: 'New York, USA',     label: 'New York' },
     { value: 'Los Angeles, USA',  label: 'Los Angeles' },
     { value: 'Chicago, USA',      label: 'Chicago' },
     { value: 'Houston, USA',      label: 'Houston' },
   ]},
-  { group: '🇵🇱 Polsko', items: [
+  { group: 'Polsko', items: [
     { value: 'Warsaw, Poland',    label: 'Varšava' },
     { value: 'Krakow, Poland',    label: 'Krakov' },
     { value: 'Wroclaw, Poland',   label: 'Wroclaw' },
@@ -72,7 +75,7 @@ const REGIONS = [
 
 const INDUSTRIES: Record<string, { group: string; items: { value: string; label: string }[] }[]> = {
   cs: [
-    { group: '🔧 Řemesla', items: [
+    { group: 'Řemesla', items: [
       { value: 'plumber',          label: 'Instalatér' },
       { value: 'electrician',      label: 'Elektrikář' },
       { value: 'carpenter',        label: 'Tesař / Truhlář' },
@@ -83,24 +86,24 @@ const INDUSTRIES: Record<string, { group: string; items: { value: string; label:
       { value: 'glazier',          label: 'Sklenář' },
       { value: 'chimney sweep',    label: 'Kominík' },
     ]},
-    { group: '🍕 Jídlo & pití', items: [
+    { group: 'Jídlo & pití', items: [
       { value: 'restaurant',       label: 'Restaurace' },
       { value: 'cafe',             label: 'Kavárna' },
       { value: 'bakery',           label: 'Pekárna' },
       { value: 'butcher shop',     label: 'Řeznictví' },
     ]},
-    { group: '💇 Krása & wellness', items: [
+    { group: 'Krása & wellness', items: [
       { value: 'hair salon',       label: 'Kadeřnictví' },
       { value: 'beauty salon',     label: 'Kosmetický salon' },
       { value: 'nail studio',      label: 'Nehtové studio' },
       { value: 'massage',          label: 'Masáže' },
       { value: 'yoga studio',      label: 'Jóga studio' },
     ]},
-    { group: '🚗 Auto', items: [
+    { group: 'Auto', items: [
       { value: 'car repair',       label: 'Autoservis' },
       { value: 'tire shop',        label: 'Pneuservis' },
     ]},
-    { group: '🏥 Zdravotnictví', items: [
+    { group: 'Zdravotnictví', items: [
       { value: 'general practitioner', label: 'Praktický lékař' },
       { value: 'dentist',          label: 'Zubař' },
       { value: 'physiotherapist',  label: 'Fyzioterapeut' },
@@ -108,18 +111,18 @@ const INDUSTRIES: Record<string, { group: string; items: { value: string; label:
       { value: 'optician',         label: 'Optika' },
       { value: 'veterinarian',     label: 'Veterinář' },
     ]},
-    { group: '⚖️ Právní & finance', items: [
+    { group: 'Právní & finance', items: [
       { value: 'lawyer',           label: 'Právník / Advokát' },
       { value: 'accountant',       label: 'Účetní' },
       { value: 'real estate agency', label: 'Realitní kancelář' },
     ]},
-    { group: '🎓 Vzdělávání & sport', items: [
+    { group: 'Vzdělávání & sport', items: [
       { value: 'driving school',   label: 'Autoškola' },
       { value: 'language school',  label: 'Jazyková škola' },
       { value: 'gym',              label: 'Fitness centrum' },
       { value: 'personal trainer', label: 'Osobní trenér' },
     ]},
-    { group: '📋 Ostatní služby', items: [
+    { group: 'Ostatní služby', items: [
       { value: 'photographer',     label: 'Fotograf' },
       { value: 'cleaning service', label: 'Úklid' },
       { value: 'florist',          label: 'Květinářství' },
@@ -127,7 +130,7 @@ const INDUSTRIES: Record<string, { group: string; items: { value: string; label:
     ]},
   ],
   sk: [
-    { group: '🔧 Remeslá', items: [
+    { group: 'Remeslá', items: [
       { value: 'plumber',          label: 'Inštalatér' },
       { value: 'electrician',      label: 'Elektrikár' },
       { value: 'carpenter',        label: 'Tesár / Stolár' },
@@ -136,34 +139,34 @@ const INDUSTRIES: Record<string, { group: string; items: { value: string; label:
       { value: 'landscaper',       label: 'Záhradník' },
       { value: 'locksmith',        label: 'Zámočník' },
     ]},
-    { group: '🍕 Jedlo & pitie', items: [
+    { group: 'Jedlo & pitie', items: [
       { value: 'restaurant',       label: 'Reštaurácia' },
       { value: 'cafe',             label: 'Kaviareň' },
       { value: 'bakery',           label: 'Pekáreň' },
       { value: 'butcher shop',     label: 'Mäsiarstvo' },
     ]},
-    { group: '💇 Krása & wellness', items: [
+    { group: 'Krása & wellness', items: [
       { value: 'hair salon',       label: 'Kaderníctvo' },
       { value: 'beauty salon',     label: 'Kozmetický salón' },
       { value: 'nail studio',      label: 'Nechtové štúdio' },
       { value: 'massage',          label: 'Masáže' },
     ]},
-    { group: '🚗 Auto', items: [
+    { group: 'Auto', items: [
       { value: 'car repair',       label: 'Autoservis' },
       { value: 'tire shop',        label: 'Pneuservis' },
     ]},
-    { group: '🏥 Zdravotníctvo', items: [
+    { group: 'Zdravotníctvo', items: [
       { value: 'general practitioner', label: 'Praktický lekár' },
       { value: 'dentist',          label: 'Zubár' },
       { value: 'physiotherapist',  label: 'Fyzioterapeut' },
       { value: 'veterinarian',     label: 'Veterinár' },
     ]},
-    { group: '⚖️ Právne & financie', items: [
+    { group: 'Právne & financie', items: [
       { value: 'lawyer',           label: 'Advokát' },
       { value: 'accountant',       label: 'Účtovník' },
       { value: 'real estate agency', label: 'Realitná kancelária' },
     ]},
-    { group: '📋 Iné služby', items: [
+    { group: 'Iné služby', items: [
       { value: 'photographer',     label: 'Fotograf' },
       { value: 'cleaning service', label: 'Upratovanie' },
       { value: 'gym',              label: 'Fitnescentrum' },
@@ -171,7 +174,7 @@ const INDUSTRIES: Record<string, { group: string; items: { value: string; label:
     ]},
   ],
   en: [
-    { group: '🔧 Trades', items: [
+    { group: 'Trades', items: [
       { value: 'plumber',          label: 'Plumber' },
       { value: 'electrician',      label: 'Electrician' },
       { value: 'carpenter',        label: 'Carpenter' },
@@ -180,34 +183,34 @@ const INDUSTRIES: Record<string, { group: string; items: { value: string; label:
       { value: 'landscaper',       label: 'Landscaper' },
       { value: 'locksmith',        label: 'Locksmith' },
     ]},
-    { group: '🍕 Food & drink', items: [
+    { group: 'Food & drink', items: [
       { value: 'restaurant',       label: 'Restaurant' },
       { value: 'cafe',             label: 'Cafe' },
       { value: 'bakery',           label: 'Bakery' },
       { value: 'butcher shop',     label: 'Butcher' },
     ]},
-    { group: '💇 Beauty & wellness', items: [
+    { group: 'Beauty & wellness', items: [
       { value: 'hair salon',       label: 'Hair salon' },
       { value: 'beauty salon',     label: 'Beauty salon' },
       { value: 'nail studio',      label: 'Nail studio' },
       { value: 'massage',          label: 'Massage' },
     ]},
-    { group: '🚗 Auto', items: [
+    { group: 'Auto', items: [
       { value: 'car repair',       label: 'Car repair' },
       { value: 'tire shop',        label: 'Tire shop' },
     ]},
-    { group: '🏥 Healthcare', items: [
+    { group: 'Healthcare', items: [
       { value: 'general practitioner', label: 'GP / Doctor' },
       { value: 'dentist',          label: 'Dentist' },
       { value: 'physiotherapist',  label: 'Physiotherapist' },
       { value: 'veterinarian',     label: 'Vet' },
     ]},
-    { group: '⚖️ Legal & finance', items: [
+    { group: 'Legal & finance', items: [
       { value: 'lawyer',           label: 'Lawyer' },
       { value: 'accountant',       label: 'Accountant' },
       { value: 'real estate agency', label: 'Real estate agency' },
     ]},
-    { group: '📋 Services', items: [
+    { group: 'Services', items: [
       { value: 'photographer',     label: 'Photographer' },
       { value: 'cleaning service', label: 'Cleaning service' },
       { value: 'gym',              label: 'Gym' },
@@ -217,32 +220,32 @@ const INDUSTRIES: Record<string, { group: string; items: { value: string; label:
 };
 
 // Popular categories shown as quick chips (localized)
-const POPULAR_CHIPS: Record<string, { value: string; label: string; emoji: string }[]> = {
+const POPULAR_CHIPS: Record<string, { value: string; label: string }[]> = {
   cs: [
-    { value: 'hair salon',    label: 'Kadeřnictví',  emoji: '💇' },
-    { value: 'restaurant',    label: 'Restaurace',   emoji: '🍕' },
-    { value: 'car repair',    label: 'Autoservis',   emoji: '🔧' },
-    { value: 'plumber',       label: 'Instalatér',   emoji: '🪛' },
-    { value: 'dentist',       label: 'Zubař',        emoji: '🦷' },
-    { value: 'real estate agency', label: 'Reality', emoji: '🏠' },
-    { value: 'lawyer',        label: 'Právník',      emoji: '⚖️' },
-    { value: 'electrician',   label: 'Elektrikář',   emoji: '⚡' },
+    { value: 'hair salon',    label: 'Kadeřnictví' },
+    { value: 'restaurant',    label: 'Restaurace' },
+    { value: 'car repair',    label: 'Autoservis' },
+    { value: 'plumber',       label: 'Instalatér' },
+    { value: 'dentist',       label: 'Zubař' },
+    { value: 'real estate agency', label: 'Reality' },
+    { value: 'lawyer',        label: 'Právník' },
+    { value: 'electrician',   label: 'Elektrikář' },
   ],
   sk: [
-    { value: 'hair salon',    label: 'Kaderníctvo',  emoji: '💇' },
-    { value: 'restaurant',    label: 'Reštaurácia',  emoji: '🍕' },
-    { value: 'car repair',    label: 'Autoservis',   emoji: '🔧' },
-    { value: 'plumber',       label: 'Inštalatér',   emoji: '🪛' },
-    { value: 'dentist',       label: 'Zubár',        emoji: '🦷' },
-    { value: 'electrician',   label: 'Elektrikár',   emoji: '⚡' },
+    { value: 'hair salon',    label: 'Kaderníctvo' },
+    { value: 'restaurant',    label: 'Reštaurácia' },
+    { value: 'car repair',    label: 'Autoservis' },
+    { value: 'plumber',       label: 'Inštalatér' },
+    { value: 'dentist',       label: 'Zubár' },
+    { value: 'electrician',   label: 'Elektrikár' },
   ],
   en: [
-    { value: 'hair salon',    label: 'Hair salon',   emoji: '💇' },
-    { value: 'restaurant',    label: 'Restaurant',   emoji: '🍕' },
-    { value: 'car repair',    label: 'Car repair',   emoji: '🔧' },
-    { value: 'plumber',       label: 'Plumber',      emoji: '🪛' },
-    { value: 'dentist',       label: 'Dentist',      emoji: '🦷' },
-    { value: 'electrician',   label: 'Electrician',  emoji: '⚡' },
+    { value: 'hair salon',    label: 'Hair salon' },
+    { value: 'restaurant',    label: 'Restaurant' },
+    { value: 'car repair',    label: 'Car repair' },
+    { value: 'plumber',       label: 'Plumber' },
+    { value: 'dentist',       label: 'Dentist' },
+    { value: 'electrician',   label: 'Electrician' },
   ],
 };
 
@@ -256,6 +259,8 @@ interface BusinessResult {
   address?: string;
   website?: string;
   hasWebsite: boolean;
+  websiteStatus?: string | null;
+  websiteEvidence?: string;
   hasFacebook: boolean;
   hasInstagram: boolean;
   hasLinkedIn: boolean;
@@ -265,34 +270,56 @@ interface BusinessResult {
   websiteIsOld: boolean;
   websiteScore: number;
   websiteAgeNote: string;
+  websiteMs?: number | null;
   reviewCount: number;
   rating?: number;
   googleMapsUrl?: string;
   source?: string;
+  category?: string;
+  /** How good a sales opportunity this is, 0–100. Computed when the row is saved. */
+  leadScore: number;
+  /** Registry fields, present only on rows discovered through ARES. */
+  ico?: string;
+  foundedAt?: string | null;
+  vatPayer?: boolean;
+  vatUnreliable?: boolean;
 }
 
-interface Filters {
-  website:    boolean | null;
-  oldWebsite: boolean | null;
-  social:     boolean | null;
-  reviews:    boolean | null;
-  rating:     boolean | null;
+type WebStatus = 'HAS' | 'NONE' | 'UNKNOWN';
+
+/** Results saved before three-state classification have no status; their `false` proved nothing. */
+function webStatus(b: BusinessResult): WebStatus {
+  if (b.websiteStatus === 'HAS' || b.websiteStatus === 'NONE' || b.websiteStatus === 'UNKNOWN') {
+    return b.websiteStatus;
+  }
+  return b.hasWebsite ? 'HAS' : 'UNKNOWN';
 }
 
-const EMPTY: Filters = { website: null, oldWebsite: null, social: null, reviews: null, rating: null };
+/**
+ * Filtering lives in `@/lib/lead-filters` — the same registry the API route uses. This page
+ * only remembers *which* filters are on; it knows nothing about what any of them mean, so a
+ * new filter appears here the moment it is added to the registry.
+ */
+const GROUP_ORDER: FilterGroup[] = ['web', 'contact', 'company'];
 
-function match(b: BusinessResult, f: Filters): boolean {
-  const social = b.hasFacebook || b.hasInstagram || b.hasLinkedIn;
-  if (f.website    !== null && b.hasWebsite   !== f.website)              return false;
-  if (f.oldWebsite !== null && b.websiteIsOld !== f.oldWebsite)           return false;
-  if (f.oldWebsite !== null && !b.hasWebsite)                             return false;
-  if (f.social     !== null && social         !== f.social)               return false;
-  if (f.reviews    !== null && (b.reviewCount >= 10) !== f.reviews)       return false;
-  if (f.rating     !== null && ((b.rating ?? 0) >= 3.5) !== f.rating)    return false;
-  return true;
+/**
+ * Why this row scores what it scores — the two strongest reasons, in the order they matter.
+ * Two, not five: a list of everything slightly wrong with a firm is noise, the first two lines
+ * are what a person actually says on the phone.
+ */
+function topReasons(b: BusinessResult): string[] {
+  const status = webStatus(b);
+  const out: string[] = [];
+  if (status === 'UNKNOWN')    out.push('Nemá dohledatelný web');
+  else if (status === 'NONE')  out.push('Nemá web');
+  else if (b.websiteIsOld)     out.push('Web působí zastarale');
+  else if (typeof b.websiteMs === 'number' && b.websiteMs >= 2500)
+                               out.push(`Web se načítá ${(b.websiteMs / 1000).toFixed(1)} s`);
+  if (!b.hasFacebook && !b.hasInstagram && !b.hasLinkedIn) out.push('Bez sociálních sítí');
+  if (b.phone || b.email)      out.push('Je na koho se obrátit');
+  if (b.vatUnreliable)         out.push('Nespolehlivý plátce DPH');
+  return out.slice(0, 2);
 }
-
-const activeCount = (f: Filters) => Object.values(f).filter(v => v !== null).length;
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 
@@ -305,103 +332,224 @@ function IgIcon() {
 function LiIcon() {
   return <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>;
 }
+function WaIcon() {
+  return <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>;
+}
+
+// ── Phone helpers ─────────────────────────────────────────────────────────────
+
+function isCzMobile(phone: string): boolean {
+  const d = phone.replace(/[\s\-()+]/g, '');
+  const local = d.startsWith('420') ? d.slice(3) : d;
+  return local.length === 9 && (local.startsWith('6') || local.startsWith('7'));
+}
+
+function whatsappHref(phone: string): string {
+  const d = phone.replace(/[\s\-()+]/g, '');
+  const num = d.startsWith('420') ? d : `420${d}`;
+  return `https://wa.me/${num}`;
+}
+
+// ── Contact strategy ──────────────────────────────────────────────────────────
+
+/**
+ * Which channel to try first, and why. Ordered, not colour-coded: the first entry is the
+ * recommendation, the rest are fallbacks, and greyer type says that better than five brand
+ * colours competing for attention inside one row.
+ */
+function ContactStrategy({ b }: { b: BusinessResult }) {
+  const mobile = b.phone ? isCzMobile(b.phone) : false;
+
+  type Method = { key: string; icon: React.ReactNode; label: string; href: string; tip: string };
+  const methods: Method[] = [];
+
+  if (b.phone && mobile) {
+    methods.push({
+      key: 'call',
+      icon: <PhoneCall size={11} />,
+      label: 'Zavolej přímo',
+      href: `tel:${b.phone}`,
+      tip: 'Nejvyšší šance odpovědi. Nejlépe 9–11h nebo 14–16h.',
+    });
+    methods.push({
+      key: 'wa',
+      icon: <WaIcon />,
+      label: 'WhatsApp',
+      href: whatsappHref(b.phone),
+      tip: 'Majitelé malých firem čtou WA pravidelně — stručná zpráva funguje.',
+    });
+  }
+
+  if (b.hasInstagram && b.instagramUrl) {
+    methods.push({
+      key: 'ig',
+      icon: <IgIcon />,
+      label: 'DM na Instagramu',
+      href: b.instagramUrl,
+      tip: 'Pro vizuální obory (kadeřnictví, kosmetika…) velmi vysoká odezva.',
+    });
+  }
+
+  if (b.hasFacebook && b.facebookUrl) {
+    methods.push({
+      key: 'fb',
+      icon: <FbIcon />,
+      label: 'DM na Facebooku',
+      href: b.facebookUrl,
+      tip: 'Messenger funguje dobře u starší klientely (40+).',
+    });
+  }
+
+  if (b.email) {
+    methods.push({
+      key: 'email',
+      icon: <Mail size={11} />,
+      label: 'E-mail',
+      href: `mailto:${b.email}`,
+      tip: 'Nejnižší odezva u cold outreach. Použij jen pokud není nic jiného.',
+    });
+  }
+
+  if (methods.length === 0) return null;
+
+  return (
+    <div className="mt-3 border-t border-line pt-3">
+      <p className="text-[11px] font-semibold text-ink-faint uppercase tracking-wider mb-2">
+        Jak kontaktovat
+      </p>
+      <div className="space-y-2">
+        {methods.map((m, i) => (
+          <div key={m.key} className="flex items-start gap-2.5">
+            <a
+              href={m.href}
+              target={m.key !== 'call' && m.key !== 'email' ? '_blank' : undefined}
+              rel="noopener noreferrer"
+              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs shrink-0 border transition-colors ${
+                i === 0
+                  ? 'border-ink text-ink font-semibold hover:bg-ink hover:text-white'
+                  : 'border-line text-ink-muted hover:border-ink hover:text-ink'
+              }`}
+            >
+              {m.icon}
+              {m.label}
+            </a>
+            <span className="text-[11px] text-ink-faint leading-tight pt-1">{m.tip}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function SocialLinks({ b }: { b: BusinessResult }) {
   const hasSocial = b.hasFacebook || b.hasInstagram || b.hasLinkedIn;
   if (!hasSocial) {
     return (
-      <span className="badge badge-red">
-        <Users size={10} />
-        Bez soc. sítí
-      </span>
+      <span className="badge"><Users size={10} />Bez soc. sítí</span>
     );
   }
+  const links: Array<[boolean, string, React.ReactNode, string]> = [
+    [b.hasFacebook,  b.facebookUrl  ?? `https://www.facebook.com/search/results/?q=${encodeURIComponent(b.name ?? '')}`,        <FbIcon key="f" />, 'Facebook'],
+    [b.hasInstagram, b.instagramUrl ?? `https://www.instagram.com/${encodeURIComponent(b.name ?? '')}`,                        <IgIcon key="i" />, 'Instagram'],
+    [b.hasLinkedIn,  b.linkedInUrl  ?? `https://www.linkedin.com/search/results/all/?keywords=${encodeURIComponent(b.name ?? '')}`, <LiIcon key="l" />, 'LinkedIn'],
+  ];
   return (
     <span className="flex items-center gap-1.5 flex-wrap">
-      {b.hasFacebook && (
-        <a
-          href={b.facebookUrl ?? `https://www.facebook.com/search/results/?q=${encodeURIComponent(b.name ?? '')}`}
-          target="_blank" rel="noopener noreferrer" title="Facebook"
-          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-[#1877F2]/10 text-[#1877F2] ring-1 ring-[#1877F2]/30 hover:bg-[#1877F2]/20 transition-colors"
-        >
-          <FbIcon /> Facebook
+      {links.filter(([on]) => on).map(([, href, icon, label]) => (
+        <a key={label} href={href} target="_blank" rel="noopener noreferrer" title={label}
+           className="badge hover:border-ink hover:text-ink transition-colors">
+          {icon} {label}
         </a>
-      )}
-      {b.hasInstagram && (
-        <a
-          href={b.instagramUrl ?? `https://www.instagram.com/${encodeURIComponent(b.name ?? '')}`}
-          target="_blank" rel="noopener noreferrer" title="Instagram"
-          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-[#E1306C]/10 text-[#E1306C] ring-1 ring-[#E1306C]/30 hover:bg-[#E1306C]/20 transition-colors"
-        >
-          <IgIcon /> Instagram
-        </a>
-      )}
-      {b.hasLinkedIn && (
-        <a
-          href={b.linkedInUrl ?? `https://www.linkedin.com/search/results/all/?keywords=${encodeURIComponent(b.name ?? '')}`}
-          target="_blank" rel="noopener noreferrer" title="LinkedIn"
-          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-[#0A66C2]/10 text-[#0A66C2] ring-1 ring-[#0A66C2]/30 hover:bg-[#0A66C2]/20 transition-colors"
-        >
-          <LiIcon /> LinkedIn
-        </a>
-      )}
+      ))}
     </span>
   );
 }
 
-function WebsiteScoreBadge({ score, isOld, note, isCs }: { score: number; isOld: boolean; note: string; isCs: boolean }) {
-  if (!score || score === 50) return null;
-  if (isOld) return (
-    <span className="badge badge-yellow gap-1" title={note}>
-      <Clock size={10} />
-      {isCs ? `Starý web (${score}/100)` : `Old site (${score}/100)`}
+function WebsiteStatusBadge({ b }: { b: BusinessResult }) {
+  const status = webStatus(b);
+  if (status === 'NONE') {
+    return (
+      <span className="badge-red" title={b.websiteEvidence || undefined}>
+        <Globe size={10} />Nemají web
+      </span>
+    );
+  }
+  if (status === 'UNKNOWN') {
+    return (
+      <span className="badge" title={b.websiteEvidence || 'Žádný zdroj web nepotvrdil ani nevyvrátil'}>
+        <Globe size={10} />Web neuveden
+      </span>
+    );
+  }
+  const scoreLabel = b.websiteScore && b.websiteScore !== 50 ? ` (${b.websiteScore}/100)` : '';
+  const tooltip = b.websiteAgeNote ? `${b.websiteAgeNote}${scoreLabel}` : (scoreLabel ? `Skóre${scoreLabel}` : '');
+  if (b.websiteIsOld) {
+    return (
+      <span className="badge-accent" title={tooltip || undefined}>
+        <Clock size={10} />Potřebuje nový web{scoreLabel}
+      </span>
+    );
+  }
+  return (
+    <span className="badge" title={tooltip || undefined}>
+      <Globe size={10} />Mají web{scoreLabel}
     </span>
   );
-  if (score >= 65) return (
-    <span className="badge badge-green gap-1">
-      <Globe size={10} />
-      {isCs ? `Moderní web (${score}/100)` : `Modern site (${score}/100)`}
-    </span>
-  );
-  return null;
+}
+
+/**
+ * A row can come from more than one source — the search merges them and stores the ids joined
+ * by `+`. Google Maps and Firmy.cz are marked as historical: those sources were switched off
+ * in Vlna 2 for licensing reasons and only older rows still carry them.
+ */
+const SOURCE_LABELS: Record<string, string> = {
+  ares:   'ARES',
+  osm:    'OpenStreetMap',
+  csv:    'Vlastní import',
+  google: 'Google Maps (historické)',
+  firmy:  'Firmy.cz (historické)',
+};
+
+function isHistoricalSource(source?: string): boolean {
+  return (source ?? '').split('+').some(id => id === 'google' || id === 'firmy');
 }
 
 function SourceBadge({ source }: { source?: string }) {
-  if (source === 'firmy') {
-    return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-orange-50 text-orange-600 ring-1 ring-orange-200">
-        Firmy.cz
-      </span>
-    );
-  }
+  const ids = (source ?? 'ares').split('+').filter(Boolean);
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-50 text-blue-600 ring-1 ring-blue-200">
-      Google Maps
-    </span>
+    <>
+      {ids.map(id => (
+        <span key={id} className="text-[10px] uppercase tracking-wider text-ink-faint">
+          {SOURCE_LABELS[id] ?? id}
+        </span>
+      ))}
+    </>
   );
 }
 
 function generateMessage(b: BusinessResult, industry: string): string {
   const greeting = buildGreeting(b.name);
+  const status = webStatus(b);
 
-  if (b.source === 'firmy' || (!b.hasWebsite && b.source !== 'google')) {
+  // The wording below claims the firm has no site, so it is only for a proven NONE.
+  if (status === 'NONE') {
     return `${greeting} 👋
 
 jsem Kristián a dělám weby na míru – moderní, rychlé a dobře vypadající na mobilu i počítači.
 
-Váš záznam jsem našel na Firmy.cz – vidím že nabízíte ${industry || 'vaše služby'} a zatím web nemáte. Web může být váš nejlepší obchodní zástupce – pracuje 24/7 a přivádí zákazníky. Rád vám zdarma ukážu jak by mohl vypadat – bez závazků.
+Zaujalo mě, že zatím web nemáte. Přitom ${industry || 'vaše služby'} lidé hledají nejčastěji právě na internetu – web může být jeden z nejlepších způsobů jak získat nové zákazníky. Rád vám zdarma ukážu jak by mohl vypadat – bez závazků.
 
 Třeba znáte i někoho komu by se web hodil – budu za doporučení moc vděčný 🙏
 
 Kristián · https://webovkyvanek.cz/`;
   }
 
-  if (!b.hasWebsite) {
+  if (status === 'UNKNOWN') {
     return `${greeting} 👋
 
 jsem Kristián a dělám weby na míru – moderní, rychlé a dobře vypadající na mobilu i počítači.
 
-Zaujalo mě, že zatím web nemáte. Web dnes může být jeden z nejlepších způsobů jak získat nové zákazníky. Rád vám zdarma ukážu jak by mohl vypadat – bez závazků.
+Narazil jsem na vaši firmu a napadlo mě, jestli by se vám nehodila lepší prezentace na internetu. Rád vám zdarma ukážu jak by web mohl vypadat – bez závazků.
 
 Třeba znáte i někoho komu by se web hodil – budu za doporučení moc vděčný 🙏
 
@@ -422,9 +570,11 @@ Kristián · https://webovkyvanek.cz/`;
 
   return `${greeting} 👋
 
-jsem Kristián a dělám weby na míru.
+jsem Kristián – pomáhám firmám získávat více zákazníků přes internet.
 
-Zaujala mě vaše firma – rád bych vám ukázal jak by mohl vypadat moderní web, který přivádí zákazníky. Zdarma, bez závazků.
+Zaujala mě vaše firma a váš web vypadá dobře! Přesto věřím, že každá online prezentace má prostor se zlepšovat – rychlost, SEO, nebo to jak web přesvědčí návštěvníka zavolat. Rád se na to podívám a řeknu vám svůj názor zdarma, bez závazků.
+
+Třeba znáte i někoho, komu by se nový web hodil – budu za doporučení moc vděčný 🙏
 
 Kristián · https://webovkyvanek.cz/`;
 }
@@ -442,10 +592,10 @@ function MessageBox({ b, industry }: { b: BusinessResult; industry: string }) {
   };
 
   return (
-    <div className="mt-3 border-t border-ink/5 pt-3">
+    <div className="mt-3 border-t border-line pt-3">
       <button
         onClick={() => setOpen(o => !o)}
-        className="flex items-center gap-1.5 text-xs text-ink-faint hover:text-brand-600 transition-colors font-medium"
+        className="flex items-center gap-1.5 text-xs text-ink-faint hover:text-ink transition-colors font-medium"
       >
         <MessageSquare size={12} />
         {open ? 'Skrýt zprávu' : 'Zobrazit zprávu pro oslovení'}
@@ -458,14 +608,14 @@ function MessageBox({ b, industry }: { b: BusinessResult; industry: string }) {
             readOnly
             value={msg}
             rows={8}
-            className="w-full text-xs text-ink-muted bg-surface border border-ink/10 rounded-lg p-3 resize-none font-mono leading-relaxed"
+            className="w-full text-xs text-ink-muted bg-surface-subtle border border-line rounded-lg p-3 resize-none font-mono leading-relaxed"
           />
           <button
             onClick={copy}
             className={`absolute top-2 right-2 flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
               copied
-                ? 'bg-emerald-100 text-emerald-700'
-                : 'bg-white border border-ink/15 text-ink-muted hover:text-ink hover:border-ink/30'
+                ? 'bg-ink text-white'
+                : 'bg-white border border-line text-ink-muted hover:text-ink hover:border-ink'
             }`}
           >
             {copied ? <><Check size={11} /> Zkopírováno</> : <><Copy size={11} /> Kopírovat</>}
@@ -476,31 +626,54 @@ function MessageBox({ b, industry }: { b: BusinessResult; industry: string }) {
   );
 }
 
-function SendEmailButton({ businessId, email }: { businessId: string; email: string }) {
-  const [status, setStatus] = useState<'idle'|'sending'|'sent'|'error'>('idle');
+/**
+ * Prepares the e-mail and hands it over — the app never sends it. Unsolicited commercial mail
+ * needs the recipient's prior consent under § 7 zákona 480/2004 Sb., and we have none, so the
+ * decision to press send stays with the user, in the user's own mailbox.
+ */
+function DraftEmailButton({ businessId, email }: { businessId: string; email: string }) {
+  const [status, setStatus] = useState<'idle'|'loading'|'ready'|'error'>('idle');
   const [errMsg, setErrMsg] = useState('');
+  const [mailto, setMailto] = useState('');
 
-  const send = async () => {
-    setStatus('sending');
-    const res = await fetch('/api/send-email', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ businessResultId: businessId }),
-    });
-    const d = await res.json();
-    if (res.ok) { setStatus('sent'); }
-    else { setStatus('error'); setErrMsg(d.error || 'Chyba'); }
+  const prepare = async () => {
+    setStatus('loading');
+    try {
+      const res = await fetch('/api/draft-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ businessResultId: businessId }),
+      });
+      const d = await res.json();
+      if (!res.ok) { setStatus('error'); setErrMsg(d.error || 'Chyba'); return; }
+
+      await navigator.clipboard.writeText(d.body).catch(() => {});
+      setMailto(
+        `mailto:${encodeURIComponent(d.to || email)}` +
+        `?subject=${encodeURIComponent(d.subject)}&body=${encodeURIComponent(d.body)}`,
+      );
+      setStatus('ready');
+    } catch {
+      setStatus('error');
+      setErrMsg('Koncept se nepodařilo připravit.');
+    }
   };
 
-  if (status === 'sent') return <span className="flex items-center gap-1 text-xs text-emerald-600 font-medium"><Check size={12} /> Odesláno!</span>;
-  if (status === 'error') return <span className="text-xs text-red-500" title={errMsg}>Chyba</span>;
+  if (status === 'ready') {
+    return (
+      <a href={mailto} className="flex items-center gap-1 text-xs font-medium text-accent hover:text-accent-ink">
+        <Check size={12} /> Zkopírováno – otevřít ve schránce
+      </a>
+    );
+  }
+  if (status === 'error') return <span className="text-xs font-medium text-ink" title={errMsg}>{errMsg || 'Chyba'}</span>;
 
   return (
-    <button onClick={send} disabled={status === 'sending'}
-      className="flex items-center gap-1 text-xs text-brand-600 hover:text-brand-700 font-medium disabled:opacity-50 transition-colors">
-      {status === 'sending'
-        ? <><svg className="animate-spin h-3 w-3" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>Odesílám…</>
-        : <><Send size={12} /> Poslat email</>}
+    <button onClick={prepare} disabled={status === 'loading'}
+      className="flex items-center gap-1 text-xs font-medium text-ink-muted hover:text-accent disabled:opacity-40 transition-colors">
+      {status === 'loading'
+        ? <><svg className="animate-spin h-3 w-3" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>Připravuji…</>
+        : <><Send size={12} /> Zkopírovat koncept</>}
     </button>
   );
 }
@@ -512,11 +685,9 @@ export default function SearchPage() {
   const locale = useLocale();
   const isCs = locale === 'cs';
 
-  const [brevoConfigured, setBrevoConfigured] = useState(false);
   const [userPlan, setUserPlan] = useState<string>('FREE');
 
   useEffect(() => {
-    fetch('/api/profile/brevo').then(r => r.json()).then(d => setBrevoConfigured(d.configured ?? false)).catch(() => {});
     fetch('/api/auth/me').then(r => r.json()).then(d => setUserPlan(d.user?.plan ?? 'FREE')).catch(() => {});
   }, []);
 
@@ -524,7 +695,7 @@ export default function SearchPage() {
   const [customRegion, setCustomRegion]   = useState('');
   const [industry, setIndustry]           = useState('');
   const [customIndustry, setCustomIndustry] = useState('');
-  const [filters, setFilters]             = useState<Filters>(EMPTY);
+  const [active, setActive]               = useState<Set<string>>(new Set());
   const [results, setResults]             = useState<BusinessResult[]>([]);
   const [searchId, setSearchId]           = useState<string | null>(null);
   const [loading, setLoading]             = useState(false);
@@ -535,16 +706,26 @@ export default function SearchPage() {
   const effectiveRegion   = region === '__custom__'   ? customRegion   : region;
   const effectiveIndustry = industry === '__custom__' ? customIndustry : industry;
 
-  const filtered = results.filter(b => match(b, filters));
+  /** Every active filter has to hold — combining is always AND. Best opportunities first. */
+  const filtered = results
+    .filter(b => matchesAll(b, active))
+    .sort((a, b) => b.leadScore - a.leadScore || a.name.localeCompare(b.name, 'cs'));
 
-  const setF = <K extends keyof Filters>(key: K, val: boolean) =>
-    setFilters(prev => ({ ...prev, [key]: prev[key] === val ? null : val }));
+  const toggle = (id: string) =>
+    setActive(prev => {
+      const next = new Set(prev);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
 
-  const cnt = (key: keyof Filters, val: boolean) =>
-    results.filter(b => match(b, { ...EMPTY, [key]: val })).length;
-
-  const cntBoth = () =>
-    results.filter(b => !b.hasWebsite && !b.hasFacebook && !b.hasInstagram && !b.hasLinkedIn).length;
+  /**
+   * How many rows this chip would leave if it were the *next* one turned on. Showing the count
+   * against the already-filtered set stops the user from clicking their way to zero results.
+   */
+  const countFor = (id: string) => {
+    const withIt = new Set(active).add(id);
+    return results.filter(b => matchesAll(b, withIt)).length;
+  };
 
   const isWholeCzech = (r: string) =>
     ['celá čr', 'cela cr', 'celá cr'].includes(r.toLowerCase().trim());
@@ -555,11 +736,11 @@ export default function SearchPage() {
     setLoading(true);
     setError('');
     setResults([]);
-    setFilters(EMPTY);
+    setActive(new Set());
     setHasSearched(true);
     setLoadingMsg(isWholeCzech(effectiveRegion)
       ? (isCs ? 'Prohledávám všech 14 krajů… může trvat 1–2 minuty.' : 'Searching all 14 regions… may take 1–2 min.')
-      : isCs ? 'Hledám firmy z Google Maps i Firmy.cz…' : 'Searching Google Maps and Firmy.cz…');
+      : isCs ? 'Hledám v ARESu a OpenStreetMap…' : 'Searching ARES and OpenStreetMap…');
     try {
       const res = await fetch('/api/search', {
         method: 'POST',
@@ -581,37 +762,16 @@ export default function SearchPage() {
     }
   };
 
-  type TriProps = { label: string; n: number; active: boolean; onClick: () => void; color: string };
-  const Tri = ({ label, n, active, onClick, color }: TriProps) => (
-    <button onClick={onClick}
-      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
-        active ? color + ' shadow-sm' : 'border-ink/10 text-ink-faint hover:border-ink/20 hover:text-ink bg-white'
-      }`}>
-      {label}
-      <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${active ? 'bg-white/30' : 'bg-ink/5'}`}>{n}</span>
-    </button>
-  );
-
-  const problemCount = (b: BusinessResult) => {
-    let n = 0;
-    if (!b.hasWebsite) n++;
-    else if (b.websiteIsOld) n++;
-    if (!b.hasFacebook && !b.hasInstagram && !b.hasLinkedIn) n++;
-    if (b.reviewCount < 10) n++;
-    if ((b.rating ?? 5) < 3.5) n++;
-    return n;
-  };
-
   const popularChips = POPULAR_CHIPS[locale] ?? POPULAR_CHIPS.en;
   const isPro = userPlan === 'PRO' || userPlan === 'BUSINESS';
 
   return (
     <div className="min-h-screen bg-surface pt-16">
-      <div className="border-b border-ink/5 bg-surface">
+      <div className="border-b border-line bg-white">
         <div className="max-w-6xl mx-auto px-4 py-8">
           <h1 className="text-2xl font-bold text-ink mb-1">{t('title')}</h1>
           <p className="text-ink-muted text-sm">
-            {isCs ? 'Vyber kraj a obor — výsledky z Google Maps i Firmy.cz' : 'Select a region and industry to find potential clients'}
+            {isCs ? 'Vyber kraj a obor — výsledky z veřejného rejstříku ARES a OpenStreetMap' : 'Select a region and industry to find potential clients'}
           </p>
         </div>
       </div>
@@ -643,7 +803,7 @@ export default function SearchPage() {
                       ))}
                     </optgroup>
                   ))}
-                  <option value="__custom__">{isCs ? '✏️ Jiné město (zadat ručně)' : '✏️ Other (type manually)'}</option>
+                  <option value="__custom__">{isCs ? 'Jiné město (zadat ručně)' : 'Other (type manually)'}</option>
                 </select>
                 <ChevronDown size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none" />
               </div>
@@ -673,13 +833,8 @@ export default function SearchPage() {
                     key={chip.value}
                     type="button"
                     onClick={() => setIndustry(chip.value)}
-                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
-                      industry === chip.value
-                        ? 'bg-brand-600 text-white border-brand-600'
-                        : 'bg-white border-ink/15 text-ink-muted hover:border-brand-400 hover:text-brand-600'
-                    }`}
+                    className={industry === chip.value ? 'chip-active' : 'chip'}
                   >
-                    <span>{chip.emoji}</span>
                     {chip.label}
                   </button>
                 ))}
@@ -703,7 +858,7 @@ export default function SearchPage() {
                     </optgroup>
                   ))}
                   <option value="__custom__">
-                    {locale === 'cs' ? '✏️ Jiný obor (zadat ručně)' : locale === 'sk' ? '✏️ Iný odbor (zadať ručne)' : '✏️ Other (type manually)'}
+                    {locale === 'cs' ? 'Jiný obor (zadat ručně)' : locale === 'sk' ? 'Iný odbor (zadať ručne)' : 'Other (type manually)'}
                   </option>
                 </select>
                 <ChevronDown size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none" />
@@ -735,7 +890,7 @@ export default function SearchPage() {
           </div>
 
           {loading && loadingMsg && (
-            <div className="mt-4 flex items-center gap-2 text-sm text-brand-600 bg-brand-50 border border-brand-200 rounded-xl px-4 py-3">
+            <div className="mt-4 flex items-center gap-2 text-sm text-ink-muted border-t border-line pt-4">
               <svg className="animate-spin h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
@@ -746,96 +901,31 @@ export default function SearchPage() {
         </form>
 
         {error && (
-          <div className="rounded-xl bg-red-50 border border-red-200 text-red-700 px-4 py-3 text-sm mb-4">{error}</div>
+          <div className="rounded-lg border border-ink px-4 py-3 text-sm font-medium text-ink mb-4">{error}</div>
         )}
 
         {results.length > 0 && (
           <>
-            {/* ── Quick filters ── */}
-            <div className="mb-4">
-              <p className="text-[11px] font-semibold text-ink-faint uppercase tracking-wider mb-2 px-1">
-                {isCs ? '⚡ Rychlé filtry' : '⚡ Quick filters'}
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={() => setFilters(f =>
-                    f.website === false && f.social === null
-                      ? EMPTY
-                      : { ...EMPTY, website: false }
-                  )}
-                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all ${
-                    filters.website === false && filters.social === null
-                      ? 'bg-red-600 text-white border-red-600 shadow-sm'
-                      : 'bg-white border-red-200 text-red-700 hover:bg-red-50'
-                  }`}
-                >
-                  <Globe size={14} />
-                  {isCs ? 'Jen bez webu' : 'No website'}
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
-                    filters.website === false && filters.social === null ? 'bg-white/25 text-white' : 'bg-red-100 text-red-700'
-                  }`}>{cnt('website', false)}</span>
-                </button>
-
-                <button
-                  onClick={() => setFilters(f =>
-                    f.social === false && f.website === null
-                      ? EMPTY
-                      : { ...EMPTY, social: false }
-                  )}
-                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all ${
-                    filters.social === false && filters.website === null
-                      ? 'bg-orange-500 text-white border-orange-500 shadow-sm'
-                      : 'bg-white border-orange-200 text-orange-700 hover:bg-orange-50'
-                  }`}
-                >
-                  <Users size={14} />
-                  {isCs ? 'Jen bez soc. sítí' : 'No social media'}
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
-                    filters.social === false && filters.website === null ? 'bg-white/25 text-white' : 'bg-orange-100 text-orange-700'
-                  }`}>{cnt('social', false)}</span>
-                </button>
-
-                <button
-                  onClick={() => setFilters(f =>
-                    f.website === false && f.social === false
-                      ? EMPTY
-                      : { ...EMPTY, website: false, social: false }
-                  )}
-                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all ${
-                    filters.website === false && filters.social === false
-                      ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
-                      : 'bg-white border-purple-200 text-purple-700 hover:bg-purple-50'
-                  }`}
-                >
-                  <Star size={14} />
-                  {isCs ? 'Bez webu i sítí' : 'No web & no social'}
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
-                    filters.website === false && filters.social === false ? 'bg-white/25 text-white' : 'bg-purple-100 text-purple-700'
-                  }`}>{cntBoth()}</span>
-                </button>
-              </div>
-            </div>
-
-            {/* ── Detailed filters ── */}
-            <div className="card mb-4 p-4">
-              <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-                <div className="flex items-center gap-2">
-                  <SlidersHorizontal size={15} className="text-ink-faint" />
-                  <span className="text-sm font-medium text-ink">{isCs ? 'Filtrovat' : 'Filter'}</span>
-                  {activeCount(filters) > 0 && (
-                    <span className="badge-purple text-[10px]">{activeCount(filters)} {isCs ? 'aktivní' : 'active'}</span>
-                  )}
-                </div>
-                <div className="flex items-center gap-3 flex-wrap">
-                  <span className="text-xs text-ink-faint">
+            {/* ── Filters ──────────────────────────────────────────────────────────
+                Rendered by looping the registry, so a filter added in lead-filters.ts shows up
+                here with no change to this file. The number on a chip is how many firms would
+                remain if it were switched on next — filters combine with AND. */}
+            <div className="mb-8">
+              <div className="flex items-baseline justify-between flex-wrap gap-3 pb-3 mb-4 border-b border-line">
+                <div className="flex items-baseline gap-3">
+                  <h2 className="text-lg font-extrabold tracking-tight">{isCs ? 'Výsledky' : 'Results'}</h2>
+                  <span className="tnum text-sm text-ink-muted">
                     {isCs ? `${filtered.length} z ${results.length} firem` : `${filtered.length} of ${results.length}`}
                   </span>
-                  {activeCount(filters) > 0 && (
-                    <button onClick={() => setFilters(EMPTY)} className="flex items-center gap-1 text-xs text-ink-faint hover:text-ink">
-                      <X size={12} />{isCs ? 'Resetovat' : 'Reset'}
+                </div>
+
+                <div className="flex items-center gap-4 flex-wrap">
+                  {active.size > 0 && (
+                    <button onClick={() => setActive(new Set())}
+                      className="flex items-center gap-1 text-xs text-ink-muted hover:text-ink transition-colors">
+                      <X size={12} />{isCs ? 'Zrušit filtry' : 'Clear filters'}
                     </button>
                   )}
-                  {/* Export buttons */}
                   {searchId && (
                     <div className="flex items-center gap-2">
                       <button
@@ -859,171 +949,163 @@ export default function SearchPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-                <div>
-                  <p className="text-[11px] font-semibold text-ink-faint uppercase tracking-wider mb-2">{isCs ? 'Web' : 'Website'}</p>
-                  <div className="flex gap-2 flex-wrap">
-                    <Tri label={isCs ? 'Má web' : 'Has website'} n={cnt('website', true)} active={filters.website === true} onClick={() => setF('website', true)} color="border-emerald-300 bg-emerald-50 text-emerald-700" />
-                    <Tri label={isCs ? 'Bez webu' : 'No website'} n={cnt('website', false)} active={filters.website === false} onClick={() => setF('website', false)} color="border-red-300 bg-red-50 text-red-700" />
-                  </div>
-                </div>
-                <div>
-                  <p className="text-[11px] font-semibold text-ink-faint uppercase tracking-wider mb-2">{isCs ? 'Kvalita webu' : 'Site quality'}</p>
-                  <div className="flex gap-2 flex-wrap">
-                    <Tri label={isCs ? 'Starý web' : 'Old site'} n={cnt('oldWebsite', true)} active={filters.oldWebsite === true} onClick={() => setF('oldWebsite', true)} color="border-yellow-300 bg-yellow-50 text-yellow-700" />
-                    <Tri label={isCs ? 'Moderní' : 'Modern'} n={cnt('oldWebsite', false)} active={filters.oldWebsite === false} onClick={() => setF('oldWebsite', false)} color="border-emerald-300 bg-emerald-50 text-emerald-700" />
-                  </div>
-                </div>
-                <div>
-                  <p className="text-[11px] font-semibold text-ink-faint uppercase tracking-wider mb-2">{isCs ? 'Sociální sítě' : 'Social'}</p>
-                  <div className="flex gap-2 flex-wrap">
-                    <Tri label={isCs ? 'Má soc. sítě' : 'Has social'} n={cnt('social', true)} active={filters.social === true} onClick={() => setF('social', true)} color="border-emerald-300 bg-emerald-50 text-emerald-700" />
-                    <Tri label={isCs ? 'Bez soc. sítí' : 'No social'} n={cnt('social', false)} active={filters.social === false} onClick={() => setF('social', false)} color="border-red-300 bg-red-50 text-red-700" />
-                  </div>
-                </div>
-                <div>
-                  <p className="text-[11px] font-semibold text-ink-faint uppercase tracking-wider mb-2">{isCs ? 'Recenze' : 'Reviews'}</p>
-                  <div className="flex gap-2 flex-wrap">
-                    <Tri label="10+" n={cnt('reviews', true)} active={filters.reviews === true} onClick={() => setF('reviews', true)} color="border-emerald-300 bg-emerald-50 text-emerald-700" />
-                    <Tri label="<10" n={cnt('reviews', false)} active={filters.reviews === false} onClick={() => setF('reviews', false)} color="border-yellow-300 bg-yellow-50 text-yellow-700" />
-                  </div>
-                </div>
-                <div>
-                  <p className="text-[11px] font-semibold text-ink-faint uppercase tracking-wider mb-2">{isCs ? 'Hodnocení' : 'Rating'}</p>
-                  <div className="flex gap-2 flex-wrap">
-                    <Tri label="3.5+" n={cnt('rating', true)} active={filters.rating === true} onClick={() => setF('rating', true)} color="border-emerald-300 bg-emerald-50 text-emerald-700" />
-                    <Tri label="<3.5" n={cnt('rating', false)} active={filters.rating === false} onClick={() => setF('rating', false)} color="border-purple-300 bg-purple-50 text-purple-700" />
-                  </div>
-                </div>
+              <div className="space-y-2.5">
+                {GROUP_ORDER.map(group => {
+                  const items = LEAD_FILTERS.filter(f => f.group === group);
+                  if (items.length === 0) return null;
+                  return (
+                    <div key={group} className="flex flex-wrap items-center gap-2">
+                      <span className="w-16 shrink-0 text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
+                        {isCs ? GROUP_LABELS[group].cs : GROUP_LABELS[group].en}
+                      </span>
+                      {items.map(f => {
+                        const on = active.has(f.id);
+                        const n  = countFor(f.id);
+                        return (
+                          <button
+                            key={f.id}
+                            onClick={() => toggle(f.id)}
+                            disabled={!on && n === 0}
+                            className={on ? 'chip-active' : 'chip'}
+                          >
+                            {isCs ? f.label.cs : f.label.en}
+                            <span className={`tnum ${on ? 'text-white/60' : 'text-ink-faint'}`}>{n}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
-            {/* ── Results ── */}
-            <div className="space-y-3">
-              {filtered.map(b => {
-                const problems = problemCount(b);
+            {/* ── Results ──────────────────────────────────────────────────────────
+                A row, not a card: one hairline between neighbours, the score on the left, and
+                a 3px accent edge on the ones worth calling first. */}
+            <div className="border-t border-line">
+              {filtered.map((b, i) => {
+                const good    = b.leadScore >= GOOD_LEAD;
+                const reasons = topReasons(b);
                 return (
-                  <div key={b.id} className="card p-0 overflow-hidden hover:shadow-card-hover transition-shadow">
-                    <div className="flex items-start gap-4 p-5">
+                  <div
+                    key={b.id}
+                    className="row stagger flex items-start gap-4 py-5 pl-4 pr-1 border-l-[3px]"
+                    style={{
+                      '--i': Math.min(i, 20),
+                      borderLeftColor: good ? 'rgb(var(--accent))' : 'transparent',
+                    } as React.CSSProperties}
+                  >
+                    <LeadScore value={b.leadScore} />
 
-                      {/* Score circle */}
-                      <div className={`flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm ${
-                        problems >= 3 ? 'bg-red-100 text-red-600' :
-                        problems === 2 ? 'bg-orange-100 text-orange-600' :
-                        problems === 1 ? 'bg-yellow-100 text-yellow-600' :
-                        'bg-emerald-100 text-emerald-600'
-                      }`}>
-                        {problems > 0 ? problems : '✓'}
-                      </div>
-
-                      <div className="flex-1 min-w-0">
-                        {/* Name + maps link */}
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <h3 className="font-semibold text-ink">{b.name}</h3>
-                              <SourceBadge source={b.source} />
-                            </div>
-                            {b.address && (
-                              <p className="text-xs text-ink-faint mt-0.5 flex items-center gap-1">
-                                <MapPin size={11} />{b.address}
-                              </p>
-                            )}
+                    <div className="flex-1 min-w-0">
+                      {/* Name + source */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="font-semibold text-ink leading-tight">{b.name}</h3>
+                            <SourceBadge source={b.source} />
                           </div>
-                          {b.googleMapsUrl && b.source !== 'firmy' && (
-                            <a href={b.googleMapsUrl} target="_blank" rel="noopener noreferrer"
-                               className="flex-shrink-0 btn-ghost btn-sm p-1.5" title="Otevřít v Google Maps">
-                              <ExternalLink size={13} />
-                            </a>
-                          )}
-                          {b.source === 'firmy' && b.googleMapsUrl && (
-                            <a href={b.googleMapsUrl} target="_blank" rel="noopener noreferrer"
-                               className="flex-shrink-0 btn-ghost btn-sm p-1.5 text-orange-500" title="Otevřít na Firmy.cz">
-                              <ExternalLink size={13} />
-                            </a>
+                          {b.address && (
+                            <p className="text-xs text-ink-faint mt-1 flex items-center gap-1">
+                              <MapPin size={11} />{b.address}
+                            </p>
                           )}
                         </div>
-
-                        {/* Contacts */}
-                        <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
-                          {b.phone && (
-                            <a href={`tel:${b.phone}`} className="flex items-center gap-1 text-xs text-ink-muted hover:text-brand-600 transition-colors">
-                              <Phone size={11} />{b.phone}
-                            </a>
-                          )}
-                          {b.email && (
-                            <a href={`mailto:${b.email}`} className="flex items-center gap-1 text-xs text-ink-muted hover:text-brand-600 transition-colors">
-                              <Mail size={11} />{b.email}
-                            </a>
-                          )}
-                          {b.website && (
-                            <a href={b.website} target="_blank" rel="noopener noreferrer"
-                               className="flex items-center gap-1 text-xs text-ink-muted hover:text-brand-600 transition-colors truncate max-w-[220px]">
-                              <Globe size={11} />{b.website.replace(/^https?:\/\//, '')}
-                            </a>
-                          )}
-                          {b.email && brevoConfigured && (
-                            <SendEmailButton businessId={b.id} email={b.email} />
-                          )}
-                        </div>
-
-                        {/* Badges row */}
-                        <div className="flex flex-wrap gap-2 mt-3 items-center">
-                          <span className={b.hasWebsite ? 'badge-green' : 'badge-red'}>
-                            <Globe size={10} />
-                            {b.hasWebsite ? (isCs ? 'Má web' : 'Has website') : (isCs ? 'Bez webu' : 'No website')}
-                          </span>
-
-                          {b.hasWebsite && (
-                            <WebsiteScoreBadge score={b.websiteScore} isOld={b.websiteIsOld} note={b.websiteAgeNote} isCs={isCs} />
-                          )}
-
-                          <SocialLinks b={b} />
-
-                          {b.rating != null && (
-                            <span className={(b.rating ?? 5) < 3.5 ? 'badge-red' : b.reviewCount < 10 ? 'badge-yellow' : 'badge-green'}>
-                              <Star size={10} />
-                              {b.rating.toFixed(1)} ({b.reviewCount} {isCs ? 'rec.' : 'rev.'})
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Outreach message */}
-                        {(b.source === 'firmy' || !b.hasWebsite || b.websiteIsOld) && (
-                          <MessageBox b={b} industry={effectiveIndustry} />
+                        {/* Only rows found before Vlna 2 carry a directory link. */}
+                        {b.googleMapsUrl && isHistoricalSource(b.source) && (
+                          <a href={b.googleMapsUrl} target="_blank" rel="noopener noreferrer"
+                             className="shrink-0 btn-ghost btn-sm p-1.5" title="Původní zdroj záznamu">
+                            <ExternalLink size={13} />
+                          </a>
                         )}
                       </div>
 
-                      {/* Issues column (desktop) */}
-                      {problems > 0 && (
-                        <div className="hidden lg:block flex-shrink-0 text-right min-w-[130px]">
-                          <p className="text-xs font-medium text-ink-faint mb-1">{isCs ? 'Problémy' : 'Issues'}</p>
-                          <div className="space-y-0.5">
-                            {!b.hasWebsite && <p className="text-xs text-red-600">→ {isCs ? 'Chybí web' : 'No website'}</p>}
-                            {b.hasWebsite && b.websiteIsOld && <p className="text-xs text-yellow-600">→ {isCs ? 'Starý web' : 'Old website'}</p>}
-                            {!b.hasFacebook && !b.hasInstagram && !b.hasLinkedIn && <p className="text-xs text-orange-600">→ {isCs ? 'Chybí soc. sítě' : 'No social'}</p>}
-                            {b.reviewCount < 10 && <p className="text-xs text-yellow-600">→ {isCs ? 'Málo recenzí' : 'Few reviews'}</p>}
-                            {(b.rating ?? 5) < 3.5 && <p className="text-xs text-purple-600">→ {isCs ? 'Nízké hodnocení' : 'Low rating'}</p>}
-                          </div>
-                        </div>
-                      )}
+                      {/* Contacts */}
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
+                        {b.phone && (() => {
+                          const mobile = isCzMobile(b.phone!);
+                          return (
+                            <span className="flex items-center gap-1.5">
+                              <a href={`tel:${b.phone}`}
+                                 className={`flex items-center gap-1 text-xs transition-colors hover:text-accent ${mobile ? 'text-ink font-medium' : 'text-ink-muted'}`}>
+                                {mobile ? <Smartphone size={11} /> : <Phone size={11} />}
+                                {b.phone}
+                                {mobile && <span className="text-[10px] text-ink-faint font-normal">(mobil)</span>}
+                              </a>
+                              {mobile && (
+                                <a href={whatsappHref(b.phone!)} target="_blank" rel="noopener noreferrer"
+                                   title="Napsat přes WhatsApp" className="badge hover:border-ink hover:text-ink transition-colors">
+                                  <WaIcon /> WA
+                                </a>
+                              )}
+                            </span>
+                          );
+                        })()}
+                        {b.email && (
+                          <a href={`mailto:${b.email}`} className="flex items-center gap-1 text-xs text-ink-muted hover:text-accent transition-colors">
+                            <Mail size={11} />{b.email}
+                          </a>
+                        )}
+                        {b.website && (
+                          <a href={b.website} target="_blank" rel="noopener noreferrer"
+                             className="flex items-center gap-1 text-xs text-ink-muted hover:text-accent transition-colors truncate max-w-[220px]">
+                            <Globe size={11} />{b.website.replace(/^https?:\/\//, '')}
+                          </a>
+                        )}
+                        {b.email && <DraftEmailButton businessId={b.id} email={b.email} />}
+                      </div>
+
+                      {/* Badges */}
+                      <div className="flex flex-wrap gap-2 mt-3 items-center">
+                        <WebsiteStatusBadge b={b} />
+                        <SocialLinks b={b} />
+                        {b.ico && (
+                          <span className="badge" title="IČO z veřejného rejstříku ARES">IČO {b.ico}</span>
+                        )}
+                        {b.vatUnreliable && (
+                          <span className="badge-red" title="Finanční správa firmu vede jako nespolehlivého plátce DPH">
+                            Nespolehlivý plátce DPH
+                          </span>
+                        )}
+                      </div>
+
+                      <ContactStrategy b={b} />
+                      <MessageBox b={b} industry={effectiveIndustry} />
                     </div>
+
+                    {/* Why this score (desktop) */}
+                    {reasons.length > 0 && (
+                      <div className="hidden lg:block shrink-0 w-44 text-right">
+                        <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint mb-1">
+                          {isCs ? 'Proč' : 'Why'}
+                        </p>
+                        {reasons.map(r => (
+                          <p key={r} className="text-xs text-ink-muted leading-relaxed">{r}</p>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 );
               })}
 
               {filtered.length === 0 && (
-                <div className="card text-center py-16 text-ink-faint">
-                  <Search size={40} className="mx-auto mb-3 opacity-20" />
-                  <p className="mb-3">{t('no_results')}</p>
-                  {activeCount(filters) > 0 && (
-                    <button onClick={() => setFilters(EMPTY)} className="btn-outline btn-sm mx-auto">
+                <div className="text-center py-20 text-ink-faint">
+                  <p className="mb-4">{t('no_results')}</p>
+                  {active.size > 0 && (
+                    <button onClick={() => setActive(new Set())} className="btn-outline btn-sm mx-auto">
                       {isCs ? 'Zrušit filtry' : 'Clear filters'}
                     </button>
                   )}
                 </div>
               )}
             </div>
+
+            {/* ODbL is share-alike: anything derived from OSM has to name the source. */}
+            {results.some(b => (b.source ?? '').split('+').includes('osm')) && (
+              <p className="mt-4 text-center text-[11px] text-ink-faint">
+                Část dat: {OSM_ATTRIBUTION} · údaje o firmách z veřejného rejstříku ARES
+              </p>
+            )}
           </>
         )}
 

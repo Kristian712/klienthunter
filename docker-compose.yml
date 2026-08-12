@@ -19,7 +19,6 @@ services:
     environment:
       DATABASE_URL: postgresql://postgres:password@db:5432/klienthunter
       JWT_SECRET: change-me-in-production
-      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY}
     depends_on:
       - db
 
