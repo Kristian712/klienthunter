@@ -9,7 +9,7 @@ import { saveUser } from '@/lib/client-auth';
 export default function LoginPage() {
   const t = useTranslations('auth');
   const locale = useLocale();
-  const isCs = locale === 'cs';
+  const isCs = locale === 'cs' || locale === 'sk';
   const [form, setForm]       = useState({ email: '', password: '' });
   const [error, setError]     = useState('');
   const [loading, setLoading] = useState(false);

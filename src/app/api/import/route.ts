@@ -77,6 +77,13 @@ export async function POST(req: NextRequest) {
       address: clean(r.address),
     }));
 
+    // An imported row is scored against the same criteria as a searched one, or the import
+    // would rank by a different rule than the rest of the app.
+    const profile = await prisma.user.findUnique({
+      where: { id: payload.userId },
+      select: { targetFilters: true },
+    });
+
     // Stored as a search so the import shows up in the history and can be exported, reopened
     // and deleted exactly like one.
     const search = await prisma.search.create({
@@ -88,7 +95,7 @@ export async function POST(req: NextRequest) {
     // hand-maintained spreadsheet.
     const candidates = mergeLeads([leads], cap);
     const verified = await enrichAndVerify(candidates, { probeNetwork: true, deadlineAt });
-    const results = await persistResults(search.id, verified);
+    const results = await persistResults(search.id, verified, profile?.targetFilters);
 
     return NextResponse.json({
       searchId: search.id,

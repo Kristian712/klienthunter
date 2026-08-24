@@ -47,6 +47,14 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Ranking is per-user: the score of a row is the share of *this* user's onboarding criteria
+    // the firm meets. Someone who skipped onboarding has an empty list and gets the neutral
+    // default from `lead-score.ts`.
+    const profile = await prisma.user.findUnique({
+      where: { id: payload.userId },
+      select: { targetFilters: true },
+    });
+
     const search = await prisma.search.create({
       data: { userId: payload.userId, query: industry, region },
     });
@@ -65,7 +73,7 @@ export async function POST(req: NextRequest) {
     // A nationwide run would need thousands of probes and would never finish, so it skips the
     // network entirely and yields only HAS / UNKNOWN from what the sources already said.
     const verified = await enrichAndVerify(candidates, { probeNetwork: !wholeCz, deadlineAt });
-    const results = await persistResults(search.id, verified);
+    const results = await persistResults(search.id, verified, profile?.targetFilters);
 
     return NextResponse.json({ searchId: search.id, results });
   } catch (err) {

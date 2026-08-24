@@ -9,21 +9,6 @@
     "register": "Registrovať sa",
     "logout": "Odhlásiť sa"
   },
-  "home": {
-    "hero_title": "Nájdi firmy, ktoré potrebujú tvoju pomoc",
-    "hero_subtitle": "KlientHunter automaticky nájde firmy bez webu alebo bez sociálnych sietí – tvoji potenciálni klienti sú len pár klikov ďalej.",
-    "cta_start": "Začať zadarmo",
-    "cta_demo": "Ako to funguje",
-    "feature1_title": "Vyhľadávanie firiem",
-    "feature1_desc": "Hľadaj firmy podľa regiónu a odboru v registri ARES a v OpenStreetMap.",
-    "feature2_title": "Automatická analýza",
-    "feature2_desc": "Pri každej firme overíme web a sociálne siete a doplníme údaje z registra.",
-    "feature3_title": "Export do Excelu",
-    "feature3_desc": "Stiahni kompletný zoznam firiem so všetkými kontaktmi pre outreach.",
-    "stats_businesses": "Firiem analyzovaných",
-    "stats_users": "Spokojných užívateľov",
-    "stats_countries": "Krajín"
-  },
   "search": {
     "title": "Vyhľadať firmy",
     "region_label": "Región / Mesto",
@@ -99,17 +84,5 @@
     "business_period": "/mesiac",
     "current_plan": "Aktuálny plán",
     "choose_plan": "Vybrať plán"
-  },
-  "common": {
-    "yes": "Áno",
-    "no": "Nie",
-    "loading": "Načítavam…",
-    "error": "Chyba",
-    "success": "Úspech",
-    "save": "Uložiť",
-    "cancel": "Zrušiť",
-    "delete": "Zmazať",
-    "edit": "Upraviť",
-    "back": "Späť"
   }
 }

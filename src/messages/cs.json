@@ -9,21 +9,6 @@
     "register": "Registrovat se",
     "logout": "Odhlásit se"
   },
-  "home": {
-    "hero_title": "Najdi firmy, které potřebují tvou pomoc",
-    "hero_subtitle": "KlientHunter automaticky vyhledá firmy bez webu nebo bez sociálních sítí – tvoji potenciální klienti jsou jen pár kliknutí daleko.",
-    "cta_start": "Začít zdarma",
-    "cta_demo": "Jak to funguje",
-    "feature1_title": "Vyhledávání firem",
-    "feature1_desc": "Hledej firmy podle regionu a oboru v rejstříku ARES a v OpenStreetMap.",
-    "feature2_title": "Automatická analýza",
-    "feature2_desc": "U každé firmy ověříme web a sociální sítě a doplníme údaje z rejstříku.",
-    "feature3_title": "Export do Excelu",
-    "feature3_desc": "Stáhni si kompletní seznam firem se všemi kontakty pro outreach.",
-    "stats_businesses": "Firem analyzováno",
-    "stats_users": "Spokojených uživatelů",
-    "stats_countries": "Zemí"
-  },
   "search": {
     "title": "Vyhledat firmy",
     "region_label": "Region / Město",
@@ -100,21 +85,27 @@
     "current_plan": "Aktuální plán",
     "choose_plan": "Vybrat plán",
     "features": {
-      "free": ["5 vyhledávání měsíčně", "20 výsledků na vyhledávání", "Základní filtry", "Export do CSV"],
-      "pro": ["100 vyhledávání měsíčně", "200 výsledků na vyhledávání", "Pokročilé filtry", "Export do Excelu", "Uložené výsledky"],
-      "business": ["Neomezená vyhledávání", "500 výsledků na vyhledávání", "Všechny filtry", "Export do Excelu", "API přístup", "Prioritní podpora"]
+      "free": [
+        "5 vyhledávání měsíčně",
+        "20 výsledků na vyhledávání",
+        "Základní filtry",
+        "Export do CSV"
+      ],
+      "pro": [
+        "100 vyhledávání měsíčně",
+        "200 výsledků na vyhledávání",
+        "Pokročilé filtry",
+        "Export do Excelu",
+        "Uložené výsledky"
+      ],
+      "business": [
+        "Neomezená vyhledávání",
+        "500 výsledků na vyhledávání",
+        "Všechny filtry",
+        "Export do Excelu",
+        "API přístup",
+        "Prioritní podpora"
+      ]
     }
-  },
-  "common": {
-    "yes": "Ano",
-    "no": "Ne",
-    "loading": "Načítám...",
-    "error": "Chyba",
-    "success": "Úspěch",
-    "save": "Uložit",
-    "cancel": "Zrušit",
-    "delete": "Smazat",
-    "edit": "Upravit",
-    "back": "Zpět"
   }
 }

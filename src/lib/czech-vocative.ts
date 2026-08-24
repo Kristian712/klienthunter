@@ -44,7 +44,14 @@ export function extractFirstName(businessName: string): string | null {
   return null;
 }
 
-export function buildGreeting(businessName: string): string {
+/**
+ * Slovak dropped the vocative in everyday use and English never had one, so only Czech gets the
+ * declension. The name list is shared: Czech and Slovak first names overlap almost completely,
+ * and a missed match just means a plain "Dobrý deň," — the safe direction to fail in.
+ */
+export function buildGreeting(businessName: string, locale = 'cs'): string {
   const firstName = extractFirstName(businessName);
+  if (locale === 'en') return firstName ? `Hello ${firstName},` : 'Hello,';
+  if (locale === 'sk') return firstName ? `Dobrý deň, ${firstName},` : 'Dobrý deň,';
   return firstName ? `Dobrý den, ${toVocative(firstName)},` : 'Dobrý den,';
 }

@@ -9,21 +9,6 @@
     "register": "Register",
     "logout": "Logout"
   },
-  "home": {
-    "hero_title": "Find businesses that need your help",
-    "hero_subtitle": "KlientHunter automatically finds businesses without a website or without social media – your potential clients are just a few clicks away.",
-    "cta_start": "Start for free",
-    "cta_demo": "How it works",
-    "feature1_title": "Business Search",
-    "feature1_desc": "Search for businesses by region and industry in the ARES registry and OpenStreetMap.",
-    "feature2_title": "Automatic Analysis",
-    "feature2_desc": "We check every business for a website and social media and add registry data.",
-    "feature3_title": "Export to Excel",
-    "feature3_desc": "Download a complete list of businesses with all contacts for outreach.",
-    "stats_businesses": "Businesses analyzed",
-    "stats_users": "Happy users",
-    "stats_countries": "Countries"
-  },
   "search": {
     "title": "Search Businesses",
     "region_label": "Region / City",
@@ -100,21 +85,27 @@
     "current_plan": "Current Plan",
     "choose_plan": "Choose Plan",
     "features": {
-      "free": ["5 searches per month", "20 results per search", "Basic filters", "CSV export"],
-      "pro": ["100 searches per month", "200 results per search", "Advanced filters", "Excel export", "Saved results"],
-      "business": ["Unlimited searches", "500 results per search", "All filters", "Excel export", "API access", "Priority support"]
+      "free": [
+        "5 searches per month",
+        "20 results per search",
+        "Basic filters",
+        "CSV export"
+      ],
+      "pro": [
+        "100 searches per month",
+        "200 results per search",
+        "Advanced filters",
+        "Excel export",
+        "Saved results"
+      ],
+      "business": [
+        "Unlimited searches",
+        "500 results per search",
+        "All filters",
+        "Excel export",
+        "API access",
+        "Priority support"
+      ]
     }
-  },
-  "common": {
-    "yes": "Yes",
-    "no": "No",
-    "loading": "Loading...",
-    "error": "Error",
-    "success": "Success",
-    "save": "Save",
-    "cancel": "Cancel",
-    "delete": "Delete",
-    "edit": "Edit",
-    "back": "Back"
   }
 }

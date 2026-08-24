@@ -2,10 +2,16 @@
 
 import { useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
-import { Crown, Shield, User, Mail, Calendar, Search, BarChart3, Edit2, Check, X, Lock, Send } from 'lucide-react';
+import { Crown, Shield, User, Mail, Calendar, Search, BarChart3, Edit2, Check, X, Lock, Send, Target } from 'lucide-react';
+import { localized } from '@/lib/lead-filters';
+import { EMPTY_PROFILE, type UserProfile } from '@/lib/profile';
+import {
+  CriteriaField, IndustryField, ProfessionField, RegionField,
+  EMPTY_DRAFT, draftToPayload, toDraft, type ProfileDraft,
+} from '@/components/ProfileFields';
 
 interface ProfileData {
-  user: {
+  user: UserProfile & {
     id: string; email: string; name?: string;
     plan: string; isAdmin: boolean; isVip: boolean; createdAt: string;
     _count: { searches: number };
@@ -19,9 +25,28 @@ interface ProfileData {
 
 const PLAN_LABELS: Record<string, string> = { FREE: 'Zdarma', PRO: 'Pro', BUSINESS: 'Business' };
 
+const T = {
+  title:      { cs: 'Koho hledáte',  sk: 'Koho hľadáte',  en: 'Who you are looking for' },
+  lead:       { cs: 'Odpovědi z úvodního dotazníku. Předvyplňují hledání a určují pořadí výsledků — nic neodfiltrují.',
+                sk: 'Odpovede z úvodného dotazníka. Predvypĺňajú hľadanie a určujú poradie výsledkov — nič neodfiltrujú.',
+                en: 'Your onboarding answers. They pre-fill the search and set the ranking — they filter nothing out.' },
+  sigLabel:   { cs: 'Podpis pod oslovovací zprávu',
+                sk: 'Podpis pod oslovovaciu správu',
+                en: 'Signature under your outreach message' },
+  sigHint:    { cs: 'Jeden řádek pod vaše jméno — web, telefon, cokoli. Nepovinné.',
+                sk: 'Jeden riadok pod vaše meno — web, telefón, čokoľvek. Nepovinné.',
+                en: 'One line under your name — a site, a phone number, anything. Optional.' },
+  save:       { cs: 'Uložit',        sk: 'Uložiť',        en: 'Save' },
+  savingNow:  { cs: 'Ukládám…',      sk: 'Ukladám…',      en: 'Saving…' },
+  saved:      { cs: 'Profil uložen', sk: 'Profil uložený', en: 'Profile saved' },
+  saveFailed: { cs: 'Uložení se nepovedlo. Zkuste to znovu.',
+                sk: 'Uloženie sa nepodarilo. Skúste to znova.',
+                en: 'Saving failed. Please try again.' },
+};
+
 export default function ProfilePage() {
   const locale = useLocale();
-  const isCs = locale === 'cs';
+  const isCs = locale === 'cs' || locale === 'sk';
 
   const [data, setData]         = useState<ProfileData | null>(null);
   const [loading, setLoading]   = useState(true);
@@ -37,12 +62,23 @@ export default function ProfilePage() {
   // who configured Brevo earlier delete the credentials we still hold.
   const [brevoConfigured, setBrevoConfigured] = useState(false);
 
+  // The onboarding answers, editable here for good. Held as a draft so a half-finished edit is
+  // never written — the user presses Save, or nothing happens.
+  const [draft, setDraft] = useState<ProfileDraft>(EMPTY_DRAFT);
+  const [savingProfile, setSavingProfile] = useState(false);
+  // Not part of the draft: the onboarding modal asks four questions and this is not one of them.
+  const [signature, setSignature] = useState('');
+
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
 
   useEffect(() => {
     fetch('/api/profile').then(r => r.json()).then(d => {
       setData(d);
       setNameVal(d.user?.name ?? '');
+      if (d.user) {
+        setDraft(toDraft({ ...EMPTY_PROFILE, ...d.user }));
+        setSignature(d.user.outreachSignature ?? '');
+      }
       setLoading(false);
     });
     fetch('/api/profile/brevo').then(r => r.json()).then(d => {
@@ -69,6 +105,25 @@ export default function ProfilePage() {
       showToast(isCs ? 'Jméno uloženo' : 'Name saved');
     }
     setSaving(false);
+  };
+
+  const patch = (next: Partial<ProfileDraft>) => setDraft(d => ({ ...d, ...next }));
+
+  const saveProfile = async () => {
+    setSavingProfile(true);
+    const res = await fetch('/api/profile', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...draftToPayload(draft), outreachSignature: signature }),
+    });
+    if (res.ok) {
+      const d = await res.json();
+      setData(prev => (prev ? { ...prev, user: { ...prev.user, ...d.user } } : prev));
+      showToast(localized(T.saved, locale));
+    } else {
+      showToast(localized(T.saveFailed, locale));
+    }
+    setSavingProfile(false);
   };
 
   const savePassword = async (e: React.FormEvent) => {
@@ -192,6 +247,41 @@ export default function ProfilePage() {
               <div className="text-xs text-ink-faint mt-1">{s.label}</div>
             </div>
           ))}
+        </div>
+
+        {/* Onboarding answers — editable for good, so a change of trade is one visit away */}
+        <div className="card">
+          <h2 className="font-semibold text-ink flex items-center gap-2 mb-1">
+            <Target size={16} className="text-ink-faint" />
+            {localized(T.title, locale)}
+          </h2>
+          <p className="text-xs text-ink-faint mb-6">{localized(T.lead, locale)}</p>
+
+          <div className="space-y-6">
+            <ProfessionField draft={draft} patch={patch} locale={locale} />
+            <IndustryField   draft={draft} patch={patch} locale={locale} />
+            <RegionField     draft={draft} patch={patch} locale={locale} />
+            <CriteriaField   draft={draft} patch={patch} locale={locale} />
+
+            <div>
+              <label className="label">{localized(T.sigLabel, locale)}</label>
+              <input
+                type="text"
+                className="input"
+                maxLength={160}
+                placeholder="https://…  ·  +420 …"
+                value={signature}
+                onChange={e => setSignature(e.target.value)}
+              />
+              <p className="text-[11px] text-ink-faint mt-1">{localized(T.sigHint, locale)}</p>
+            </div>
+          </div>
+
+          <div className="mt-6 pt-4 border-t border-line">
+            <button onClick={saveProfile} disabled={savingProfile} className="btn-primary btn-sm">
+              {savingProfile ? localized(T.savingNow, locale) : localized(T.save, locale)}
+            </button>
+          </div>
         </div>
 
         {/* Change password */}

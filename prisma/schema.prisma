@@ -19,6 +19,29 @@ model User {
   stripeCustomerId String?
   brevoApiKey      String?
   brevoSenderEmail String?
+
+  // ── Onboarding profile ────────────────────────────────────────────────────
+  // What the user sells, who they sell it to and where. Collected once after
+  // registration so every later visit is one click, and used to rank results:
+  // see targetFilters below and src/lib/lead-score.ts.
+  //
+  // An id from PROFESSIONS in src/lib/profile.ts, or 'other'.
+  profession       String?
+  // Free text, the only thing we have when profession is 'other'.
+  professionText   String?
+  // The trade of the firms they are looking for — feeds the search query.
+  targetIndustry   String?
+  targetRegion     String?
+  targetCity       String?
+  // Ids from LEAD_FILTERS. The share of these a firm meets is its score, so an
+  // empty list is meaningful: it means "score by the neutral default".
+  targetFilters    String[] @default([])
+  // Set once the modal has been answered *or* skipped, so we never nag twice.
+  onboardedAt      DateTime?
+  // One free line under the signature of the outreach draft — the user's site,
+  // phone, whatever they want. See src/lib/outreach.ts.
+  outreachSignature String?
+
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 

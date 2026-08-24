@@ -1,5 +1,3 @@
-import { SLOW_WEBSITE_MS, yearsSince } from './lead-score';
-
 /**
  * Every filter the app offers, as data.
  *
@@ -14,7 +12,22 @@ import { SLOW_WEBSITE_MS, yearsSince } from './lead-score';
  * The important part for the future: filters ask about *fields*, never about sources. A new
  * source that fills in `phone` immediately improves "bez kontaktu" without anyone touching
  * this file.
+ *
+ * These filters are also the vocabulary the scoring uses: a user picks the ones that describe
+ * their ideal client and `lib/lead-score.ts` counts how many of them a firm meets. That is why
+ * the two shared primitives below live here and not there — the dependency runs one way,
+ * lead-score → lead-filters, and never back.
  */
+
+/** A page slower than this to first byte reads as slow. Used by a filter and by the UI. */
+export const SLOW_WEBSITE_MS = 2_500;
+
+export function yearsSince(date: Date | string | null | undefined): number | null {
+  if (!date) return null;
+  const d = date instanceof Date ? date : new Date(date);
+  if (Number.isNaN(d.getTime())) return null;
+  return (Date.now() - d.getTime()) / (365.25 * 24 * 60 * 60 * 1000);
+}
 
 /** The subset of a result row the client-side predicates need. */
 export interface FilterableLead {
@@ -36,20 +49,53 @@ export interface FilterableLead {
 
 export type FilterGroup = 'web' | 'contact' | 'company';
 
+/**
+ * Slovak falls back to Czech rather than English. Every label here is understood by a Slovak
+ * reader, and a half-Slovak half-English screen looks broken in a way half-Czech does not.
+ */
+export function localized(text: { cs: string; sk?: string; en: string }, locale: string): string {
+  if (locale === 'en') return text.en;
+  if (locale === 'sk') return text.sk ?? text.cs;
+  return text.cs;
+}
+
 export interface LeadFilter {
   id: string;
   group: FilterGroup;
-  label: { cs: string; en: string };
+  label: { cs: string; sk?: string; en: string };
   /** Prisma `BusinessResultWhereInput`, typed loosely so this module stays Prisma-free. */
   where: Record<string, unknown>;
   test: (b: FilterableLead) => boolean;
+  /**
+   * True when the data this filter asks about is simply missing for this row — "we did not
+   * learn", as opposed to `test` returning false, which means "we learned it, and it is no".
+   *
+   * Only the *scoring* reads this (see `lead-score.ts`); filtering ignores it entirely, because
+   * a chip the user clicked must keep meaning "show me rows that pass `test`, full stop".
+   *
+   * It matters because our two sources know disjoint things. OpenStreetMap carries the phones
+   * and e-mails but has never heard of a founding date; ARES is the other way round. Without
+   * this flag, an accountant who picks "nová firma" scores every OSM row as a confirmed miss,
+   * the ceiling drops to 50, and the "call these first" highlight never fires once.
+   *
+   * Absent means "this filter is always answerable" — most are, because an empty `phone` column
+   * really is the answer.
+   */
+  unknown?: (b: FilterableLead) => boolean;
 }
 
-export const GROUP_LABELS: Record<FilterGroup, { cs: string; en: string }> = {
-  web:     { cs: 'Web',    en: 'Website' },
-  contact: { cs: 'Kontakt', en: 'Contact' },
-  company: { cs: 'Firma',   en: 'Company' },
+export const GROUP_LABELS: Record<FilterGroup, { cs: string; sk?: string; en: string }> = {
+  company: { cs: 'Firma',   sk: 'Firma',   en: 'Company' },
+  contact: { cs: 'Kontakt', sk: 'Kontakt', en: 'Contact' },
+  web:     { cs: 'Web',     sk: 'Web',     en: 'Website' },
 };
+
+/**
+ * Company first, website last. The website group used to lead because the product was about
+ * firms without one; it is now one property among many and must not be the first thing a
+ * photographer or an accountant reads.
+ */
+export const GROUP_ORDER: FilterGroup[] = ['company', 'contact', 'web'];
 
 /**
  * Rows written before three-state classification carry no status; their `hasWebsite: false`
@@ -86,11 +132,24 @@ function foundedBefore(years: number): Date {
   return new Date(Date.now() - years * 365.25 * 24 * 60 * 60 * 1000);
 }
 
+function youngerThan(years: number) {
+  return (b: FilterableLead) => {
+    const age = yearsSince(b.foundedAt);
+    return age !== null && age < years;
+  };
+}
+
+/** No founding date means no opinion about the firm's age — only ARES ever supplies one. */
+const ageUnknown = (b: FilterableLead) => yearsSince(b.foundedAt) === null;
+
+/** `vatPayer` is filled by the DPH enrichment; null means that lookup never returned. */
+const vatUnknown = (b: FilterableLead) => b.vatPayer === null || b.vatPayer === undefined;
+
 export const LEAD_FILTERS: LeadFilter[] = [
   {
     id: 'no_website',
     group: 'web',
-    label: { cs: 'Web neuveden', en: 'No website found' },
+    label: { cs: 'Web neuveden', sk: 'Web neuvedený', en: 'No website found' },
     // Deliberately UNKNOWN, not NONE. Since the directory sources were removed, nothing can
     // prove a business has no site, so NONE is empty and this is the bucket worth selling to.
     where: STATUS_UNKNOWN,
@@ -99,28 +158,46 @@ export const LEAD_FILTERS: LeadFilter[] = [
   {
     id: 'has_website',
     group: 'web',
-    label: { cs: 'Má web', en: 'Has website' },
+    label: { cs: 'Má web', sk: 'Má web', en: 'Has website' },
     where: STATUS_HAS,
     test: b => webStatusOf(b) === 'HAS',
   },
   {
     id: 'slow_website',
     group: 'web',
-    label: { cs: `Pomalý web (${SLOW_WEBSITE_MS / 1000}s+)`, en: `Slow website (${SLOW_WEBSITE_MS / 1000}s+)` },
+    label: { cs: `Pomalý web (${SLOW_WEBSITE_MS / 1000}s+)`, sk: `Pomalý web (${SLOW_WEBSITE_MS / 1000}s+)`, en: `Slow website (${SLOW_WEBSITE_MS / 1000}s+)` },
     where: { websiteMs: { gte: SLOW_WEBSITE_MS } },
     test: b => typeof b.websiteMs === 'number' && b.websiteMs >= SLOW_WEBSITE_MS,
+    // A page we never timed is not a fast page. Nationwide runs skip every probe.
+    unknown: b => typeof b.websiteMs !== 'number',
   },
   {
     id: 'old_website',
     group: 'web',
-    label: { cs: 'Zastaralý web', en: 'Outdated website' },
+    label: { cs: 'Zastaralý web', sk: 'Zastaraný web', en: 'Outdated website' },
     where: { websiteIsOld: true },
     test: b => Boolean(b.websiteIsOld),
+    // You cannot call a site outdated if you never found the site.
+    unknown: b => !b.websiteIsOld && webStatusOf(b) !== 'HAS',
+  },
+  {
+    id: 'has_contact',
+    group: 'contact',
+    // Part of the neutral default scoring in lead-score.ts: whatever you sell, a firm you
+    // cannot reach is not a lead.
+    label: { cs: 'Má telefon nebo e-mail', sk: 'Má telefón alebo e-mail', en: 'Has phone or e-mail' },
+    where: {
+      OR: [
+        { NOT: [{ phone: null }, { phone: '' }] },
+        { NOT: [{ email: null }, { email: '' }] },
+      ],
+    },
+    test: b => Boolean(b.phone || b.email),
   },
   {
     id: 'no_contact',
     group: 'contact',
-    label: { cs: 'Bez telefonu i e-mailu', en: 'No phone or e-mail' },
+    label: { cs: 'Bez telefonu i e-mailu', sk: 'Bez telefónu aj e-mailu', en: 'No phone or e-mail' },
     where: {
       AND: [
         { OR: [{ phone: null }, { phone: '' }] },
@@ -132,63 +209,77 @@ export const LEAD_FILTERS: LeadFilter[] = [
   {
     id: 'has_phone',
     group: 'contact',
-    label: { cs: 'Má telefon', en: 'Has phone' },
+    label: { cs: 'Má telefon', sk: 'Má telefón', en: 'Has phone' },
     where: { NOT: [{ phone: null }, { phone: '' }] },
     test: b => Boolean(b.phone),
   },
   {
     id: 'has_email',
     group: 'contact',
-    label: { cs: 'Má e-mail', en: 'Has e-mail' },
+    label: { cs: 'Má e-mail', sk: 'Má e-mail', en: 'Has e-mail' },
     where: { NOT: [{ email: null }, { email: '' }] },
     test: b => Boolean(b.email),
   },
   {
     id: 'no_social',
     group: 'contact',
-    label: { cs: 'Bez sociálních sítí', en: 'No social profiles' },
+    label: { cs: 'Bez sociálních sítí', sk: 'Bez sociálnych sietí', en: 'No social profiles' },
     where: { hasFacebook: false, hasInstagram: false, hasLinkedIn: false },
     test: b => !hasSocial(b),
   },
   {
     id: 'no_category',
     group: 'company',
-    label: { cs: 'Bez uvedeného oboru', en: 'No trade listed' },
+    label: { cs: 'Bez uvedeného oboru', sk: 'Bez uvedeného odboru', en: 'No trade listed' },
     where: { OR: [{ category: null }, { category: '' }] },
     test: b => !b.category,
   },
   {
+    id: 'new_firm',
+    group: 'company',
+    // The entry date in ARES is exact, so "founded in the last year" is one of the few things
+    // we can state without hedging. It is the whole lead list for an accountant or a bookkeeper.
+    label: { cs: 'Nová firma (do 1 roku)', sk: 'Nová firma (do 1 roka)', en: 'New firm (under 1 year)' },
+    where: { foundedAt: { gt: foundedBefore(1) } },
+    test: youngerThan(1),
+    unknown: ageUnknown,
+  },
+  {
     id: 'established_3y',
     group: 'company',
-    label: { cs: 'Firma 3+ roky', en: '3+ years old' },
+    label: { cs: 'Firma 3+ roky', sk: 'Firma 3+ roky', en: '3+ years old' },
     where: { foundedAt: { lte: foundedBefore(3) } },
     test: olderThan(3),
+    unknown: ageUnknown,
   },
   {
     id: 'established_10y',
     group: 'company',
-    label: { cs: 'Firma 10+ let', en: '10+ years old' },
+    label: { cs: 'Firma 10+ let', sk: 'Firma 10+ rokov', en: '10+ years old' },
     where: { foundedAt: { lte: foundedBefore(10) } },
     test: olderThan(10),
+    unknown: ageUnknown,
   },
   {
     id: 'vat_payer',
     group: 'company',
-    label: { cs: 'Plátce DPH', en: 'VAT registered' },
+    label: { cs: 'Plátce DPH', sk: 'Platiteľ DPH', en: 'VAT registered' },
     where: { vatPayer: true },
     test: b => b.vatPayer === true,
+    unknown: vatUnknown,
   },
   {
     id: 'vat_none',
     group: 'company',
-    label: { cs: 'Neplátce DPH', en: 'Not VAT registered' },
+    label: { cs: 'Neplátce DPH', sk: 'Neplatiteľ DPH', en: 'Not VAT registered' },
     where: { vatPayer: false },
     test: b => b.vatPayer === false,
+    unknown: vatUnknown,
   },
   {
     id: 'vat_unreliable',
     group: 'company',
-    label: { cs: 'Nespolehlivý plátce', en: 'Unreliable VAT payer' },
+    label: { cs: 'Nespolehlivý plátce', sk: 'Nespoľahlivý platiteľ', en: 'Unreliable VAT payer' },
     where: { vatUnreliable: true },
     test: b => b.vatUnreliable === true,
   },

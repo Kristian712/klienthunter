@@ -7,247 +7,14 @@ import {
   Phone, Mail, MapPin, X, Clock, ChevronDown, Check, Send,
   FileText, Table2, MessageSquare, Copy, Smartphone, PhoneCall,
 } from 'lucide-react';
-import { buildGreeting } from '@/lib/czech-vocative';
 import { OSM_ATTRIBUTION } from '@/lib/attribution';
-import { LEAD_FILTERS, GROUP_LABELS, matchesAll, type FilterGroup } from '@/lib/lead-filters';
+import { outreachBody, toSender } from '@/lib/outreach';
+import { LEAD_FILTERS, GROUP_LABELS, GROUP_ORDER, matchesAll, localized } from '@/lib/lead-filters';
+import { scoreBreakdown } from '@/lib/lead-score';
+import { EMPTY_PROFILE, type UserProfile } from '@/lib/profile';
+import { REGIONS, INDUSTRIES, POPULAR_CHIPS } from '@/lib/search-options';
 import { LeadScore, GOOD_LEAD } from '@/components/LeadScore';
-
-// ── Regions ───────────────────────────────────────────────────────────────────
-
-const REGIONS = [
-  { group: 'Česká republika — kraje', items: [
-    { value: 'Celá ČR',                                    label: 'Celá ČR (všechny kraje)' },
-    { value: 'Praha, Czech Republic',                      label: 'Praha (Hlavní město Praha)' },
-    { value: 'Středočeský kraj, Czech Republic',           label: 'Středočeský kraj' },
-    { value: 'České Budějovice, Jihočeský kraj',           label: 'Jihočeský kraj' },
-    { value: 'Plzeň, Plzeňský kraj',                       label: 'Plzeňský kraj' },
-    { value: 'Karlovy Vary, Karlovarský kraj',             label: 'Karlovarský kraj' },
-    { value: 'Ústí nad Labem, Ústecký kraj',               label: 'Ústecký kraj' },
-    { value: 'Liberec, Liberecký kraj',                    label: 'Liberecký kraj' },
-    { value: 'Hradec Králové, Královéhradecký kraj',       label: 'Královéhradecký kraj' },
-    { value: 'Pardubice, Pardubický kraj',                 label: 'Pardubický kraj' },
-    { value: 'Jihlava, Kraj Vysočina',                     label: 'Kraj Vysočina' },
-    { value: 'Brno, Jihomoravský kraj',                    label: 'Jihomoravský kraj' },
-    { value: 'Olomouc, Olomoucký kraj',                    label: 'Olomoucký kraj' },
-    { value: 'Zlín, Zlínský kraj',                         label: 'Zlínský kraj' },
-    { value: 'Ostrava, Moravskoslezský kraj',              label: 'Moravskoslezský kraj' },
-  ]},
-  { group: 'Slovensko — kraje', items: [
-    { value: 'Bratislava, Slovakia',                       label: 'Bratislavský kraj' },
-    { value: 'Trnava, Slovakia',                           label: 'Trnavský kraj' },
-    { value: 'Trenčín, Slovakia',                          label: 'Trenčianský kraj' },
-    { value: 'Nitra, Slovakia',                            label: 'Nitrianský kraj' },
-    { value: 'Žilina, Slovakia',                           label: 'Žilinský kraj' },
-    { value: 'Banská Bystrica, Slovakia',                  label: 'Banskobystrický kraj' },
-    { value: 'Prešov, Slovakia',                           label: 'Prešovský kraj' },
-    { value: 'Košice, Slovakia',                           label: 'Košický kraj' },
-  ]},
-  { group: 'Německo', items: [
-    { value: 'Berlin, Germany',   label: 'Berlín' },
-    { value: 'Munich, Germany',   label: 'Mnichov' },
-    { value: 'Hamburg, Germany',  label: 'Hamburg' },
-    { value: 'Frankfurt, Germany',label: 'Frankfurt' },
-  ]},
-  { group: 'Rakousko', items: [
-    { value: 'Vienna, Austria',   label: 'Vídeň' },
-    { value: 'Graz, Austria',     label: 'Graz' },
-    { value: 'Linz, Austria',     label: 'Linz' },
-  ]},
-  { group: 'Velká Británie', items: [
-    { value: 'London, UK',        label: 'Londýn' },
-    { value: 'Manchester, UK',    label: 'Manchester' },
-    { value: 'Birmingham, UK',    label: 'Birmingham' },
-  ]},
-  { group: 'USA', items: [
-    { value: 'New York, USA',     label: 'New York' },
-    { value: 'Los Angeles, USA',  label: 'Los Angeles' },
-    { value: 'Chicago, USA',      label: 'Chicago' },
-    { value: 'Houston, USA',      label: 'Houston' },
-  ]},
-  { group: 'Polsko', items: [
-    { value: 'Warsaw, Poland',    label: 'Varšava' },
-    { value: 'Krakow, Poland',    label: 'Krakov' },
-    { value: 'Wroclaw, Poland',   label: 'Wroclaw' },
-  ]},
-];
-
-// ── Industries ────────────────────────────────────────────────────────────────
-
-const INDUSTRIES: Record<string, { group: string; items: { value: string; label: string }[] }[]> = {
-  cs: [
-    { group: 'Řemesla', items: [
-      { value: 'plumber',          label: 'Instalatér' },
-      { value: 'electrician',      label: 'Elektrikář' },
-      { value: 'carpenter',        label: 'Tesař / Truhlář' },
-      { value: 'painter',          label: 'Malíř pokojů' },
-      { value: 'roofer',           label: 'Pokrývač' },
-      { value: 'landscaper',       label: 'Zahradník' },
-      { value: 'locksmith',        label: 'Zámečník' },
-      { value: 'glazier',          label: 'Sklenář' },
-      { value: 'chimney sweep',    label: 'Kominík' },
-    ]},
-    { group: 'Jídlo & pití', items: [
-      { value: 'restaurant',       label: 'Restaurace' },
-      { value: 'cafe',             label: 'Kavárna' },
-      { value: 'bakery',           label: 'Pekárna' },
-      { value: 'butcher shop',     label: 'Řeznictví' },
-    ]},
-    { group: 'Krása & wellness', items: [
-      { value: 'hair salon',       label: 'Kadeřnictví' },
-      { value: 'beauty salon',     label: 'Kosmetický salon' },
-      { value: 'nail studio',      label: 'Nehtové studio' },
-      { value: 'massage',          label: 'Masáže' },
-      { value: 'yoga studio',      label: 'Jóga studio' },
-    ]},
-    { group: 'Auto', items: [
-      { value: 'car repair',       label: 'Autoservis' },
-      { value: 'tire shop',        label: 'Pneuservis' },
-    ]},
-    { group: 'Zdravotnictví', items: [
-      { value: 'general practitioner', label: 'Praktický lékař' },
-      { value: 'dentist',          label: 'Zubař' },
-      { value: 'physiotherapist',  label: 'Fyzioterapeut' },
-      { value: 'pharmacy',         label: 'Lékárna' },
-      { value: 'optician',         label: 'Optika' },
-      { value: 'veterinarian',     label: 'Veterinář' },
-    ]},
-    { group: 'Právní & finance', items: [
-      { value: 'lawyer',           label: 'Právník / Advokát' },
-      { value: 'accountant',       label: 'Účetní' },
-      { value: 'real estate agency', label: 'Realitní kancelář' },
-    ]},
-    { group: 'Vzdělávání & sport', items: [
-      { value: 'driving school',   label: 'Autoškola' },
-      { value: 'language school',  label: 'Jazyková škola' },
-      { value: 'gym',              label: 'Fitness centrum' },
-      { value: 'personal trainer', label: 'Osobní trenér' },
-    ]},
-    { group: 'Ostatní služby', items: [
-      { value: 'photographer',     label: 'Fotograf' },
-      { value: 'cleaning service', label: 'Úklid' },
-      { value: 'florist',          label: 'Květinářství' },
-      { value: 'tailor',           label: 'Krejčí' },
-    ]},
-  ],
-  sk: [
-    { group: 'Remeslá', items: [
-      { value: 'plumber',          label: 'Inštalatér' },
-      { value: 'electrician',      label: 'Elektrikár' },
-      { value: 'carpenter',        label: 'Tesár / Stolár' },
-      { value: 'painter',          label: 'Maliar' },
-      { value: 'roofer',           label: 'Pokrývač' },
-      { value: 'landscaper',       label: 'Záhradník' },
-      { value: 'locksmith',        label: 'Zámočník' },
-    ]},
-    { group: 'Jedlo & pitie', items: [
-      { value: 'restaurant',       label: 'Reštaurácia' },
-      { value: 'cafe',             label: 'Kaviareň' },
-      { value: 'bakery',           label: 'Pekáreň' },
-      { value: 'butcher shop',     label: 'Mäsiarstvo' },
-    ]},
-    { group: 'Krása & wellness', items: [
-      { value: 'hair salon',       label: 'Kaderníctvo' },
-      { value: 'beauty salon',     label: 'Kozmetický salón' },
-      { value: 'nail studio',      label: 'Nechtové štúdio' },
-      { value: 'massage',          label: 'Masáže' },
-    ]},
-    { group: 'Auto', items: [
-      { value: 'car repair',       label: 'Autoservis' },
-      { value: 'tire shop',        label: 'Pneuservis' },
-    ]},
-    { group: 'Zdravotníctvo', items: [
-      { value: 'general practitioner', label: 'Praktický lekár' },
-      { value: 'dentist',          label: 'Zubár' },
-      { value: 'physiotherapist',  label: 'Fyzioterapeut' },
-      { value: 'veterinarian',     label: 'Veterinár' },
-    ]},
-    { group: 'Právne & financie', items: [
-      { value: 'lawyer',           label: 'Advokát' },
-      { value: 'accountant',       label: 'Účtovník' },
-      { value: 'real estate agency', label: 'Realitná kancelária' },
-    ]},
-    { group: 'Iné služby', items: [
-      { value: 'photographer',     label: 'Fotograf' },
-      { value: 'cleaning service', label: 'Upratovanie' },
-      { value: 'gym',              label: 'Fitnescentrum' },
-      { value: 'driving school',   label: 'Autoškola' },
-    ]},
-  ],
-  en: [
-    { group: 'Trades', items: [
-      { value: 'plumber',          label: 'Plumber' },
-      { value: 'electrician',      label: 'Electrician' },
-      { value: 'carpenter',        label: 'Carpenter' },
-      { value: 'painter',          label: 'Painter' },
-      { value: 'roofer',           label: 'Roofer' },
-      { value: 'landscaper',       label: 'Landscaper' },
-      { value: 'locksmith',        label: 'Locksmith' },
-    ]},
-    { group: 'Food & drink', items: [
-      { value: 'restaurant',       label: 'Restaurant' },
-      { value: 'cafe',             label: 'Cafe' },
-      { value: 'bakery',           label: 'Bakery' },
-      { value: 'butcher shop',     label: 'Butcher' },
-    ]},
-    { group: 'Beauty & wellness', items: [
-      { value: 'hair salon',       label: 'Hair salon' },
-      { value: 'beauty salon',     label: 'Beauty salon' },
-      { value: 'nail studio',      label: 'Nail studio' },
-      { value: 'massage',          label: 'Massage' },
-    ]},
-    { group: 'Auto', items: [
-      { value: 'car repair',       label: 'Car repair' },
-      { value: 'tire shop',        label: 'Tire shop' },
-    ]},
-    { group: 'Healthcare', items: [
-      { value: 'general practitioner', label: 'GP / Doctor' },
-      { value: 'dentist',          label: 'Dentist' },
-      { value: 'physiotherapist',  label: 'Physiotherapist' },
-      { value: 'veterinarian',     label: 'Vet' },
-    ]},
-    { group: 'Legal & finance', items: [
-      { value: 'lawyer',           label: 'Lawyer' },
-      { value: 'accountant',       label: 'Accountant' },
-      { value: 'real estate agency', label: 'Real estate agency' },
-    ]},
-    { group: 'Services', items: [
-      { value: 'photographer',     label: 'Photographer' },
-      { value: 'cleaning service', label: 'Cleaning service' },
-      { value: 'gym',              label: 'Gym' },
-      { value: 'driving school',   label: 'Driving school' },
-    ]},
-  ],
-};
-
-// Popular categories shown as quick chips (localized)
-const POPULAR_CHIPS: Record<string, { value: string; label: string }[]> = {
-  cs: [
-    { value: 'hair salon',    label: 'Kadeřnictví' },
-    { value: 'restaurant',    label: 'Restaurace' },
-    { value: 'car repair',    label: 'Autoservis' },
-    { value: 'plumber',       label: 'Instalatér' },
-    { value: 'dentist',       label: 'Zubař' },
-    { value: 'real estate agency', label: 'Reality' },
-    { value: 'lawyer',        label: 'Právník' },
-    { value: 'electrician',   label: 'Elektrikář' },
-  ],
-  sk: [
-    { value: 'hair salon',    label: 'Kaderníctvo' },
-    { value: 'restaurant',    label: 'Reštaurácia' },
-    { value: 'car repair',    label: 'Autoservis' },
-    { value: 'plumber',       label: 'Inštalatér' },
-    { value: 'dentist',       label: 'Zubár' },
-    { value: 'electrician',   label: 'Elektrikár' },
-  ],
-  en: [
-    { value: 'hair salon',    label: 'Hair salon' },
-    { value: 'restaurant',    label: 'Restaurant' },
-    { value: 'car repair',    label: 'Car repair' },
-    { value: 'plumber',       label: 'Plumber' },
-    { value: 'dentist',       label: 'Dentist' },
-    { value: 'electrician',   label: 'Electrician' },
-  ],
-};
+import { OnboardingModal } from '@/components/OnboardingModal';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -300,25 +67,39 @@ function webStatus(b: BusinessResult): WebStatus {
  * only remembers *which* filters are on; it knows nothing about what any of them mean, so a
  * new filter appears here the moment it is added to the registry.
  */
-const GROUP_ORDER: FilterGroup[] = ['web', 'contact', 'company'];
+
+const UNRELIABLE_NOTE = {
+  cs: 'Nespolehlivý plátce DPH', sk: 'Nespoľahlivý platiteľ DPH', en: 'Unreliable VAT payer',
+};
 
 /**
- * Why this row scores what it scores — the two strongest reasons, in the order they matter.
- * Two, not five: a list of everything slightly wrong with a firm is noise, the first two lines
- * are what a person actually says on the phone.
+ * Why this row sits where it does: the user's own criteria that this firm meets.
+ *
+ * This used to be a fixed list led by "Nemá dohledatelný web", which is only a reason to call
+ * if you happen to sell websites. Now the reasons are whatever the user said mattered, so an
+ * accountant reads "Nová firma (do 1 roku)" and a photographer reads "Bez sociálních sítí".
+ *
+ * Two lines, not five: everything slightly notable about a firm is noise, the first two are
+ * what a person actually says on the phone. An unreliable VAT payer takes a slot regardless —
+ * that is the one thing you want to know before dialling.
  */
-function topReasons(b: BusinessResult): string[] {
-  const status = webStatus(b);
-  const out: string[] = [];
-  if (status === 'UNKNOWN')    out.push('Nemá dohledatelný web');
-  else if (status === 'NONE')  out.push('Nemá web');
-  else if (b.websiteIsOld)     out.push('Web působí zastarale');
-  else if (typeof b.websiteMs === 'number' && b.websiteMs >= 2500)
-                               out.push(`Web se načítá ${(b.websiteMs / 1000).toFixed(1)} s`);
-  if (!b.hasFacebook && !b.hasInstagram && !b.hasLinkedIn) out.push('Bez sociálních sítí');
-  if (b.phone || b.email)      out.push('Je na koho se obrátit');
-  if (b.vatUnreliable)         out.push('Nespolehlivý plátce DPH');
-  return out.slice(0, 2);
+function rowSummary(b: BusinessResult, criteria: string[], locale: string) {
+  const { matched, unanswered, total, unreliable } = scoreBreakdown(b, criteria);
+
+  const reasons: string[] = [];
+  if (unreliable) reasons.push(localized(UNRELIABLE_NOTE, locale));
+  reasons.push(...matched.map(f => localized(f.label, locale)));
+
+  // The hover on the number says what the number counted. A bare "78 / 100" is a verdict the
+  // user has to trust; "splňuje 2 ze 3 kritérií" is a claim they can check.
+  let scoreTitle = localized(S.meetsOf, locale)
+    .replace('{n}', String(matched.length))
+    .replace('{total}', String(total));
+  if (unanswered.length > 0) {
+    scoreTitle += localized(S.unanswered, locale).replace('{k}', String(unanswered.length));
+  }
+
+  return { reasons: reasons.slice(0, 2), scoreTitle };
 }
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
@@ -441,11 +222,53 @@ function ContactStrategy({ b }: { b: BusinessResult }) {
   );
 }
 
-function SocialLinks({ b }: { b: BusinessResult }) {
+/**
+ * Row-level chrome, in three languages.
+ *
+ * Every one of these used to be a Czech literal, which quietly shipped Czech to the Slovak and
+ * English builds. The wording is also deliberately factual: "Zastaralý web" is something we
+ * measured, whereas the old "Potřebuje nový web" was a sales opinion the data cannot support.
+ */
+const S = {
+  noSocial:    { cs: 'Bez soc. sítí',   sk: 'Bez soc. sietí',   en: 'No social profiles' },
+  webNone:     { cs: 'Web nenalezen',   sk: 'Web nenájdený',    en: 'No website found' },
+  webUnknown:  { cs: 'Web neuveden',    sk: 'Web neuvedený',    en: 'Website not stated' },
+  webOld:      { cs: 'Zastaralý web',   sk: 'Zastaraný web',    en: 'Outdated website' },
+  webHas:      { cs: 'Mají web',        sk: 'Majú web',         en: 'Has a website' },
+  webNoSource: { cs: 'Žádný zdroj web nepotvrdil ani nevyvrátil',
+                 sk: 'Žiadny zdroj web nepotvrdil ani nevyvrátil',
+                 en: 'No source confirmed or ruled out a website' },
+  scoreWord:   { cs: 'Skóre',           sk: 'Skóre',            en: 'Score' },
+  showMsg:     { cs: 'Zobrazit zprávu pro oslovení',
+                 sk: 'Zobraziť správu na oslovenie',
+                 en: 'Show outreach message' },
+  hideMsg:     { cs: 'Skrýt zprávu',    sk: 'Skryť správu',     en: 'Hide message' },
+  copy:        { cs: 'Kopírovat',       sk: 'Kopírovať',        en: 'Copy' },
+  copied:      { cs: 'Zkopírováno',     sk: 'Skopírované',      en: 'Copied' },
+  copyDraft:   { cs: 'Zkopírovat koncept', sk: 'Skopírovať koncept', en: 'Copy draft' },
+  preparing:   { cs: 'Připravuji…',     sk: 'Pripravujem…',     en: 'Preparing…' },
+  openMail:    { cs: 'Zkopírováno – otevřít ve schránce',
+                 sk: 'Skopírované – otvoriť v schránke',
+                 en: 'Copied – open in your mail app' },
+  draftFailed: { cs: 'Koncept se nepodařilo připravit.',
+                 sk: 'Koncept sa nepodarilo pripraviť.',
+                 en: 'Could not prepare the draft.' },
+  error:       { cs: 'Chyba',           sk: 'Chyba',            en: 'Error' },
+  meetsOf:     { cs: 'Splňuje {n} z {total} kritérií',
+                 sk: 'Spĺňa {n} z {total} kritérií',
+                 en: 'Meets {n} of {total} criteria' },
+  // Appended when a criterion could not be judged. Saying "nesplňuje" about something we never
+  // looked up would be the app claiming more than it knows.
+  unanswered:  { cs: ' · u {k} nemáme data',
+                 sk: ' · pri {k} nemáme dáta',
+                 en: ' · no data for {k}' },
+};
+
+function SocialLinks({ b, locale }: { b: BusinessResult; locale: string }) {
   const hasSocial = b.hasFacebook || b.hasInstagram || b.hasLinkedIn;
   if (!hasSocial) {
     return (
-      <span className="badge"><Users size={10} />Bez soc. sítí</span>
+      <span className="badge"><Users size={10} />{localized(S.noSocial, locale)}</span>
     );
   }
   const links: Array<[boolean, string, React.ReactNode, string]> = [
@@ -465,34 +288,38 @@ function SocialLinks({ b }: { b: BusinessResult }) {
   );
 }
 
-function WebsiteStatusBadge({ b }: { b: BusinessResult }) {
+function WebsiteStatusBadge({ b, locale }: { b: BusinessResult; locale: string }) {
   const status = webStatus(b);
   if (status === 'NONE') {
+    // Never "nemají web": no registry records websites, so all we can honestly say is that our
+    // own check found none. The landing FAQ makes the same promise, in the same words.
     return (
       <span className="badge-red" title={b.websiteEvidence || undefined}>
-        <Globe size={10} />Nemají web
+        <Globe size={10} />{localized(S.webNone, locale)}
       </span>
     );
   }
   if (status === 'UNKNOWN') {
     return (
-      <span className="badge" title={b.websiteEvidence || 'Žádný zdroj web nepotvrdil ani nevyvrátil'}>
-        <Globe size={10} />Web neuveden
+      <span className="badge" title={b.websiteEvidence || localized(S.webNoSource, locale)}>
+        <Globe size={10} />{localized(S.webUnknown, locale)}
       </span>
     );
   }
   const scoreLabel = b.websiteScore && b.websiteScore !== 50 ? ` (${b.websiteScore}/100)` : '';
-  const tooltip = b.websiteAgeNote ? `${b.websiteAgeNote}${scoreLabel}` : (scoreLabel ? `Skóre${scoreLabel}` : '');
+  const tooltip = b.websiteAgeNote
+    ? `${b.websiteAgeNote}${scoreLabel}`
+    : (scoreLabel ? `${localized(S.scoreWord, locale)}${scoreLabel}` : '');
   if (b.websiteIsOld) {
     return (
       <span className="badge-accent" title={tooltip || undefined}>
-        <Clock size={10} />Potřebuje nový web{scoreLabel}
+        <Clock size={10} />{localized(S.webOld, locale)}{scoreLabel}
       </span>
     );
   }
   return (
     <span className="badge" title={tooltip || undefined}>
-      <Globe size={10} />Mají web{scoreLabel}
+      <Globe size={10} />{localized(S.webHas, locale)}{scoreLabel}
     </span>
   );
 }
@@ -527,62 +354,17 @@ function SourceBadge({ source }: { source?: string }) {
   );
 }
 
-function generateMessage(b: BusinessResult, industry: string): string {
-  const greeting = buildGreeting(b.name);
-  const status = webStatus(b);
-
-  // The wording below claims the firm has no site, so it is only for a proven NONE.
-  if (status === 'NONE') {
-    return `${greeting} 👋
-
-jsem Kristián a dělám weby na míru – moderní, rychlé a dobře vypadající na mobilu i počítači.
-
-Zaujalo mě, že zatím web nemáte. Přitom ${industry || 'vaše služby'} lidé hledají nejčastěji právě na internetu – web může být jeden z nejlepších způsobů jak získat nové zákazníky. Rád vám zdarma ukážu jak by mohl vypadat – bez závazků.
-
-Třeba znáte i někoho komu by se web hodil – budu za doporučení moc vděčný 🙏
-
-Kristián · https://webovkyvanek.cz/`;
-  }
-
-  if (status === 'UNKNOWN') {
-    return `${greeting} 👋
-
-jsem Kristián a dělám weby na míru – moderní, rychlé a dobře vypadající na mobilu i počítači.
-
-Narazil jsem na vaši firmu a napadlo mě, jestli by se vám nehodila lepší prezentace na internetu. Rád vám zdarma ukážu jak by web mohl vypadat – bez závazků.
-
-Třeba znáte i někoho komu by se web hodil – budu za doporučení moc vděčný 🙏
-
-Kristián · https://webovkyvanek.cz/`;
-  }
-
-  if (b.websiteIsOld) {
-    return `${greeting} 👋
-
-jsem Kristián a specializuji se na moderní weby.
-
-Narazil jsem na váš web – myslím, že by si zasloužil osvěžení. Rychlejší načítání, aktuální design a správné zobrazení na mobilu. Rád vám zdarma ukážu jak by mohl nový vypadat – žádný závazek.
-
-Třeba znáte i někoho pro koho by nový web byl přínos – budu za doporučení moc rád 🙏
-
-Kristián · https://webovkyvanek.cz/`;
-  }
-
-  return `${greeting} 👋
-
-jsem Kristián – pomáhám firmám získávat více zákazníků přes internet.
-
-Zaujala mě vaše firma a váš web vypadá dobře! Přesto věřím, že každá online prezentace má prostor se zlepšovat – rychlost, SEO, nebo to jak web přesvědčí návštěvníka zavolat. Rád se na to podívám a řeknu vám svůj názor zdarma, bez závazků.
-
-Třeba znáte i někoho, komu by se nový web hodil – budu za doporučení moc vděčný 🙏
-
-Kristián · https://webovkyvanek.cz/`;
-}
-
-function MessageBox({ b, industry }: { b: BusinessResult; industry: string }) {
+/**
+ * The first message, assembled from the *user's* profile by `lib/outreach.ts`.
+ *
+ * What stood here before were four Czech templates hard-coded to the author's own name and
+ * agency URL. Every other user was silently made to introduce themselves as a web developer
+ * they are not.
+ */
+function MessageBox({ b, profile, locale }: { b: BusinessResult; profile: UserProfile; locale: string }) {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
-  const msg = generateMessage(b, industry);
+  const msg = outreachBody(toSender(profile), b.name, locale);
 
   const copy = () => {
     navigator.clipboard.writeText(msg).then(() => {
@@ -598,7 +380,7 @@ function MessageBox({ b, industry }: { b: BusinessResult; industry: string }) {
         className="flex items-center gap-1.5 text-xs text-ink-faint hover:text-ink transition-colors font-medium"
       >
         <MessageSquare size={12} />
-        {open ? 'Skrýt zprávu' : 'Zobrazit zprávu pro oslovení'}
+        {localized(open ? S.hideMsg : S.showMsg, locale)}
         <ChevronDown size={12} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
@@ -618,7 +400,9 @@ function MessageBox({ b, industry }: { b: BusinessResult; industry: string }) {
                 : 'bg-white border border-line text-ink-muted hover:text-ink hover:border-ink'
             }`}
           >
-            {copied ? <><Check size={11} /> Zkopírováno</> : <><Copy size={11} /> Kopírovat</>}
+            {copied
+              ? <><Check size={11} /> {localized(S.copied, locale)}</>
+              : <><Copy size={11} /> {localized(S.copy, locale)}</>}
           </button>
         </div>
       )}
@@ -631,7 +415,7 @@ function MessageBox({ b, industry }: { b: BusinessResult; industry: string }) {
  * needs the recipient's prior consent under § 7 zákona 480/2004 Sb., and we have none, so the
  * decision to press send stays with the user, in the user's own mailbox.
  */
-function DraftEmailButton({ businessId, email }: { businessId: string; email: string }) {
+function DraftEmailButton({ businessId, email, locale }: { businessId: string; email: string; locale: string }) {
   const [status, setStatus] = useState<'idle'|'loading'|'ready'|'error'>('idle');
   const [errMsg, setErrMsg] = useState('');
   const [mailto, setMailto] = useState('');
@@ -642,10 +426,10 @@ function DraftEmailButton({ businessId, email }: { businessId: string; email: st
       const res = await fetch('/api/draft-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ businessResultId: businessId }),
+        body: JSON.stringify({ businessResultId: businessId, locale }),
       });
       const d = await res.json();
-      if (!res.ok) { setStatus('error'); setErrMsg(d.error || 'Chyba'); return; }
+      if (!res.ok) { setStatus('error'); setErrMsg(d.error || localized(S.error, locale)); return; }
 
       await navigator.clipboard.writeText(d.body).catch(() => {});
       setMailto(
@@ -655,25 +439,27 @@ function DraftEmailButton({ businessId, email }: { businessId: string; email: st
       setStatus('ready');
     } catch {
       setStatus('error');
-      setErrMsg('Koncept se nepodařilo připravit.');
+      setErrMsg(localized(S.draftFailed, locale));
     }
   };
 
   if (status === 'ready') {
     return (
       <a href={mailto} className="flex items-center gap-1 text-xs font-medium text-accent hover:text-accent-ink">
-        <Check size={12} /> Zkopírováno – otevřít ve schránce
+        <Check size={12} /> {localized(S.openMail, locale)}
       </a>
     );
   }
-  if (status === 'error') return <span className="text-xs font-medium text-ink" title={errMsg}>{errMsg || 'Chyba'}</span>;
+  if (status === 'error') {
+    return <span className="text-xs font-medium text-ink" title={errMsg}>{errMsg || localized(S.error, locale)}</span>;
+  }
 
   return (
     <button onClick={prepare} disabled={status === 'loading'}
       className="flex items-center gap-1 text-xs font-medium text-ink-muted hover:text-accent disabled:opacity-40 transition-colors">
       {status === 'loading'
-        ? <><svg className="animate-spin h-3 w-3" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>Připravuji…</>
-        : <><Send size={12} /> Zkopírovat koncept</>}
+        ? <><svg className="animate-spin h-3 w-3" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>{localized(S.preparing, locale)}</>
+        : <><Send size={12} /> {localized(S.copyDraft, locale)}</>}
     </button>
   );
 }
@@ -683,7 +469,7 @@ function DraftEmailButton({ businessId, email }: { businessId: string; email: st
 export default function SearchPage() {
   const t = useTranslations('search');
   const locale = useLocale();
-  const isCs = locale === 'cs';
+  const isCs = locale === 'cs' || locale === 'sk';
 
   const [userPlan, setUserPlan] = useState<string>('FREE');
 
@@ -695,6 +481,44 @@ export default function SearchPage() {
   const [customRegion, setCustomRegion]   = useState('');
   const [industry, setIndustry]           = useState('');
   const [customIndustry, setCustomIndustry] = useState('');
+
+  // ── Profile ───────────────────────────────────────────────────────────────
+  // The profile decides two things: what the form starts out as, and how the results are
+  // ranked. Both are just defaults — everything stays editable in place.
+  const [profile, setProfile] = useState<UserProfile>(EMPTY_PROFILE);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
+  /** Fill in only what the user has not already typed, so a reload never eats their input. */
+  function applyProfile(p: UserProfile) {
+    setProfile(p);
+    if (p.targetRegion)   setRegion(r => r || p.targetRegion!);
+    if (p.targetIndustry) setIndustry(i => i || p.targetIndustry!);
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/profile')
+      .then(r => r.json())
+      .then(d => {
+        if (cancelled || !d.user) return;
+        applyProfile(d.user as UserProfile);
+        // `?welcome=1` comes from the registration redirect; `onboardedAt` covers everyone who
+        // arrived some other way and has never been asked.
+        const welcomed = new URLSearchParams(window.location.search).has('welcome');
+        if (welcomed || !d.user.onboardedAt) setShowOnboarding(true);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  function closeOnboarding(saved: UserProfile | null) {
+    setShowOnboarding(false);
+    if (saved) applyProfile(saved);
+    else setProfile(p => ({ ...p, onboardedAt: new Date().toISOString() }));
+    // Drop `?welcome=1` so a refresh does not reopen the modal.
+    window.history.replaceState({}, '', window.location.pathname);
+  }
+
   const [active, setActive]               = useState<Set<string>>(new Set());
   const [results, setResults]             = useState<BusinessResult[]>([]);
   const [searchId, setSearchId]           = useState<string | null>(null);
@@ -767,11 +591,19 @@ export default function SearchPage() {
 
   return (
     <div className="min-h-screen bg-surface pt-16">
+      {showOnboarding && (
+        <OnboardingModal locale={locale} initial={profile} onDone={closeOnboarding} />
+      )}
+
       <div className="border-b border-line bg-white">
         <div className="max-w-6xl mx-auto px-4 py-8">
           <h1 className="text-2xl font-bold text-ink mb-1">{t('title')}</h1>
           <p className="text-ink-muted text-sm">
-            {isCs ? 'Vyber kraj a obor — výsledky z veřejného rejstříku ARES a OpenStreetMap' : 'Select a region and industry to find potential clients'}
+            {localized({
+              cs: 'Vyberte kraj a obor. Data z veřejného rejstříku ARES a z OpenStreetMap.',
+              sk: 'Vyberte kraj a odbor. Dáta z verejného registra ARES a z OpenStreetMap.',
+              en: 'Pick a region and a trade. Data from the ARES public registry and OpenStreetMap.',
+            }, locale)}
           </p>
         </div>
       </div>
@@ -956,7 +788,7 @@ export default function SearchPage() {
                   return (
                     <div key={group} className="flex flex-wrap items-center gap-2">
                       <span className="w-16 shrink-0 text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
-                        {isCs ? GROUP_LABELS[group].cs : GROUP_LABELS[group].en}
+                        {localized(GROUP_LABELS[group], locale)}
                       </span>
                       {items.map(f => {
                         const on = active.has(f.id);
@@ -968,7 +800,7 @@ export default function SearchPage() {
                             disabled={!on && n === 0}
                             className={on ? 'chip-active' : 'chip'}
                           >
-                            {isCs ? f.label.cs : f.label.en}
+                            {localized(f.label, locale)}
                             <span className={`tnum ${on ? 'text-white/60' : 'text-ink-faint'}`}>{n}</span>
                           </button>
                         );
@@ -984,8 +816,8 @@ export default function SearchPage() {
                 a 3px accent edge on the ones worth calling first. */}
             <div className="border-t border-line">
               {filtered.map((b, i) => {
-                const good    = b.leadScore >= GOOD_LEAD;
-                const reasons = topReasons(b);
+                const good = b.leadScore >= GOOD_LEAD;
+                const { reasons, scoreTitle } = rowSummary(b, profile.targetFilters, locale);
                 return (
                   <div
                     key={b.id}
@@ -995,7 +827,7 @@ export default function SearchPage() {
                       borderLeftColor: good ? 'rgb(var(--accent))' : 'transparent',
                     } as React.CSSProperties}
                   >
-                    <LeadScore value={b.leadScore} />
+                    <LeadScore value={b.leadScore} title={scoreTitle} />
 
                     <div className="flex-1 min-w-0">
                       {/* Name + source */}
@@ -1052,13 +884,13 @@ export default function SearchPage() {
                             <Globe size={11} />{b.website.replace(/^https?:\/\//, '')}
                           </a>
                         )}
-                        {b.email && <DraftEmailButton businessId={b.id} email={b.email} />}
+                        {b.email && <DraftEmailButton businessId={b.id} email={b.email} locale={locale} />}
                       </div>
 
                       {/* Badges */}
                       <div className="flex flex-wrap gap-2 mt-3 items-center">
-                        <WebsiteStatusBadge b={b} />
-                        <SocialLinks b={b} />
+                        <WebsiteStatusBadge b={b} locale={locale} />
+                        <SocialLinks b={b} locale={locale} />
                         {b.ico && (
                           <span className="badge" title="IČO z veřejného rejstříku ARES">IČO {b.ico}</span>
                         )}
@@ -1070,7 +902,7 @@ export default function SearchPage() {
                       </div>
 
                       <ContactStrategy b={b} />
-                      <MessageBox b={b} industry={effectiveIndustry} />
+                      <MessageBox b={b} profile={profile} locale={locale} />
                     </div>
 
                     {/* Why this score (desktop) */}

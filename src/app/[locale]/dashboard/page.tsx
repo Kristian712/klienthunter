@@ -17,7 +17,7 @@ const PLAN_LABELS: Record<string, string> = { FREE: 'Zdarma', PRO: 'Pro', BUSINE
 
 export default function DashboardPage() {
   const locale = useLocale();
-  const isCs = locale === 'cs';
+  const isCs = locale === 'cs' || locale === 'sk';
   const [user, setUser]       = useState<User | null>(null);
   const [searches, setSearches] = useState<Search[]>([]);
   const [loading, setLoading] = useState(true);

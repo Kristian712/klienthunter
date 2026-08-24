@@ -11,7 +11,16 @@ import type { VerifiedCandidate } from './lead-pipeline';
  * Split out of `lead-pipeline.ts` so that everything up to this point stays free of Prisma
  * and can run in a plain script without a database.
  */
-export async function persistResults(searchId: string, verified: VerifiedCandidate[]) {
+export async function persistResults(
+  searchId: string,
+  verified: VerifiedCandidate[],
+  /**
+   * The searching user's criteria from onboarding. Results belong to exactly one user's search,
+   * so scoring them against that user's definition of a good client is well defined. Omitted
+   * (or empty, for someone who skipped onboarding) means the neutral default in `lead-score.ts`.
+   */
+  criteria?: readonly string[] | null,
+) {
   const persist = async ({ c, verdict }: VerifiedCandidate) => {
     // The probe already downloaded the page, so scoring and contact extraction cost no extra
     // request — and touch no page robots.txt kept us out of.
@@ -53,7 +62,7 @@ export async function persistResults(searchId: string, verified: VerifiedCandida
         websiteAgeNote:  checks?.websiteAgeNote ?? '',
         // Computed here rather than on read so the number a user sorted by yesterday is the
         // same number today — and so the database can order by it.
-        leadScore:       leadScore(row),
+        leadScore:       leadScore(row, criteria),
         // Ratings, review counts and opening hours came only from Google Places, which had to
         // go for licensing reasons. The columns stay for the rows written before that.
         reviewCount:     0,

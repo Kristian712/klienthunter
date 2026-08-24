@@ -22,7 +22,7 @@ interface InviteCode {
 
 export default function AdminPage() {
   const locale = useLocale();
-  const isCs = locale === 'cs';
+  const isCs = locale === 'cs' || locale === 'sk';
 
   const [users, setUsers]             = useState<AdminUser[]>([]);
   const [codes, setCodes]             = useState<InviteCode[]>([]);

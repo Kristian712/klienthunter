@@ -10,7 +10,7 @@ import { saveUser } from '@/lib/client-auth';
 export default function RegisterPage() {
   const t = useTranslations('auth');
   const locale = useLocale();
-  const isCs = locale === 'cs';
+  const isCs = locale === 'cs' || locale === 'sk';
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -45,7 +45,9 @@ export default function RegisterPage() {
         return;
       }
       saveUser(data.user);
-      window.location.href = `/${locale}/dashboard`;
+      // Straight to the search with the onboarding modal open, rather than to a dashboard with
+      // nothing on it yet: the four questions there are what make the first search useful.
+      window.location.href = `/${locale}/search?welcome=1`;
     } finally {
       setLoading(false);
     }
