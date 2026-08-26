@@ -1,50 +1,159 @@
-import { useLocale } from 'next-intl';
 import type { Metadata } from 'next';
+import { LegalDocument } from '@/components/LegalDocument';
+import { localized } from '@/lib/lead-filters';
+import { OPERATOR, type LegalBlock } from '@/lib/legal';
 
-export const metadata: Metadata = { title: 'Podmínky použití – KlientHunter' };
+/**
+ * Podmínky použití.
+ *
+ * Původní verze měla šest vět a mlčela přesně tam, kde je riziko: aplikace píše obchodní
+ * e-maily. Odesílá je ale uživatel ze své schránky — a tím se z něj podle § 7 zákona
+ * č. 480/2004 Sb. stává šiřitel obchodního sdělení se všemi povinnostmi, které z toho plynou
+ * (pokuta až 10 000 000 Kč). Zároveň se stává správcem osobních údajů, které si vyexportoval.
+ * Oddíly 4 a 5 to říkají nahlas, protože uživatel, který to netuší, si může udělat vážný problém.
+ */
 
-export default function TermsPage() {
-  const locale = useLocale();
-  const isCs = locale === 'cs' || locale === 'sk';
+const M = {
+  title: { cs: 'Podmínky použití', sk: 'Podmienky používania', en: 'Terms of Service' },
+  description: {
+    cs: 'Pravidla používání KlientHunteru, odpovědnost za oslovování firem a omezení záruk.',
+    sk: 'Pravidlá používania KlientHunteru, zodpovednosť za oslovovanie firiem a obmedzenie záruk.',
+    en: 'Rules for using KlientHunter, responsibility for outreach, and limits of warranty.',
+  },
+};
 
-  return (
-    <div className="max-w-3xl mx-auto px-4 py-16 pt-24">
-      <h1 className="text-3xl font-bold text-ink mb-8">
-        {isCs ? 'Podmínky použití' : 'Terms of Service'}
-      </h1>
-      <div className="space-y-6 text-ink-muted">
-        {[
-          {
-            cs: '1. Používáním KlientHunter souhlasíte s těmito podmínkami.',
-            en: '1. By using KlientHunter you agree to these terms.',
-          },
-          {
-            cs: '2. Aplikace slouží výhradně pro legální účely – vyhledávání firemních kontaktů pro obchodní komunikaci.',
-            en: '2. The app is for legal purposes only – finding business contacts for commercial communication.',
-          },
-          {
-            cs: '3. Zakazuje se hromadný spam, phishing nebo jakékoli obtěžování nalezených kontaktů.',
-            en: '3. Mass spam, phishing or any harassment of found contacts is prohibited.',
-          },
-          {
-            cs: '4. Provozovatel si vyhrazuje právo zrušit účet při porušení podmínek.',
-            en: '4. The operator reserves the right to terminate accounts for violations.',
-          },
-          {
-            cs: '5. Služba je poskytována "tak jak je" bez záruky dostupnosti. Provozovatel nenese odpovědnost za škody vzniklé použitím aplikace.',
-            en: '5. The service is provided "as is" without uptime guarantees. The operator is not liable for damages from using the app.',
-          },
-          {
-            cs: '6. Podmínky se mohou měnit. O změnách budete informováni emailem.',
-            en: '6. Terms may change. You will be notified by email of changes.',
-          },
-        ].map((item, i) => (
-          <p key={i}>{isCs ? item.cs : item.en}</p>
-        ))}
-        <p className="text-sm text-ink-faint pt-4">
-          {isCs ? 'Kontakt: krstnjanku@gmail.com' : 'Contact: krstnjanku@gmail.com'}
-        </p>
-      </div>
-    </div>
-  );
+export function generateMetadata({ params: { locale } }: { params: { locale: string } }): Metadata {
+  return {
+    title: `${localized(M.title, locale)} – KlientHunter`,
+    description: localized(M.description, locale),
+  };
+}
+
+const INTRO = {
+  cs: 'Používáním KlientHunteru souhlasíte s těmito podmínkami. Pokud s nimi nesouhlasíte, službu prosím nepoužívejte.',
+  sk: 'Používaním KlientHunteru súhlasíte s týmito podmienkami. Ak s nimi nesúhlasíte, službu prosím nepoužívajte.',
+  en: 'By using KlientHunter you agree to these terms. If you do not agree with them, please do not use the service.',
+};
+
+const BLOCKS: LegalBlock[] = [
+  {
+    heading: { cs: 'Kdo službu provozuje', sk: 'Kto službu prevádzkuje', en: 'Who operates the service' },
+    body: [
+      {
+        cs: `KlientHunter provozuje ${OPERATOR.name}, kontakt ${OPERATOR.email}. Smluvní vztah vzniká mezi vámi a provozovatelem okamžikem založení účtu.`,
+        sk: `KlientHunter prevádzkuje ${OPERATOR.name}, kontakt ${OPERATOR.email}. Zmluvný vzťah vzniká medzi vami a prevádzkovateľom okamihom založenia účtu.`,
+        en: `KlientHunter is operated by ${OPERATOR.name}, contact ${OPERATOR.email}. A contract between you and the operator comes into being when you create an account.`,
+      },
+    ],
+  },
+  {
+    heading: { cs: 'Co služba dělá', sk: 'Čo služba robí', en: 'What the service does' },
+    body: [
+      {
+        cs: 'KlientHunter vyhledává firmy ve veřejných rejstřících a mapách, řadí je podle kritérií, která si nastavíte, a umožňuje výsledky exportovat. Kromě toho umí připravit koncept oslovovacího e-mailu.',
+        sk: 'KlientHunter vyhľadáva firmy vo verejných registroch a mapách, zoraďuje ich podľa kritérií, ktoré si nastavíte, a umožňuje výsledky exportovať. Okrem toho vie pripraviť koncept oslovovacieho e-mailu.',
+        en: 'KlientHunter searches public registers and maps, ranks the results by criteria you choose, and lets you export them. It can also prepare a draft outreach e-mail.',
+      },
+      {
+        cs: 'Službu nelze používat k žádnému účelu, který zákon zakazuje, ani k obtěžování nalezených firem nebo osob. Zakázané je zejména rozesílání nevyžádaných sdělení v rozporu se zákonem, podvodné jednání, získávání údajů pro jejich další prodej a jakýkoli pokus službu automatizovaně vytěžit nad rámec běžného používání.',
+        sk: 'Službu nemožno používať na žiadny účel, ktorý zákon zakazuje, ani na obťažovanie nájdených firiem alebo osôb. Zakázané je najmä rozosielanie nevyžiadaných oznámení v rozpore so zákonom, podvodné konanie, získavanie údajov na ich ďalší predaj a akýkoľvek pokus službu automatizovane vyťažiť nad rámec bežného používania.',
+        en: 'The service may not be used for any unlawful purpose, nor to harass the businesses or people it finds. Prohibited in particular: sending unsolicited messages contrary to law, fraud, harvesting data for resale, and any attempt to scrape the service beyond ordinary use.',
+      },
+    ],
+  },
+  {
+    heading: { cs: 'Účet a přístup', sk: 'Účet a prístup', en: 'Account and access' },
+    body: [
+      {
+        cs: 'Registrace je zatím na pozvánku. Za bezpečnost svého hesla odpovídáte vy; účet nesmíte sdílet s dalšími osobami. Přístup k placeným plánům se v současnosti sjednává individuálně, cena je uvedena v ceníku a je konečná. Provozovatel může účet zrušit při porušení těchto podmínek — pokud jde o placený účet a k porušení nedošlo, vrátí poměrnou část uhrazené ceny.',
+        sk: 'Registrácia je zatiaľ na pozvánku. Za bezpečnosť svojho hesla zodpovedáte vy; účet nesmiete zdieľať s ďalšími osobami. Prístup k plateným plánom sa v súčasnosti dojednáva individuálne, cena je uvedená v cenníku a je konečná. Prevádzkovateľ môže účet zrušiť pri porušení týchto podmienok — ak ide o platený účet a k porušeniu nedošlo, vráti pomernú časť uhradenej ceny.',
+        en: 'Registration is currently by invitation. You are responsible for the security of your password and must not share the account. Access to paid plans is presently arranged individually; the price shown in the pricing page is final. The operator may close an account that breaches these terms — for a paid account closed without such a breach, the unused portion of the fee is refunded.',
+      },
+    ],
+  },
+  {
+    heading: {
+      cs: 'Oslovování firem je na vás — a je to vaše odpovědnost',
+      sk: 'Oslovovanie firiem je na vás — a je to vaša zodpovednosť',
+      en: 'Outreach is yours to send — and yours to answer for',
+    },
+    body: [
+      {
+        cs: 'Aplikace koncept zprávy pouze napíše. Nikdy nic neodesílá. Zprávu odesíláte vy, ze své vlastní schránky, a tím se z vás podle § 7 zákona č. 480/2004 Sb. stává šiřitel obchodního sdělení.',
+        sk: 'Aplikácia koncept správy iba napíše. Nikdy nič neodosiela. Správu odosielate vy, zo svojej vlastnej schránky, a tým sa z vás podľa § 7 zákona č. 480/2004 Zb. stáva šíriteľ obchodného oznámenia.',
+        en: 'The app only writes the draft. It never sends anything. You send the message, from your own mailbox, and in doing so you become the sender of a commercial communication under § 7 of Czech Act No. 480/2004 Coll.',
+      },
+      {
+        cs: 'Z toho pro vás plyne, že obchodní sdělení musí být jako obchodní sdělení zřetelně označeno, musí být zjevné, kdo je odesílá, a musí obsahovat funkční způsob, jak další zprávy odmítnout. Za dodržení těchto povinností odpovídáte vy, nikoli provozovatel. Česká obchodní inspekce může za jejich porušení uložit pokutu až 10 000 000 Kč. To, že adresa je veřejně uvedená, sama o sobě souhlas s oslovením nezakládá — Úřad pro ochranu osobních údajů to opakovaně potvrdil.',
+        sk: 'Z toho pre vás plynie, že obchodné oznámenie musí byť ako obchodné oznámenie zreteľne označené, musí byť zjavné, kto ho odosiela, a musí obsahovať funkčný spôsob, ako ďalšie správy odmietnuť. Za dodržanie týchto povinností zodpovedáte vy, nie prevádzkovateľ. Za ich porušenie hrozí pokuta až 10 000 000 Kč. To, že adresa je verejne uvedená, samo osebe súhlas s oslovením nezakladá.',
+        en: 'That means the message must be clearly identifiable as a commercial communication, must make plain who is sending it, and must offer a working way to refuse further messages. Compliance is your responsibility, not the operator’s. The Czech Trade Inspection Authority can impose fines of up to CZK 10,000,000 for breaches. The fact that an address is published does not by itself constitute consent to be contacted — the Czech data protection authority has confirmed this repeatedly.',
+      },
+    ],
+  },
+  {
+    heading: {
+      cs: 'Exportovaná data a ochrana osobních údajů',
+      sk: 'Exportované dáta a ochrana osobných údajov',
+      en: 'Exported data and data protection',
+    },
+    body: [
+      {
+        cs: 'Jakmile si výsledky vyexportujete do svého souboru nebo je přenesete do vlastního systému, stáváte se vůči těmto údajům samostatným správcem podle GDPR. Od té chvíle je na vás, abyste je zpracovávali v souladu s předpisy — tedy pro určený účel, po přiměřenou dobu a s vyřízením případných námitek. Provozovatel na vaše kopie dat nemá žádný vliv a neodpovídá za to, jak s nimi naložíte.',
+        sk: 'Akonáhle si výsledky vyexportujete do svojho súboru alebo ich prenesiete do vlastného systému, stávate sa voči týmto údajom samostatným prevádzkovateľom podľa GDPR. Od tej chvíle je na vás, aby ste ich spracúvali v súlade s predpismi — teda na určený účel, po primeranú dobu a s vybavením prípadných námietok. Prevádzkovateľ na vaše kópie dát nemá žiadny vplyv a nezodpovedá za to, ako s nimi naložíte.',
+        en: 'Once you export results to a file or move them into your own system, you become an independent data controller for that data under the GDPR. From then on it is on you to process it lawfully — for a defined purpose, for a reasonable period, and handling any objections you receive. The operator has no control over your copies and is not responsible for what you do with them.',
+      },
+    ],
+  },
+  {
+    heading: {
+      cs: 'Za správnost dat neručíme',
+      sk: 'Za správnosť dát neručíme',
+      en: 'We do not warrant the data',
+    },
+    body: [
+      {
+        cs: 'Všechna data pocházejí z veřejných rejstříků, map a webů třetích stran. Aplikace je pouze zprostředkovává a nijak je neověřuje. Mohou být zastaralá, neúplná nebo chybná — firma může mít jiný kontakt, než je zapsán, a údaj o webu vypovídá jen o tom, co se aplikaci podařilo najít, nikoli o tom, jak na tom firma skutečně je. Před obchodním rozhodnutím si údaje ověřte u zdroje.',
+        sk: 'Všetky dáta pochádzajú z verejných registrov, máp a webov tretích strán. Aplikácia ich iba sprostredkúva a nijako ich neoveruje. Môžu byť zastarané, neúplné alebo chybné — firma môže mať iný kontakt, než je zapísaný, a údaj o webe vypovedá len o tom, čo sa aplikácii podarilo nájsť, nie o tom, ako na tom firma skutočne je. Pred obchodným rozhodnutím si údaje overte pri zdroji.',
+        en: 'All data comes from public registers, maps and third-party websites. The app merely relays it and does not verify it. It may be out of date, incomplete or wrong — a business may use a contact other than the one on record, and a website field tells you what the app managed to find, not how the business actually stands. Verify at source before making a commercial decision.',
+      },
+    ],
+  },
+  {
+    heading: {
+      cs: 'Dostupnost a omezení odpovědnosti',
+      sk: 'Dostupnosť a obmedzenie zodpovednosti',
+      en: 'Availability and limitation of liability',
+    },
+    body: [
+      {
+        cs: 'Služba je poskytována „tak jak je", bez záruky nepřetržité dostupnosti. Závisí na veřejných rozhraních třetích stran (ARES, OpenStreetMap), která mohou být nedostupná nebo změnit své chování. Provozovatel neodpovídá za ušlý zisk ani za nepřímou škodu. Odpovědnost za škodu způsobenou úmyslně nebo z hrubé nedbalosti se nevylučuje ani neomezuje.',
+        sk: 'Služba je poskytovaná „tak ako je", bez záruky nepretržitej dostupnosti. Závisí od verejných rozhraní tretích strán (ARES, OpenStreetMap), ktoré môžu byť nedostupné alebo zmeniť svoje správanie. Prevádzkovateľ nezodpovedá za ušlý zisk ani za nepriamu škodu. Zodpovednosť za škodu spôsobenú úmyselne alebo z hrubej nedbanlivosti sa nevylučuje ani neobmedzuje.',
+        en: 'The service is provided “as is”, with no guarantee of uninterrupted availability. It depends on third-party public interfaces (ARES, OpenStreetMap) which may be unavailable or change their behaviour. The operator is not liable for lost profit or indirect damage. Liability for damage caused intentionally or by gross negligence is neither excluded nor limited.',
+      },
+    ],
+  },
+  {
+    heading: { cs: 'Rozhodné právo', sk: 'Rozhodné právo', en: 'Governing law' },
+    body: [
+      {
+        cs: 'Vztah se řídí právem České republiky. Spory rozhodují české soudy. Jste-li spotřebitel, nejste tímto ujednáním zbaveni ochrany, kterou vám poskytují kogentní předpisy státu vašeho bydliště; mimosoudně se můžete obrátit na Českou obchodní inspekci (adr.coi.cz).',
+        sk: 'Vzťah sa riadi právom Českej republiky. Spory rozhodujú české súdy. Ak ste spotrebiteľ, nie ste týmto dojednaním zbavení ochrany, ktorú vám poskytujú kogentné predpisy štátu vášho bydliska; mimosúdne sa môžete obrátiť na Českú obchodnú inšpekciu (adr.coi.cz).',
+        en: 'This relationship is governed by the law of the Czech Republic and disputes are decided by Czech courts. If you are a consumer, this does not deprive you of the protection of mandatory rules of your country of residence; out of court you may turn to the Czech Trade Inspection Authority (adr.coi.cz).',
+      },
+    ],
+  },
+  {
+    heading: { cs: 'Změny podmínek', sk: 'Zmeny podmienok', en: 'Changes to these terms' },
+    body: [
+      {
+        cs: 'Podmínky se mohou měnit. O podstatné změně dáme registrovaným uživatelům vědět e-mailem alespoň 14 dnů předem. Pokud se změnou nebudete souhlasit, můžete účet do té doby zrušit.',
+        sk: 'Podmienky sa môžu meniť. O podstatnej zmene dáme registrovaným používateľom vedieť e-mailom aspoň 14 dní vopred. Ak so zmenou nebudete súhlasiť, môžete účet do tej doby zrušiť.',
+        en: 'These terms may change. We give registered users at least 14 days’ notice by e-mail of any material change. If you do not accept it, you may close your account before it takes effect.',
+      },
+    ],
+  },
+];
+
+export default function TermsPage({ params: { locale } }: { params: { locale: string } }) {
+  return <LegalDocument title={M.title} intro={INTRO} blocks={BLOCKS} locale={locale} />;
 }

@@ -6,11 +6,49 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Mail, Lock, User, ArrowRight, Ticket } from 'lucide-react';
 import { saveUser } from '@/lib/client-auth';
+import { localized } from '@/lib/lead-filters';
+
+/**
+ * Hlášky ze serveru mapujeme na lidský text. Server posílá anglické kódy, protože nezná jazyk
+ * uživatele — překlad patří sem.
+ */
+const ERR: Record<string, { cs: string; sk?: string; en: string }> = {
+  'Invalid invite code':      { cs: 'Neplatný kód pozvánky.',      sk: 'Neplatný kód pozvánky.',      en: 'Invalid invite code.' },
+  'Invite code already used': { cs: 'Tento kód už byl použitý.',   sk: 'Tento kód už bol použitý.',   en: 'This invite code has already been used.' },
+  'Invite code expired':      { cs: 'Platnost kódu vypršela.',     sk: 'Platnosť kódu vypršala.',     en: 'This invite code has expired.' },
+  'Email already in use':     { cs: 'Na tento e-mail už účet existuje.', sk: 'Na tento e-mail už účet existuje.', en: 'An account with this e-mail already exists.' },
+};
+
+const UI = {
+  fallback: { cs: 'Registrace se nepodařila. Zkuste to prosím znovu.',
+              sk: 'Registrácia sa nepodarila. Skúste to prosím znova.',
+              en: 'Registration failed. Please try again.' },
+  server:   { cs: 'Registrace se teď nepodařila — chyba na naší straně. Zkuste to prosím za chvíli.',
+              sk: 'Registrácia sa teraz nepodarila — chyba na našej strane. Skúste to prosím o chvíľu.',
+              en: 'Registration failed on our side. Please try again in a moment.' },
+  network:  { cs: 'Nepodařilo se spojit se serverem. Zkontrolujte připojení a zkuste to znovu.',
+              sk: 'Nepodarilo sa spojiť so serverom. Skontrolujte pripojenie a skúste to znova.',
+              en: 'Could not reach the server. Check your connection and try again.' },
+  perksTitle: { cs: 'Co získáš zdarma', sk: 'Čo získaš zadarmo', en: 'What you get for free' },
+  inviteOnly: { cs: 'Přístup pouze na pozvánku.', sk: 'Prístup iba na pozvánku.', en: 'Invite-only access.' },
+  needCode:   { cs: 'Pro registraci potřebuješ platný kód pozvánky.',
+                sk: 'Na registráciu potrebuješ platný kód pozvánky.',
+                en: 'You need a valid invite code to register.' },
+  codeLabel:  { cs: 'Kód pozvánky', sk: 'Kód pozvánky', en: 'Invite code' },
+  codeHint:   { cs: 'Kód ti pošle administrátor.', sk: 'Kód ti pošle administrátor.', en: 'The code is sent by an administrator.' },
+  pwHint:     { cs: 'Alespoň 8 znaků', sk: 'Aspoň 8 znakov', en: 'At least 8 characters' },
+};
+
+const PERKS = [
+  { cs: '5 vyhledávání zdarma',   sk: '5 hľadaní zadarmo',       en: '5 free searches' },
+  { cs: 'Přístup ke všem filtrům', sk: 'Prístup ku všetkým filtrom', en: 'All filters included' },
+  { cs: 'Export výsledků',        sk: 'Export výsledkov',        en: 'Export results' },
+  { cs: 'Bez kreditní karty',     sk: 'Bez kreditnej karty',     en: 'No credit card' },
+];
 
 export default function RegisterPage() {
   const t = useTranslations('auth');
   const locale = useLocale();
-  const isCs = locale === 'cs' || locale === 'sk';
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -33,32 +71,35 @@ export default function RegisterPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
       });
-      const data = await res.json();
       if (!res.ok) {
-        const msgs: Record<string, string> = {
-          'Invalid invite code':      isCs ? 'Neplatný invite kód.' : 'Invalid invite code.',
-          'Invite code already used': isCs ? 'Tento invite kód byl již použit.' : 'Invite code already used.',
-          'Invite code expired':      isCs ? 'Platnost invite kódu vypršela.' : 'Invite code expired.',
-          'Email already in use':     isCs ? 'Email je již registrovaný.' : 'Email already in use.',
-        };
-        setError(msgs[data.error] ?? (isCs ? 'Něco se pokazilo.' : 'Something went wrong.'));
+        // Serverová chyba není chyba uživatele — nemá smysl mu radit, ať opraví kód pozvánky.
+        if (res.status >= 500) {
+          setError(localized(UI.server, locale));
+          return;
+        }
+        const data = await res.json().catch(() => ({}));
+        const known = typeof data.error === 'string' ? ERR[data.error] : undefined;
+        setError(known ? localized(known, locale) : localized(UI.fallback, locale));
         return;
       }
+      // Až tady, protože `res.json()` na nejsonové odpovědi vyhodí výjimku — a ta dřív
+      // propadla mimo handler, takže se uživateli neukázalo vůbec nic.
+      const data = await res.json();
       saveUser(data.user);
       // Straight to the search with the onboarding modal open, rather than to a dashboard with
       // nothing on it yet: the four questions there are what make the first search useful.
       window.location.href = `/${locale}/search?welcome=1`;
+    } catch {
+      setError(localized(UI.network, locale));
     } finally {
       setLoading(false);
     }
   };
 
-  const perks = isCs
-    ? ['5 vyhledávání zdarma', 'Přístup ke všem filtrům', 'Export výsledků', 'Bez kreditní karty']
-    : ['5 free searches', 'All filters included', 'Export results', 'No credit card'];
+  const perks = PERKS.map(p => localized(p, locale));
 
   return (
-    <div className="min-h-screen flex pt-16">
+    <div className="min-h-screen flex">
       {/* Left panel */}
       <div className="hidden lg:flex flex-col justify-between w-[420px] shrink-0 p-10 border-r border-line">
         <Link href={`/${locale}`} className="font-extrabold text-[17px] tracking-tight">
@@ -66,7 +107,7 @@ export default function RegisterPage() {
         </Link>
         <div>
           <p className="text-xs font-semibold uppercase tracking-widest text-ink-faint mb-4">
-            {isCs ? 'Co získáš zdarma' : 'What you get for free'}
+            {localized(UI.perksTitle, locale)}
           </p>
           <ul className="divide-y divide-line border-y border-line">
             {perks.map(p => (
@@ -74,7 +115,7 @@ export default function RegisterPage() {
             ))}
           </ul>
         </div>
-        <p className="text-xs text-ink-faint">{isCs ? 'Přístup pouze na pozvánku.' : 'Invite-only access.'}</p>
+        <p className="text-xs text-ink-faint">{localized(UI.inviteOnly, locale)}</p>
       </div>
 
       {/* Right form */}
@@ -83,7 +124,7 @@ export default function RegisterPage() {
           <div className="mb-8">
             <h1 className="text-2xl font-bold text-ink">{t('register_title')}</h1>
             <p className="text-ink-muted text-sm mt-1">
-              {isCs ? 'Pro registraci potřebuješ platný invite kód.' : 'You need a valid invite code to register.'}
+              {localized(UI.needCode, locale)}
             </p>
           </div>
 
@@ -92,7 +133,7 @@ export default function RegisterPage() {
             <div>
               <label className="label flex items-center gap-1">
                 <Ticket size={13} />
-                {isCs ? 'Invite kód' : 'Invite code'}
+                {localized(UI.codeLabel, locale)}
                 <span className="text-accent ml-0.5">*</span>
               </label>
               <input
@@ -105,7 +146,7 @@ export default function RegisterPage() {
                 autoFocus={!form.inviteCode}
               />
               <p className="text-[11px] text-ink-faint mt-1">
-                {isCs ? 'Kód ti pošle administrátor.' : 'The code is sent by an administrator.'}
+                {localized(UI.codeHint, locale)}
               </p>
             </div>
 
@@ -131,7 +172,7 @@ export default function RegisterPage() {
                 <div className="relative">
                   <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-faint" />
                   <input type="password" className="input pl-9"
-                    placeholder={isCs ? 'Alespoň 8 znaků' : 'At least 8 characters'}
+                    placeholder={localized(UI.pwHint, locale)}
                     value={form.password} onChange={e => setForm({ ...form, password: e.target.value })}
                     required minLength={8} />
                 </div>

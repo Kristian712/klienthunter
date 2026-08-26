@@ -7,7 +7,6 @@ import {
   Phone, Mail, MapPin, X, Clock, ChevronDown, Check, Send,
   FileText, Table2, MessageSquare, Copy, Smartphone, PhoneCall,
 } from 'lucide-react';
-import { OSM_ATTRIBUTION } from '@/lib/attribution';
 import { outreachBody, toSender } from '@/lib/outreach';
 import { LEAD_FILTERS, GROUP_LABELS, GROUP_ORDER, matchesAll, localized } from '@/lib/lead-filters';
 import { scoreBreakdown } from '@/lib/lead-score';
@@ -134,61 +133,66 @@ function whatsappHref(phone: string): string {
 // ── Contact strategy ──────────────────────────────────────────────────────────
 
 /**
- * Which channel to try first, and why. Ordered, not colour-coded: the first entry is the
- * recommendation, the rest are fallbacks, and greyer type says that better than five brand
- * colours competing for attention inside one row.
+ * Which channels this row actually offers, and what is worth knowing about each.
+ *
+ * Dřív tady stály věty jako „Nejvyšší šance odpovědi, nejlépe 9–11h" nebo „Messenger funguje
+ * dobře u starší klientely (40+)". Žádné takové číslo aplikace nemá — byly vymyšlené, a to
+ * druhé navíc soudilo lidi podle věku. Je to stejná chyba, kvůli které se přepisoval zbytek
+ * appky: tvrdit něco, co data neunesou. Nové popisky říkají jen to, co je skutečně pravda —
+ * co ten kanál je a na co si u něj dát pozor. Rozhodnutí zůstává na uživateli.
  */
-function ContactStrategy({ b }: { b: BusinessResult }) {
+
+const CONTACT = {
+  heading: { cs: 'Jak kontaktovat', sk: 'Ako kontaktovať', en: 'How to get in touch' },
+  call:    { cs: 'Zavolat',          sk: 'Zavolať',          en: 'Call' },
+  callTip: { cs: 'Číslo je mobilní — voláte nejspíš přímo majiteli, ne na recepci.',
+             sk: 'Číslo je mobilné — voláte najskôr priamo majiteľovi, nie na recepciu.',
+             en: 'It is a mobile number, so you are most likely reaching the owner directly.' },
+  wa:      { cs: 'WhatsApp',         sk: 'WhatsApp',         en: 'WhatsApp' },
+  waTip:   { cs: 'Stejné číslo, jen písemně — když se nechcete vnucovat hovorem.',
+             sk: 'To isté číslo, len písomne — keď sa nechcete vnucovať hovorom.',
+             en: 'Same number in writing, if a phone call feels too intrusive.' },
+  ig:      { cs: 'Zpráva na Instagramu', sk: 'Správa na Instagrame', en: 'Instagram message' },
+  igTip:   { cs: 'Zpráva od neznámého účtu se schová do žádostí — nemusí si jí všimnout.',
+             sk: 'Správa od neznámeho účtu sa schová do žiadostí — nemusia si ju všimnúť.',
+             en: 'A message from an unknown account lands in requests and is easy to miss.' },
+  fb:      { cs: 'Zpráva na Facebooku', sk: 'Správa na Facebooku', en: 'Facebook message' },
+  fbTip:   { cs: 'Stránku spravuje někdo z firmy; zpráva od cizího účtu často končí v žádostech.',
+             sk: 'Stránku spravuje niekto z firmy; správa od cudzieho účtu často končí v žiadostiach.',
+             en: 'Someone at the business runs the page; messages from strangers often sit in requests.' },
+  email:   { cs: 'E-mail',           sk: 'E-mail',           en: 'E-mail' },
+  emailTip:{ cs: 'Písemně a doložitelně. U nevyžádané nabídky platí § 7 zák. 480/2004 Sb. — viz podmínky.',
+             sk: 'Písomne a doložiteľne. Pri nevyžiadanej ponuke platí § 7 zák. 480/2004 Zb. — viď podmienky.',
+             en: 'Written and on the record. Unsolicited offers fall under § 7 of Act 480/2004 — see the terms.' },
+};
+
+function ContactStrategy({ b, locale }: { b: BusinessResult; locale: string }) {
   const mobile = b.phone ? isCzMobile(b.phone) : false;
+  const L = (x: { cs: string; sk?: string; en: string }) => localized(x, locale);
 
   type Method = { key: string; icon: React.ReactNode; label: string; href: string; tip: string };
   const methods: Method[] = [];
 
   if (b.phone && mobile) {
-    methods.push({
-      key: 'call',
-      icon: <PhoneCall size={11} />,
-      label: 'Zavolej přímo',
-      href: `tel:${b.phone}`,
-      tip: 'Nejvyšší šance odpovědi. Nejlépe 9–11h nebo 14–16h.',
-    });
-    methods.push({
-      key: 'wa',
-      icon: <WaIcon />,
-      label: 'WhatsApp',
-      href: whatsappHref(b.phone),
-      tip: 'Majitelé malých firem čtou WA pravidelně — stručná zpráva funguje.',
-    });
+    methods.push({ key: 'call', icon: <PhoneCall size={11} />, label: L(CONTACT.call),
+                   href: `tel:${b.phone}`, tip: L(CONTACT.callTip) });
+    methods.push({ key: 'wa', icon: <WaIcon />, label: L(CONTACT.wa),
+                   href: whatsappHref(b.phone), tip: L(CONTACT.waTip) });
   }
 
   if (b.hasInstagram && b.instagramUrl) {
-    methods.push({
-      key: 'ig',
-      icon: <IgIcon />,
-      label: 'DM na Instagramu',
-      href: b.instagramUrl,
-      tip: 'Pro vizuální obory (kadeřnictví, kosmetika…) velmi vysoká odezva.',
-    });
+    methods.push({ key: 'ig', icon: <IgIcon />, label: L(CONTACT.ig),
+                   href: b.instagramUrl, tip: L(CONTACT.igTip) });
   }
 
   if (b.hasFacebook && b.facebookUrl) {
-    methods.push({
-      key: 'fb',
-      icon: <FbIcon />,
-      label: 'DM na Facebooku',
-      href: b.facebookUrl,
-      tip: 'Messenger funguje dobře u starší klientely (40+).',
-    });
+    methods.push({ key: 'fb', icon: <FbIcon />, label: L(CONTACT.fb),
+                   href: b.facebookUrl, tip: L(CONTACT.fbTip) });
   }
 
   if (b.email) {
-    methods.push({
-      key: 'email',
-      icon: <Mail size={11} />,
-      label: 'E-mail',
-      href: `mailto:${b.email}`,
-      tip: 'Nejnižší odezva u cold outreach. Použij jen pokud není nic jiného.',
-    });
+    methods.push({ key: 'email', icon: <Mail size={11} />, label: L(CONTACT.email),
+                   href: `mailto:${b.email}`, tip: L(CONTACT.emailTip) });
   }
 
   if (methods.length === 0) return null;
@@ -196,7 +200,7 @@ function ContactStrategy({ b }: { b: BusinessResult }) {
   return (
     <div className="mt-3 border-t border-line pt-3">
       <p className="text-[11px] font-semibold text-ink-faint uppercase tracking-wider mb-2">
-        Jak kontaktovat
+        {L(CONTACT.heading)}
       </p>
       <div className="space-y-2">
         {methods.map((m, i) => (
@@ -254,6 +258,30 @@ const S = {
                  sk: 'Koncept sa nepodarilo pripraviť.',
                  en: 'Could not prepare the draft.' },
   error:       { cs: 'Chyba',           sk: 'Chyba',            en: 'Error' },
+  // ODbL je share-alike: cokoliv odvozeného z OSM musí zdroj pojmenovat. Byla to jediná věta
+  // v tomhle bloku, která zůstala natvrdo česky — a přitom je to licenční podmínka, ne popisek.
+  // Hledání selhává čtyřmi různými způsoby a každý znamená pro uživatele něco jiného. Dokud
+  // se všechny slily do jedné hlášky (nebo do žádné), nedalo se z ní poznat, jestli má počkat,
+  // přihlásit se znovu, nebo zúžit dotaz.
+  errLogin:   { cs: 'Přihlaste se prosím znovu.', sk: 'Prihláste sa prosím znova.', en: 'Please sign in again.' },
+  errPlan:    { cs: 'Vyčerpali jste počet hledání ve svém plánu.',
+                sk: 'Vyčerpali ste počet hľadaní vo svojom pláne.',
+                en: 'You have used up the searches in your plan.' },
+  errBurst:   { cs: 'Hledání jde rychle za sebou. Dejte tomu pár minut — data taháme z veřejných rejstříků, které je potřeba šetřit.',
+                sk: 'Hľadania idú rýchlo za sebou. Dajte tomu pár minút — dáta ťaháme z verejných registrov, ktoré treba šetriť.',
+                en: 'That is a lot of searches in a row. Give it a few minutes — the data comes from public registers we have to go easy on.' },
+  errTimeout: { cs: 'Hledání trvalo moc dlouho a vypršelo. Zkuste užší kraj místo celé ČR.',
+                sk: 'Hľadanie trvalo príliš dlho a vypršalo. Skúste užší kraj namiesto celej ČR.',
+                en: 'The search timed out. Try a single region instead of the whole country.' },
+  errServer:  { cs: 'Hledání se nepodařilo — chyba na naší straně. Zkuste to prosím znovu.',
+                sk: 'Hľadanie sa nepodarilo — chyba na našej strane. Skúste to prosím znova.',
+                en: 'The search failed on our side. Please try again.' },
+  errNetwork: { cs: 'Nepodařilo se spojit se serverem. Zkontrolujte připojení a zkuste to znovu.',
+                sk: 'Nepodarilo sa spojiť so serverom. Skontrolujte pripojenie a skúste to znova.',
+                en: 'Could not reach the server. Check your connection and try again.' },
+  attribution: { cs: 'Část dat: © přispěvatelé OpenStreetMap (ODbL) · údaje o firmách z veřejného rejstříku ARES',
+                 sk: 'Časť dát: © prispievatelia OpenStreetMap (ODbL) · údaje o firmách z verejného registra ARES',
+                 en: 'Some data: © OpenStreetMap contributors (ODbL) · business records from the Czech ARES register' },
   meetsOf:     { cs: 'Splňuje {n} z {total} kritérií',
                  sk: 'Spĺňa {n} z {total} kritérií',
                  en: 'Meets {n} of {total} criteria' },
@@ -386,12 +414,17 @@ function MessageBox({ b, profile, locale }: { b: BusinessResult; profile: UserPr
 
       {open && (
         <div className="mt-2 relative">
-          <textarea
-            readOnly
-            value={msg}
-            rows={8}
-            className="w-full text-xs text-ink-muted bg-surface-subtle border border-line rounded-lg p-3 resize-none font-mono leading-relaxed"
-          />
+          {/*
+            Pevných osm řádků koncept ořízlo přesně v místě podpisu — a protože `resize-none`
+            zároveň schová posuvník, vypadalo to, že se zpráva podepsat zapomněla. Text je
+            jen ke čtení a ke zkopírování, takže není důvod ho svírat: `rows` se dopočítá
+            z obsahu. `whitespace-pre-wrap` drží prázdné řádky mezi odstavci.
+          */}
+          <div
+            className="w-full text-xs text-ink-muted bg-surface-subtle border border-line rounded-lg p-3 pr-24 font-mono leading-relaxed whitespace-pre-wrap"
+          >
+            {msg}
+          </div>
           <button
             onClick={copy}
             className={`absolute top-2 right-2 flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
@@ -571,15 +604,24 @@ export default function SearchPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ region: effectiveRegion, industry: effectiveIndustry }),
       });
-      const data = await res.json();
       if (!res.ok) {
-        if (res.status === 401) setError(isCs ? 'Přihlaste se prosím.' : 'Please log in.');
-        else if (res.status === 403) setError(isCs ? 'Limit vyhledávání vyčerpán.' : 'Search limit reached.');
-        else setError(data.error || 'Error');
+        // Podle stavu, ne podle těla odpovědi: u 504 vrací platforma HTML, ne JSON, takže
+        // `res.json()` na něm vyhodí výjimku — a dřív spadl celý handler, spinner zmizel
+        // a uživatel zůstal koukat na prázdnou stránku bez vysvětlení.
+        const byStatus =
+          res.status === 401 ? S.errLogin  :
+          res.status === 403 ? S.errPlan   :
+          res.status === 429 ? S.errBurst  :
+          res.status === 504 || res.status === 408 ? S.errTimeout :
+          S.errServer;
+        setError(localized(byStatus, locale));
         return;
       }
+      const data = await res.json();
       setResults(data.results);
       setSearchId(data.searchId);
+    } catch {
+      setError(localized(S.errNetwork, locale));
     } finally {
       setLoading(false);
       setLoadingMsg('');
@@ -612,6 +654,25 @@ export default function SearchPage() {
 
         {/* ── Search form ── */}
         <form onSubmit={handleSearch} className="card mb-6">
+          {/*
+            Zkratky na nejčastější obory patří nad celý řádek, ne dovnitř sloupce s oborem.
+            Dokud byly uvnitř, byl ten sloupec o dva řádky vyšší než sousední — a protože se
+            mřížka zarovnává na spodní hranu, výběr regionu klesl dolů a nad ním zela prázdná
+            plocha přes půl karty. Nahoře navíc čtou líp: je to volba, ne dekorace pole.
+          */}
+          <div className="flex flex-wrap gap-1.5 mb-4">
+            {popularChips.map(chip => (
+              <button
+                key={chip.value}
+                type="button"
+                onClick={() => setIndustry(chip.value)}
+                className={industry === chip.value ? 'chip-active' : 'chip'}
+              >
+                {chip.label}
+              </button>
+            ))}
+          </div>
+
           <div className="grid md:grid-cols-5 gap-4 items-end">
 
             {/* Region select */}
@@ -627,7 +688,7 @@ export default function SearchPage() {
                   onChange={e => setRegion(e.target.value)}
                   required={region !== '__custom__'}
                 >
-                  <option value="">{isCs ? '— Vyberte region —' : '— Select region —'}</option>
+                  <option value="">{localized({ cs: '— Vyberte region —', sk: '— Vyberte región —', en: '— Select region —' }, locale)}</option>
                   {REGIONS.map(group => (
                     <optgroup key={group.group} label={group.group}>
                       {group.items.map(r => (
@@ -635,14 +696,14 @@ export default function SearchPage() {
                       ))}
                     </optgroup>
                   ))}
-                  <option value="__custom__">{isCs ? 'Jiné město (zadat ručně)' : 'Other (type manually)'}</option>
+                  <option value="__custom__">{localized({ cs: 'Jiné město (zadat ručně)', sk: 'Iné mesto (zadať ručne)', en: 'Other (type manually)' }, locale)}</option>
                 </select>
                 <ChevronDown size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none" />
               </div>
               {region === '__custom__' && (
                 <input
                   className="input mt-2"
-                  placeholder={isCs ? 'Název města nebo oblasti…' : 'City or region name…'}
+                  placeholder={localized({ cs: 'Název města nebo oblasti…', sk: 'Názov mesta alebo oblasti…', en: 'City or region name…' }, locale)}
                   value={customRegion}
                   onChange={e => setCustomRegion(e.target.value)}
                   required
@@ -657,20 +718,6 @@ export default function SearchPage() {
                 <Search size={13} className="inline mr-1" />
                 {t('industry_label')}
               </label>
-
-              {/* Popular chips */}
-              <div className="flex flex-wrap gap-1.5 mb-2">
-                {popularChips.map(chip => (
-                  <button
-                    key={chip.value}
-                    type="button"
-                    onClick={() => setIndustry(chip.value)}
-                    className={industry === chip.value ? 'chip-active' : 'chip'}
-                  >
-                    {chip.label}
-                  </button>
-                ))}
-              </div>
 
               <div className="relative">
                 <select
@@ -901,7 +948,7 @@ export default function SearchPage() {
                         )}
                       </div>
 
-                      <ContactStrategy b={b} />
+                      <ContactStrategy b={b} locale={locale} />
                       <MessageBox b={b} profile={profile} locale={locale} />
                     </div>
 
@@ -935,7 +982,7 @@ export default function SearchPage() {
             {/* ODbL is share-alike: anything derived from OSM has to name the source. */}
             {results.some(b => (b.source ?? '').split('+').includes('osm')) && (
               <p className="mt-4 text-center text-[11px] text-ink-faint">
-                Část dat: {OSM_ATTRIBUTION} · údaje o firmách z veřejného rejstříku ARES
+                {localized(S.attribution, locale)}
               </p>
             )}
           </>

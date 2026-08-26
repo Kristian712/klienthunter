@@ -5,11 +5,35 @@ import { useTranslations, useLocale } from 'next-intl';
 import Link from 'next/link';
 import { Mail, Lock, ArrowRight } from 'lucide-react';
 import { saveUser } from '@/lib/client-auth';
+import { localized } from '@/lib/lead-filters';
+
+/**
+ * Chybové hlášky. Rozlišení mezi „špatné heslo" a „server je rozbitý" není kosmetika: dokud
+ * se každé selhání hlásilo jako neplatné údaje, uživatel při výpadku databáze desetkrát
+ * přepsal správné heslo a pak si založil nový účet.
+ */
+const ERR = {
+  credentials: { cs: 'Neplatný e-mail nebo heslo.',
+                 sk: 'Neplatný e-mail alebo heslo.',
+                 en: 'Wrong e-mail or password.' },
+  server:      { cs: 'Přihlášení se teď nepodařilo — chyba na naší straně. Zkuste to prosím za chvíli.',
+                 sk: 'Prihlásenie sa teraz nepodarilo — chyba na našej strane. Skúste to prosím o chvíľu.',
+                 en: 'Sign-in failed on our side. Please try again in a moment.' },
+  network:     { cs: 'Nepodařilo se spojit se serverem. Zkontrolujte připojení a zkuste to znovu.',
+                 sk: 'Nepodarilo sa spojiť so serverom. Skontrolujte pripojenie a skúste to znova.',
+                 en: 'Could not reach the server. Check your connection and try again.' },
+};
+
+const UI = {
+  welcome: { cs: 'Vítejte zpět',  sk: 'Vitajte späť',  en: 'Welcome back' },
+  sources: { cs: 'Data z ARESu a OpenStreetMap.',
+             sk: 'Dáta z ARESu a OpenStreetMap.',
+             en: 'Data from ARES and OpenStreetMap.' },
+};
 
 export default function LoginPage() {
   const t = useTranslations('auth');
   const locale = useLocale();
-  const isCs = locale === 'cs' || locale === 'sk';
   const [form, setForm]       = useState({ email: '', password: '' });
   const [error, setError]     = useState('');
   const [loading, setLoading] = useState(false);
@@ -24,29 +48,34 @@ export default function LoginPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
       });
-      const data = await res.json();
       if (!res.ok) {
-        setError(isCs ? 'Neplatné přihlašovací údaje.' : 'Invalid credentials.');
+        // 401 znamená „tyhle údaje nesedí". Cokoliv jiného je naše chyba, ne uživatelova.
+        setError(localized(res.status === 401 ? ERR.credentials : ERR.server, locale));
         return;
       }
+      // `res.json()` vyhodí výjimku, kdykoli odpověď není JSON — třeba když se mezi prohlížeč
+      // a aplikaci vloží chybová stránka proxy. Bez tohohle bloku spadl celý handler mlčky.
+      const data = await res.json();
       saveUser(data.user);
       window.location.href = `/${locale}/dashboard`;
+    } catch {
+      setError(localized(ERR.network, locale));
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex pt-16">
+    <div className="min-h-screen flex">
       <div className="hidden lg:flex flex-col justify-between w-[420px] shrink-0 p-10 border-r border-line">
         <Link href={`/${locale}`} className="font-extrabold text-[17px] tracking-tight">
           KlientHunter<span className="text-accent">.</span>
         </Link>
         <p className="display-sm leading-[0.9]">
-          {isCs ? 'Vítejte zpět' : 'Welcome back'}<span className="text-accent">.</span>
+          {localized(UI.welcome, locale)}<span className="text-accent">.</span>
         </p>
         <p className="text-sm text-ink-faint">
-          {isCs ? 'Data z ARESu a OpenStreetMap.' : 'Data from ARES and OpenStreetMap.'}
+          {localized(UI.sources, locale)}
         </p>
       </div>
 
@@ -54,7 +83,7 @@ export default function LoginPage() {
         <div className="w-full max-w-sm">
           <div className="mb-8">
             <h1 className="text-2xl font-bold text-ink">{t('login_title')}</h1>
-            <p className="text-ink-muted text-sm mt-1">{isCs ? 'Vítejte zpět!' : 'Welcome back!'}</p>
+            <p className="text-ink-muted text-sm mt-1">{localized(UI.welcome, locale)}!</p>
           </div>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>

@@ -17,6 +17,10 @@ export function Navbar() {
   const t = useTranslations('nav');
   const locale = useLocale();
   const pathname = usePathname();
+  // Přihlašovací a registrační stránka je celoobrazovkový split s vlastním logem vlevo. Když
+  // nad ním visela ještě tahle lišta, značka na obrazovce byla dvakrát a stránka měla dvě
+  // navigace, ze kterých ani jedna nevedla dopředu. Na těch dvou cestách se lišta skrývá.
+  const standalone = pathname.includes('/auth/');
   const [user, setUser]     = useState<UserType | null>(null);
   const [mobile, setMobile] = useState(false);
   const [dropdown, setDropdown] = useState(false);
@@ -56,6 +60,8 @@ export function Navbar() {
     ...(user?.isAdmin ? [{ href: `/${locale}/admin`, label: 'Admin' }] : []),
   ];
 
+
+  if (standalone) return null;
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-line">
       <nav className="max-w-6xl mx-auto px-5 flex items-center h-14 gap-8">

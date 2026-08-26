@@ -26,6 +26,22 @@ function isWholeCz(region: string): boolean {
  */
 const NETWORK_BUDGET_MS = 45_000;
 
+/**
+ * Nárazová pojistka nad rámec měsíčního limitu plánu.
+ *
+ * Každé hledání střílí dotaz na veřejný Overpass, který ve svých podmínkách výslovně žádá,
+ * aby ho nikdo nepoužíval jako backendovou infrastrukturu. Měsíční limit plánu tohle neřeší
+ * ze dvou důvodů: plány VIP, BUSINESS a admin ho mají nastavený na nekonečno, a i konečný
+ * limit dovolí vystřílet celý měsíční příděl během minuty. Kdyby Overpass zablokoval naši
+ * IP, přijdou o kontakty všichni uživatelé najednou — proto tenhle strop platí pro každého
+ * včetně adminů.
+ *
+ * Dvanáct za pět minut je nad rámec toho, co stihne člověk, který si výsledky opravdu čte:
+ * jedno hledání trvá i s ověřováním webů desítky sekund.
+ */
+const BURST_WINDOW_MS = 5 * 60 * 1000;
+const BURST_MAX = 12;
+
 export async function POST(req: NextRequest) {
   try {
     const token = req.cookies.get('auth-token')?.value;
@@ -34,6 +50,19 @@ export async function POST(req: NextRequest) {
     const payload = verifyToken(token);
     const body = await req.json();
     const { region, industry } = SearchSchema.parse(body);
+
+    // Počítáme už založená hledání, ne dokončená — jinak by série souběžných požadavků
+    // proklouzla všechna najednou, protože žádné z nich by v tu chvíli ještě nebylo hotové.
+    const burstSince = new Date(Date.now() - BURST_WINDOW_MS);
+    const recent = await prisma.search.count({
+      where: { userId: payload.userId, createdAt: { gte: burstSince } },
+    });
+    if (recent >= BURST_MAX) {
+      return NextResponse.json(
+        { error: 'Too many searches in a short time', code: 'RATE_LIMITED' },
+        { status: 429, headers: { 'Retry-After': String(Math.ceil(BURST_WINDOW_MS / 1000)) } },
+      );
+    }
 
     const limits = getPlanLimits(payload.plan, payload.isVip, payload.isAdmin);
 

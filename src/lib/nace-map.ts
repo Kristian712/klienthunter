@@ -66,12 +66,55 @@ export const NICHE_MAP: Record<string, NicheQuery> = {
   'chimney sweep':        { nace: ['81220', '43990'],  keywords: ['kominictví', 'kominík'], osm: ['craft=chimney_sweeper'] },
 };
 
+/** Malá písmena bez diakritiky — „Kadeřnictví" i „kadernictvi" má vést na totéž. */
+function normalize(text: string): string {
+  return text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+}
+
 /**
- * Falls back to treating an unmapped industry as a plain name search. Better a narrow
- * result than a wrong one — a guessed NACE code would silently return other trades.
+ * Klíče mapy jsou anglické slugy, protože zároveň slouží jako `value` v nabídce oborů.
+ * Uživatel, který zvolí „Jiný obor (zadat ručně)", ale píše česky — a napíše přesně to slovo,
+ * které v `keywords` u daného oboru už stojí.
+ *
+ * Dokud se hledalo jen podle klíče, skončil takový dotaz na prázdném `osm: []`. A protože
+ * OpenStreetMap je jediný zdroj, který nese telefony a e-maily, dostal uživatel sadu firem
+ * **bez jediného kontaktu** — tedy přesně to, kvůli čemu si aplikaci otevřel. Nešlo o chybu
+ * dat, jen o to, že se v nich nikdo nepodíval.
+ *
+ * Index se staví jednou při načtení modulu; mapa je konstantní.
+ */
+const BY_KEYWORD: Array<{ key: string; word: string }> = Object.entries(NICHE_MAP)
+  .flatMap(([key, q]) => q.keywords.map(word => ({ key, word: normalize(word) })))
+  // Delší slovo vyhrává: „svatební fotograf" má padnout na `fotograf`, ne na `foto` z jiného
+  // oboru, a „nehtové studio" na nehtové studio, ne na obecné „studio".
+  .sort((a, b) => b.word.length - a.word.length);
+
+/** Kratší jehla než tohle už v cizím názvu trefí náhodu častěji než obor. */
+const MIN_SUBSTRING = 4;
+
+/**
+ * Přeloží obor na dotazy do zdrojů. Zkouší v pořadí od nejjistějšího:
+ * přesný slug → přesné české slovo → české slovo obsažené v dotazu.
+ *
+ * Když nesedí nic, zůstává původní chování: hledá se jen podle názvu, bez NACE. Lepší úzký
+ * výsledek než špatný — hádaný NACE kód by tiše vrátil jiné řemeslo.
  */
 export function resolveNiche(industry: string): NicheQuery {
-  return (
-    NICHE_MAP[industry.toLowerCase()] ?? { nace: [], keywords: [industry], osm: [] }
-  );
+  const exact = NICHE_MAP[industry.toLowerCase()];
+  if (exact) return exact;
+
+  const q = normalize(industry);
+  if (!q) return { nace: [], keywords: [industry], osm: [] };
+
+  const hit =
+    BY_KEYWORD.find(k => k.word === q) ??
+    BY_KEYWORD.find(k => k.word.length >= MIN_SUBSTRING && q.includes(k.word));
+
+  if (!hit) return { nace: [], keywords: [industry], osm: [] };
+
+  // Slovo, které uživatel napsal, si necháváme navrch: v názvech firem bývá přesnější než
+  // obecné klíčové slovo oboru, a ARES hledá podle názvu.
+  const base = NICHE_MAP[hit.key];
+  const keywords = [industry, ...base.keywords.filter(w => normalize(w) !== q)];
+  return { ...base, keywords };
 }

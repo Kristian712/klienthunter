@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import { NextIntlClientProvider, useMessages } from 'next-intl';
 import { Navbar } from '@/components/Navbar';
-import { CookieBanner } from '@/components/CookieBanner';
+import { Footer } from '@/components/Footer';
 import { localized } from '@/lib/lead-filters';
 import '../globals.css';
 
@@ -58,7 +58,15 @@ export default function RootLayout({
         <NextIntlClientProvider locale={locale} messages={messages}>
           <Navbar />
           <main className="min-h-screen">{children}</main>
-          <CookieBanner />
+          <Footer locale={locale} />
+          {/*
+            Cookie banner deliberately removed. The app sets exactly one cookie — the `auth-token`
+            that keeps you signed in — and a cookie strictly necessary for a service the user asked
+            for needs no consent under § 89 odst. 3 zákona č. 127/2005 Sb. The banner also claimed
+            we analyse traffic, which we do not: there is no analytics script anywhere in the app,
+            and neither of its buttons gated anything. Asking for consent you do not need, to do
+            something you do not do, is worse than not asking.
+          */}
         </NextIntlClientProvider>
       </body>
     </html>

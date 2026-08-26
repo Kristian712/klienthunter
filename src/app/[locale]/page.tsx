@@ -179,18 +179,6 @@ const UI = {
   stepsTitle: { cs: 'Čtyři kroky, tři minuty.', sk: 'Štyri kroky, tri minúty.', en: 'Four steps, three minutes.' },
   faqTitle:   { cs: 'Otázky.',                  sk: 'Otázky.',                  en: 'Questions.' },
   closing:    { cs: 'Kdo je na řadě',           sk: 'Kto je na rade',           en: 'Who is next' },
-  product:    { cs: 'Produkt',                  sk: 'Produkt',                  en: 'Product' },
-  search:     { cs: 'Vyhledávání',              sk: 'Vyhľadávanie',             en: 'Search' },
-  pricing:    { cs: 'Ceník',                    sk: 'Cenník',                   en: 'Pricing' },
-  support:    { cs: 'Podpora',                  sk: 'Podpora',                  en: 'Support' },
-  contact:    { cs: 'Kontakt',                  sk: 'Kontakt',                  en: 'Contact' },
-  legal:      { cs: 'Právní',                   sk: 'Právne',                   en: 'Legal' },
-  privacy:    { cs: 'Ochrana údajů',            sk: 'Ochrana údajov',           en: 'Privacy' },
-  terms:      { cs: 'Podmínky',                 sk: 'Podmienky',                en: 'Terms' },
-  language:   { cs: 'Jazyk',                    sk: 'Jazyk',                    en: 'Language' },
-  sources:    { cs: 'Data: ARES · OpenStreetMap (ODbL) · registr plátců DPH',
-                sk: 'Dáta: ARES · OpenStreetMap (ODbL) · register platiteľov DPH',
-                en: 'Data: ARES · OpenStreetMap (ODbL) · Czech VAT register' },
 };
 
 export default function HomePage() {
@@ -336,44 +324,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── Footer ── */}
-      <footer className="border-t border-line px-5 py-12">
-        <div className="max-w-6xl mx-auto">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-ink-faint mb-3">{t(UI.product)}</p>
-              <div className="space-y-2">
-                <Link href={`/${locale}/search`} className="block text-sm text-ink-muted hover:text-ink">{t(UI.search)}</Link>
-                <Link href={`/${locale}/pricing`} className="block text-sm text-ink-muted hover:text-ink">{t(UI.pricing)}</Link>
-              </div>
-            </div>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-ink-faint mb-3">{t(UI.support)}</p>
-              <Link href={`/${locale}/contact`} className="block text-sm text-ink-muted hover:text-ink">{t(UI.contact)}</Link>
-            </div>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-ink-faint mb-3">{t(UI.legal)}</p>
-              <div className="space-y-2">
-                <Link href={`/${locale}/privacy`} className="block text-sm text-ink-muted hover:text-ink">{t(UI.privacy)}</Link>
-                <Link href={`/${locale}/terms`} className="block text-sm text-ink-muted hover:text-ink">{t(UI.terms)}</Link>
-              </div>
-            </div>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-ink-faint mb-3">{t(UI.language)}</p>
-              <div className="space-y-2">
-                <Link href="/cs" className="block text-sm text-ink-muted hover:text-ink">Čeština</Link>
-                <Link href="/sk" className="block text-sm text-ink-muted hover:text-ink">Slovenčina</Link>
-                <Link href="/en" className="block text-sm text-ink-muted hover:text-ink">English</Link>
-              </div>
-            </div>
-          </div>
-
-          <div className="border-t border-line mt-10 pt-6 flex flex-col md:flex-row justify-between gap-2 text-xs text-ink-faint">
-            <span>© 2026 KlientHunter</span>
-            <span>{t(UI.sources)}</span>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }
