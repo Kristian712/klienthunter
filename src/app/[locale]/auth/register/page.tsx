@@ -37,6 +37,19 @@ const UI = {
   codeLabel:  { cs: 'Kód pozvánky', sk: 'Kód pozvánky', en: 'Invite code' },
   codeHint:   { cs: 'Kód ti pošle administrátor.', sk: 'Kód ti pošle administrátor.', en: 'The code is sent by an administrator.' },
   pwHint:     { cs: 'Alespoň 8 znaků', sk: 'Aspoň 8 znakov', en: 'At least 8 characters' },
+
+  // Podmínky se stávají součástí smlouvy jen tehdy, když je druhá strana zná nebo je k nim
+  // odkázáno (§ 1751 obč. zák.). Bez tohohle řádku se na uživatele nedaly vztáhnout vůbec.
+  // Zaškrtávátko tu schválně není: souhlas se zpracováním údajů nepotřebujeme — právní základ
+  // je plnění smlouvy a oprávněný zájem — a předzaškrtnutý ani vynucený „souhlas“ by byl podle
+  // čl. 4 bodu 11 GDPR neplatný a jen by mátl. Odkaz před tlačítkem je to, co je správně.
+  consent: {
+    before: { cs: 'Vytvořením účtu souhlasíš s ', sk: 'Vytvorením účtu súhlasíš s ', en: 'By creating an account you agree to the ' },
+    terms:  { cs: 'podmínkami použití',  sk: 'podmienkami použitia', en: 'terms of use' },
+    middle: { cs: ' a bereš na vědomí ', sk: ' a berieš na vedomie ', en: ' and acknowledge the ' },
+    privacy:{ cs: 'zpracování osobních údajů', sk: 'spracovanie osobných údajov', en: 'privacy policy' },
+    after:  { cs: '.', sk: '.', en: '.' },
+  },
 };
 
 const PERKS = [
@@ -182,6 +195,18 @@ export default function RegisterPage() {
             {error && (
               <div className="rounded-lg border border-ink px-4 py-3 text-sm font-medium text-ink">{error}</div>
             )}
+
+            <p className="text-[11px] leading-relaxed text-ink-faint">
+              {localized(UI.consent.before, locale)}
+              <Link href={`/${locale}/terms`} className="text-ink underline underline-offset-2 hover:text-accent transition-colors">
+                {localized(UI.consent.terms, locale)}
+              </Link>
+              {localized(UI.consent.middle, locale)}
+              <Link href={`/${locale}/privacy`} className="text-ink underline underline-offset-2 hover:text-accent transition-colors">
+                {localized(UI.consent.privacy, locale)}
+              </Link>
+              {localized(UI.consent.after, locale)}
+            </p>
 
             <button type="submit" disabled={loading} className="btn-primary w-full py-3 rounded-xl text-base">
               {loading ? (

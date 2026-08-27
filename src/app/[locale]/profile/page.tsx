@@ -58,10 +58,6 @@ export default function ProfilePage() {
   const [toast, setToast]       = useState('');
   const [error, setError]       = useState('');
 
-  // Only ever read now: the app no longer sends mail, so all that is left is letting a user
-  // who configured Brevo earlier delete the credentials we still hold.
-  const [brevoConfigured, setBrevoConfigured] = useState(false);
-
   // The onboarding answers, editable here for good. Held as a draft so a half-finished edit is
   // never written — the user presses Save, or nothing happens.
   const [draft, setDraft] = useState<ProfileDraft>(EMPTY_DRAFT);
@@ -81,16 +77,7 @@ export default function ProfilePage() {
       }
       setLoading(false);
     });
-    fetch('/api/profile/brevo').then(r => r.json()).then(d => {
-      setBrevoConfigured(d.configured ?? false);
-    }).catch(() => {});
   }, []);
-
-  const deleteBrevo = async () => {
-    await fetch('/api/profile/brevo', { method: 'DELETE' });
-    setBrevoConfigured(false);
-    showToast('Údaje smazány.');
-  };
 
   const saveName = async () => {
     setSaving(true);
@@ -334,17 +321,12 @@ export default function ProfilePage() {
             nebo otevřeš ve své schránce a odešleš sám. Hromadné obchodní sdělení bez souhlasu
             příjemce zakazuje § 7 zákona 480/2004 Sb. – pokuta až 10 000 000 Kč.
           </p>
-
-          {brevoConfigured && (
-            <div className="flex items-center gap-3">
-              <span className="text-xs text-ink-faint">
-                Z dřívějška máš uložené přihlašovací údaje k Brevo. Už se nepoužívají.
-              </span>
-              <button onClick={deleteBrevo} className="text-xs text-ink-muted hover:text-accent underline underline-offset-2 transition-colors">
-                Smazat
-              </button>
-            </div>
-          )}
+          {/*
+            Tady dřív visel odkaz „smazat uložené údaje k Brevo“. Sloupce `brevoApiKey`
+            a `brevoSenderEmail` už v databázi nejsou — držet nepoužívaný přístupový klíč
+            k cizí službě odporuje zásadě minimalizace údajů (čl. 5 odst. 1 písm. c) GDPR)
+            a je to bezpečnostní riziko zadarmo. Smazané je lepší než smazatelné.
+          */}
         </div>
 
         {/* Search history */}

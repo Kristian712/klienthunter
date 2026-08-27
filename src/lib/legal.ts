@@ -28,7 +28,7 @@ export const OPERATOR_INCOMPLETE = OPERATOR.address === '' || OPERATOR.ico === '
  * Datum poslední změny právních textů. Měň ho ručně při každé věcné úpravě — čl. 12 GDPR stojí
  * na tom, že subjekt pozná, kterou verzi četl.
  */
-export const LEGAL_UPDATED = '26. 8. 2026';
+export const LEGAL_UPDATED = '27. 8. 2026';
 
 /** Jeden odstavec nebo odrážkový seznam, ve třech jazycích. */
 export interface LegalBlock {

@@ -9,41 +9,6 @@
     "register": "Register",
     "logout": "Logout"
   },
-  "search": {
-    "title": "Search Businesses",
-    "region_label": "Region / City",
-    "region_placeholder": "e.g. London, New York, Berlin...",
-    "industry_label": "Industry / Category",
-    "industry_placeholder": "e.g. restaurant, plumber, hair salon...",
-    "filter_label": "Filter by problem",
-    "filter_all": "All businesses",
-    "filter_no_website": "No website",
-    "filter_no_social": "No social media",
-    "filter_low_reviews": "Few reviews (less than 10)",
-    "filter_low_rating": "Low rating (less than 3.5)",
-    "search_button": "Search",
-    "searching": "Searching...",
-    "results_count": "{count} businesses found",
-    "export_excel": "Export to Excel",
-    "no_results": "No results. Try a different region or industry.",
-    "columns": {
-      "name": "Name",
-      "phone": "Phone",
-      "email": "Email",
-      "address": "Address",
-      "website": "Website",
-      "social": "Social Media",
-      "reviews": "Reviews",
-      "rating": "Rating",
-      "actions": "Actions"
-    },
-    "has_website": "Has website",
-    "no_website": "No website",
-    "has_social": "Has social media",
-    "no_social": "No social media",
-    "save": "Save",
-    "saved": "Saved"
-  },
   "auth": {
     "login_title": "Sign In",
     "register_title": "Create Account",
@@ -59,53 +24,13 @@
     "register_link": "Register",
     "login_link": "Sign in"
   },
-  "dashboard": {
-    "title": "Dashboard",
-    "welcome": "Welcome, {name}!",
-    "searches_title": "My Searches",
-    "saved_title": "Saved Businesses",
-    "plan_label": "Your Plan",
-    "upgrade": "Upgrade",
-    "searches_left": "Searches left: {count}",
-    "no_searches": "No searches yet. Start by finding businesses.",
-    "go_search": "Search businesses"
-  },
-  "pricing": {
-    "title": "Pricing",
-    "subtitle": "Choose the plan that works for you",
-    "free_name": "Free",
-    "free_price": "$0",
-    "free_period": "/month",
-    "pro_name": "Pro",
-    "pro_price": "$19",
-    "pro_period": "/month",
-    "business_name": "Business",
-    "business_price": "$59",
-    "business_period": "/month",
-    "current_plan": "Current Plan",
-    "choose_plan": "Choose Plan",
-    "features": {
-      "free": [
-        "5 searches per month",
-        "20 results per search",
-        "Basic filters",
-        "CSV export"
-      ],
-      "pro": [
-        "100 searches per month",
-        "200 results per search",
-        "Advanced filters",
-        "Excel export",
-        "Saved results"
-      ],
-      "business": [
-        "Unlimited searches",
-        "500 results per search",
-        "All filters",
-        "Excel export",
-        "API access",
-        "Priority support"
-      ]
-    }
+  "search": {
+    "title": "Search Businesses",
+    "region_label": "Region / City",
+    "industry_label": "Industry / Category",
+    "search_button": "Search",
+    "searching": "Searching...",
+    "export_excel": "Export to Excel",
+    "no_results": "No results. Try a different region or industry."
   }
 }

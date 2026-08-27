@@ -17,8 +17,9 @@ model User {
   isVip            Boolean   @default(false)
   accessExpiresAt  DateTime?
   stripeCustomerId String?
-  brevoApiKey      String?
-  brevoSenderEmail String?
+  // Sloupce `brevoApiKey` a `brevoSenderEmail` byly odstraněny. Aplikace přestala odesílat
+  // poštu ve Vlně 2, takže se od té doby jen držel cizí API klíč, který nic nedělal —
+  // to je porušení minimalizace údajů (čl. 5 odst. 1 písm. c) GDPR) a zbytečné riziko.
 
   // ── Onboarding profile ────────────────────────────────────────────────────
   // What the user sells, who they sell it to and where. Collected once after

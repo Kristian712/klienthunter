@@ -10,7 +10,18 @@ import { OPERATOR, type LegalBlock } from '@/lib/legal';
  * e-maily. Odesílá je ale uživatel ze své schránky — a tím se z něj podle § 7 zákona
  * č. 480/2004 Sb. stává šiřitel obchodního sdělení se všemi povinnostmi, které z toho plynou
  * (pokuta až 10 000 000 Kč). Zároveň se stává správcem osobních údajů, které si vyexportoval.
- * Oddíly 4 a 5 to říkají nahlas, protože uživatel, který to netuší, si může udělat vážný problém.
+ * Oddíly o oslovování a o exportu to říkají nahlas, protože uživatel, který to netuší, si může
+ * udělat vážný problém.
+ *
+ * Druhé kolo přidalo dva oddíly, které chyběly:
+ *
+ *  • **Cena.** Původní text tvrdil, že „přístup k placeným plánům se sjednává individuálně,
+ *    cena je uvedena v ceníku a je konečná". Žádný placený plán ale sjednat nejde — v aplikaci
+ *    není platební brána a stavy `PRO` a `BUSINESS` nikdo nikomu nemůže nastavit. Slibovat
+ *    smlouvu, kterou nelze uzavřít, je horší než nic neslíbit.
+ *  • **Import CSV.** U nahraného seznamu je správcem uživatel a provozovatel zpracovatelem —
+ *    přesně obráceně než u výsledků hledání. Bez tohohle oddílu podmínky mlčely o jediném
+ *    místě, kudy do aplikace tečou osobní údaje, které jsme nesebrali my.
  */
 
 const M = {
@@ -65,9 +76,24 @@ const BLOCKS: LegalBlock[] = [
     heading: { cs: 'Účet a přístup', sk: 'Účet a prístup', en: 'Account and access' },
     body: [
       {
-        cs: 'Registrace je zatím na pozvánku. Za bezpečnost svého hesla odpovídáte vy; účet nesmíte sdílet s dalšími osobami. Přístup k placeným plánům se v současnosti sjednává individuálně, cena je uvedena v ceníku a je konečná. Provozovatel může účet zrušit při porušení těchto podmínek — pokud jde o placený účet a k porušení nedošlo, vrátí poměrnou část uhrazené ceny.',
-        sk: 'Registrácia je zatiaľ na pozvánku. Za bezpečnosť svojho hesla zodpovedáte vy; účet nesmiete zdieľať s ďalšími osobami. Prístup k plateným plánom sa v súčasnosti dojednáva individuálne, cena je uvedená v cenníku a je konečná. Prevádzkovateľ môže účet zrušiť pri porušení týchto podmienok — ak ide o platený účet a k porušeniu nedošlo, vráti pomernú časť uhradenej ceny.',
-        en: 'Registration is currently by invitation. You are responsible for the security of your password and must not share the account. Access to paid plans is presently arranged individually; the price shown in the pricing page is final. The operator may close an account that breaches these terms — for a paid account closed without such a breach, the unused portion of the fee is refunded.',
+        cs: 'Registrace je zatím na pozvánku. Za bezpečnost svého hesla odpovídáte vy; účet nesmíte sdílet s dalšími osobami. Provozovatel může účet zrušit při porušení těchto podmínek.',
+        sk: 'Registrácia je zatiaľ na pozvánku. Za bezpečnosť svojho hesla zodpovedáte vy; účet nesmiete zdieľať s ďalšími osobami. Prevádzkovateľ môže účet zrušiť pri porušení týchto podmienok.',
+        en: 'Registration is currently by invitation. You are responsible for the security of your password and must not share the account. The operator may close an account that breaches these terms.',
+      },
+    ],
+  },
+  {
+    heading: { cs: 'Cena', sk: 'Cena', en: 'Price' },
+    body: [
+      {
+        cs: 'Služba je momentálně bezplatná v celém rozsahu, který účet nabízí. Placené tarify zatím neexistují: v aplikaci není platební brána, nelze na ně přejít a nikdo za službu nic neplatí. Ceny uvedené v ceníku jsou orientačním výhledem, nikoli nabídkou k uzavření smlouvy ve smyslu § 1732 odst. 2 občanského zákoníku.',
+        sk: 'Služba je momentálne bezplatná v celom rozsahu, ktorý účet ponúka. Platené tarify zatiaľ neexistujú: v aplikácii nie je platobná brána, nedá sa na ne prejsť a nikto za službu nič neplatí. Ceny uvedené v cenníku sú orientačným výhľadom, nie ponukou na uzavretie zmluvy v zmysle § 1732 ods. 2 občianskeho zákonníka.',
+        en: 'The service is currently free in full. Paid plans do not exist yet: there is no payment gateway in the app, no account can be moved onto one, and nobody pays anything. The prices listed on the pricing page are an indicative outlook, not an offer to contract within the meaning of § 1732(2) of the Czech Civil Code.',
+      },
+      {
+        cs: 'Až se placené tarify spustí, dáme registrovaným uživatelům vědět e-mailem předem a účet se na placený nepřevede jinak než vaším výslovným úkonem. Bezplatné používání se nikdy nezmění v placené samo od sebe.',
+        sk: 'Keď sa platené tarify spustia, dáme registrovaným používateľom vedieť e-mailom vopred a účet sa na platený neprevedie inak než vaším výslovným úkonom. Bezplatné používanie sa nikdy nezmení na platené samo od seba.',
+        en: 'When paid plans launch we will tell registered users by e-mail in advance, and no account will move onto one except by your own explicit act. Free use will never turn into paid use by itself.',
       },
     ],
   },
@@ -101,6 +127,25 @@ const BLOCKS: LegalBlock[] = [
         cs: 'Jakmile si výsledky vyexportujete do svého souboru nebo je přenesete do vlastního systému, stáváte se vůči těmto údajům samostatným správcem podle GDPR. Od té chvíle je na vás, abyste je zpracovávali v souladu s předpisy — tedy pro určený účel, po přiměřenou dobu a s vyřízením případných námitek. Provozovatel na vaše kopie dat nemá žádný vliv a neodpovídá za to, jak s nimi naložíte.',
         sk: 'Akonáhle si výsledky vyexportujete do svojho súboru alebo ich prenesiete do vlastného systému, stávate sa voči týmto údajom samostatným prevádzkovateľom podľa GDPR. Od tej chvíle je na vás, aby ste ich spracúvali v súlade s predpismi — teda na určený účel, po primeranú dobu a s vybavením prípadných námietok. Prevádzkovateľ na vaše kópie dát nemá žiadny vplyv a nezodpovedá za to, ako s nimi naložíte.',
         en: 'Once you export results to a file or move them into your own system, you become an independent data controller for that data under the GDPR. From then on it is on you to process it lawfully — for a defined purpose, for a reasonable period, and handling any objections you receive. The operator has no control over your copies and is not responsible for what you do with them.',
+      },
+    ],
+  },
+  {
+    heading: {
+      cs: 'Seznam, který nahrajete sami',
+      sk: 'Zoznam, ktorý nahráte sami',
+      en: 'The list you upload yourself',
+    },
+    body: [
+      {
+        cs: 'Do aplikace lze nahrát vlastní seznam firem v CSV. Nahráním prohlašujete, že jste ho získali oprávněně a že jste oprávněni údaje v něm zpracovávat a předat je nám ke zpracování. Vůči těmto údajům jste správcem vy; provozovatel je zpracovatelem a nakládá s nimi jen podle vašeho pokynu a v rozsahu potřebném k provedení importu.',
+        sk: 'Do aplikácie možno nahrať vlastný zoznam firiem v CSV. Nahraním vyhlasujete, že ste ho získali oprávnene a že ste oprávnení údaje v ňom spracúvať a odovzdať nám ich na spracovanie. Voči týmto údajom ste prevádzkovateľom vy; prevádzkovateľ služby je sprostredkovateľom a nakladá s nimi len podľa vášho pokynu a v rozsahu potrebnom na vykonanie importu.',
+        en: 'You can upload your own list of businesses as CSV. By uploading it you represent that you obtained it lawfully and that you are entitled to process the data in it and to pass it to us for processing. For that data you are the controller; the operator is a processor and handles it only on your instruction and only as far as running the import requires.',
+      },
+      {
+        cs: 'Nenahrávejte údaje o spotřebitelích, údaje ze zvláštních kategorií podle čl. 9 GDPR ani seznamy, které jste koupili nebo získali z cizí databáze bez oprávnění. Za škodu a za sankce, které by z porušení tohoto ustanovení vznikly, odpovídáte vy; provozovatel obsah nahraného souboru nekontroluje a kontrolovat nemůže.',
+        sk: 'Nenahrávajte údaje o spotrebiteľoch, údaje z osobitných kategórií podľa čl. 9 GDPR ani zoznamy, ktoré ste kúpili alebo získali z cudzej databázy bez oprávnenia. Za škodu a za sankcie, ktoré by z porušenia tohto ustanovenia vznikli, zodpovedáte vy; prevádzkovateľ obsah nahraného súboru nekontroluje a kontrolovať nemôže.',
+        en: 'Do not upload consumer data, data in the special categories of Art. 9 GDPR, or lists you bought or took from someone else’s database without authorisation. Any damage or penalty arising from a breach of this clause is yours to bear; the operator does not inspect the contents of the uploaded file and cannot do so.',
       },
     ],
   },

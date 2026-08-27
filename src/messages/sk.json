@@ -9,41 +9,6 @@
     "register": "Registrovať sa",
     "logout": "Odhlásiť sa"
   },
-  "search": {
-    "title": "Vyhľadať firmy",
-    "region_label": "Región / Mesto",
-    "region_placeholder": "napr. Bratislava, Košice…",
-    "industry_label": "Odbor / Kategória",
-    "industry_placeholder": "napr. reštaurácia, inštalatér…",
-    "filter_label": "Filtrovať podľa problému",
-    "filter_all": "Všetky firmy",
-    "filter_no_website": "Bez webu",
-    "filter_no_social": "Bez sociálnych sietí",
-    "filter_low_reviews": "Málo recenzií (menej ako 10)",
-    "filter_low_rating": "Nízke hodnotenie (menej ako 3.5)",
-    "search_button": "Vyhľadať",
-    "searching": "Vyhľadávam…",
-    "results_count": "{count} firiem nájdených",
-    "export_excel": "Exportovať do Excelu",
-    "no_results": "Žiadne výsledky. Skús iný región alebo odbor.",
-    "columns": {
-      "name": "Názov",
-      "phone": "Telefón",
-      "email": "Email",
-      "address": "Adresa",
-      "website": "Web",
-      "social": "Sociálne siete",
-      "reviews": "Recenzie",
-      "rating": "Hodnotenie",
-      "actions": "Akcie"
-    },
-    "has_website": "Má web",
-    "no_website": "Bez webu",
-    "has_social": "Má soc. siete",
-    "no_social": "Bez soc. sietí",
-    "save": "Uložiť",
-    "saved": "Uložené"
-  },
   "auth": {
     "login_title": "Prihlásiť sa",
     "register_title": "Vytvoriť účet",
@@ -59,30 +24,13 @@
     "register_link": "Registrovať sa",
     "login_link": "Prihlásiť sa"
   },
-  "dashboard": {
-    "title": "Prehľad",
-    "welcome": "Vitajte, {name}!",
-    "searches_title": "Moje vyhľadávania",
-    "saved_title": "Uložené firmy",
-    "plan_label": "Váš plán",
-    "upgrade": "Upgradovať",
-    "searches_left": "Zostávajúce vyhľadávania: {count}",
-    "no_searches": "Zatiaľ žiadne vyhľadávania.",
-    "go_search": "Vyhľadať firmy"
-  },
-  "pricing": {
-    "title": "Cenník",
-    "subtitle": "Vyberte si plán, ktorý vám vyhovuje",
-    "free_name": "Zadarmo",
-    "free_price": "0 €",
-    "free_period": "/mesiac",
-    "pro_name": "Pro",
-    "pro_price": "19 €",
-    "pro_period": "/mesiac",
-    "business_name": "Business",
-    "business_price": "59 €",
-    "business_period": "/mesiac",
-    "current_plan": "Aktuálny plán",
-    "choose_plan": "Vybrať plán"
+  "search": {
+    "title": "Vyhľadať firmy",
+    "region_label": "Región / Mesto",
+    "industry_label": "Odbor / Kategória",
+    "search_button": "Vyhľadať",
+    "searching": "Vyhľadávam…",
+    "export_excel": "Exportovať do Excelu",
+    "no_results": "Žiadne výsledky. Skús iný región alebo odbor."
   }
 }

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { localized } from '@/lib/lead-filters';
-import { OSM_ATTRIBUTION } from '@/lib/attribution';
+import { OSM_ATTRIBUTION_L } from '@/lib/attribution';
 import { OPERATOR } from '@/lib/legal';
 
 /**
@@ -29,9 +29,9 @@ const T = {
   terms:    { cs: 'Podmínky',  sk: 'Podmienky', en: 'Terms' },
   language: { cs: 'Jazyk',     sk: 'Jazyk',     en: 'Language' },
   sources: {
-    cs: `Data: ARES a živnostenský rejstřík (MF ČR), registr plátců DPH (FS ČR), ${OSM_ATTRIBUTION}`,
-    sk: `Dáta: ARES a živnostenský register (MF ČR), register platiteľov DPH (FS ČR), ${OSM_ATTRIBUTION}`,
-    en: `Data: ARES and the Czech trade register, the Czech VAT payer register, © OpenStreetMap contributors (ODbL)`,
+    cs: `Data: ARES a živnostenský rejstřík (MF ČR), registr plátců DPH (FS ČR), ${OSM_ATTRIBUTION_L.cs}`,
+    sk: `Dáta: ARES a živnostenský register (MF ČR), register platiteľov DPH (FS ČR), ${OSM_ATTRIBUTION_L.sk}`,
+    en: `Data: ARES and the Czech trade register, the Czech VAT payer register, ${OSM_ATTRIBUTION_L.en}`,
   },
 };
 
