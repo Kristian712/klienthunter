@@ -29,10 +29,12 @@ const META = {
     sk: 'KlientHunter – Nájdi firmy, ktoré môžu byť tvoji klienti',
     en: 'KlientHunter – Find businesses that could be your clients',
   },
+  // Popisek slibuje jen to, co dostane každý: export do Excelu je za plánem PRO, který se
+  // zatím koupit nedá, takže by to byl slib do prázdna — stejná chyba jako na ceníku a v FAQ.
   description: {
-    cs: 'Firmy z veřejných rejstříků a map, seřazené podle tvých vlastních kritérií. Data z ARESu a OpenStreetMap, export do Excelu.',
-    sk: 'Firmy z verejných registrov a máp, zoradené podľa tvojich vlastných kritérií. Dáta z ARESu a OpenStreetMap, export do Excelu.',
-    en: 'Businesses from public registers and maps, ranked by criteria you choose. Data from ARES and OpenStreetMap, Excel export.',
+    cs: 'Firmy z veřejných rejstříků a map, seřazené podle tvých vlastních kritérií. Data z ARESu a OpenStreetMap, výsledky ke stažení v CSV.',
+    sk: 'Firmy z verejných registrov a máp, zoradené podľa tvojich vlastných kritérií. Dáta z ARESu a OpenStreetMap, výsledky na stiahnutie v CSV.',
+    en: 'Businesses from public registers and maps, ranked by criteria you choose. Data from ARES and OpenStreetMap, results downloadable as CSV.',
   },
 };
 
