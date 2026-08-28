@@ -41,6 +41,7 @@ export function exportToExcel(businesses: BusinessResult[], filename = 'klienthu
     'Email': b.email || '',
     'Adresa': b.address || '',
     'Web': b.website || '',
+    'Kontaktní stránka': b.contactUrl || '',
     'Má web': WEBSITE_LABEL_CS[resolveStatus(b)],
     'Má Facebook': socialLabel(b.hasFacebook, b.socialsChecked),
     'Má Instagram': socialLabel(b.hasInstagram, b.socialsChecked),
@@ -56,10 +57,11 @@ export function exportToExcel(businesses: BusinessResult[], filename = 'klienthu
 
   const ws = XLSX.utils.json_to_sheet(rows);
 
+  // One entry per column above, in the same order.
   ws['!cols'] = [
     { wch: 30 }, { wch: 10 }, { wch: 18 }, { wch: 28 }, { wch: 35 },
-    { wch: 30 }, { wch: 10 }, { wch: 12 }, { wch: 14 }, { wch: 12 },
-    { wch: 12 }, { wch: 18 }, { wch: 20 }, { wch: 16 },
+    { wch: 30 }, { wch: 34 }, { wch: 10 }, { wch: 12 }, { wch: 14 },
+    { wch: 12 }, { wch: 12 }, { wch: 18 }, { wch: 20 }, { wch: 16 },
   ];
 
   const wb = XLSX.utils.book_new();

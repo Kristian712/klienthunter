@@ -23,6 +23,8 @@ interface BusinessResult {
   email?: string;
   address?: string;
   website?: string;
+  /** The firm's own "Kontakt" page, read from the link on its site. */
+  contactUrl?: string;
   hasWebsite: boolean;
   websiteStatus?: string | null;
   websiteEvidence?: string;
@@ -130,6 +132,21 @@ function isCzMobile(phone: string): boolean {
   return local.length === 9 && (local.startsWith('6') || local.startsWith('7'));
 }
 
+/**
+ * A web search for this firm, by name and town.
+ *
+ * The honest fallback for a row we could not resolve: most of what the app returns comes from
+ * ARES, which carries no website, no phone and no e-mail — so without this the row offers the
+ * reader nothing to do at all. It is a search, not a claim: the button says so, and where the
+ * user lands is up to what the search engine finds.
+ */
+function lookupHref(b: BusinessResult): string {
+  // The last part of an ARES address is "70030 Ostrava"; the postcode only narrows a web search
+  // by accident, so it goes.
+  const town = (b.address ?? '').split(',').pop()?.replace(/\d/g, '').trim() ?? '';
+  return `https://www.google.com/search?q=${encodeURIComponent([b.name, town].filter(Boolean).join(' '))}`;
+}
+
 function whatsappHref(phone: string): string {
   const d = phone.replace(/[\s\-()+]/g, '');
   const num = d.startsWith('420') ? d : `420${d}`;
@@ -166,6 +183,18 @@ const CONTACT = {
   fbTip:   { cs: 'Stránku spravuje někdo z firmy; zpráva od cizího účtu často končí v žádostech.',
              sk: 'Stránku spravuje niekto z firmy; správa od cudzieho účtu často končí v žiadostiach.',
              en: 'Someone at the business runs the page; messages from strangers often sit in requests.' },
+  contact: { cs: 'Otevřít kontakty', sk: 'Otvoriť kontakty', en: 'Open contact page' },
+  contactTip: { cs: 'Stránka „Kontakt" na webu firmy — adresa, otevírací doba a většinou i jméno člověka, se kterým budete mluvit.',
+             sk: 'Stránka „Kontakt" na webe firmy — adresa, otváracie hodiny a väčšinou aj meno človeka, s ktorým budete hovoriť.',
+             en: 'The firm\u2019s own contact page — address, opening hours and usually the name of the person you will talk to.' },
+  web:     { cs: 'Otevřít web',      sk: 'Otvoriť web',      en: 'Open website' },
+  webTip:  { cs: 'Web firmy tak, jak jsme ho ověřili. Kontakty bývají v patičce nebo v menu.',
+             sk: 'Web firmy tak, ako sme ho overili. Kontakty bývajú v pätičke alebo v menu.',
+             en: 'The website as we verified it. Contacts are usually in the footer or the menu.' },
+  lookup:  { cs: 'Najít firmu na webu', sk: 'Nájsť firmu na webe', en: 'Look the firm up' },
+  lookupTip: { cs: 'Otevře vyhledávání podle názvu a města. Její web ani profil jsme nedohledali — tohle je nejrychlejší způsob, jak zkusit najít, kde se firma prezentuje.',
+             sk: 'Otvorí vyhľadávanie podľa názvu a mesta. Jej web ani profil sme nedohľadali — toto je najrýchlejší spôsob, ako skúsiť nájsť, kde sa firma prezentuje.',
+             en: 'Opens a web search by name and town. We could not find a site or profile for this firm, so this is the fastest way to try.' },
   email:   { cs: 'E-mail',           sk: 'E-mail',           en: 'E-mail' },
   emailTip:{ cs: 'Písemně a doložitelně. U nevyžádané nabídky platí § 7 zák. 480/2004 Sb. — viz podmínky.',
              sk: 'Písomne a doložiteľne. Pri nevyžiadanej ponuke platí § 7 zák. 480/2004 Zb. — viď podmienky.',
@@ -178,6 +207,15 @@ function ContactStrategy({ b, locale }: { b: BusinessResult; locale: string }) {
 
   type Method = { key: string; icon: React.ReactNode; label: string; href: string; tip: string };
   const methods: Method[] = [];
+
+  // First, because it is the page the firm itself keeps for being contacted on.
+  if (b.contactUrl) {
+    methods.push({ key: 'contact', icon: <ExternalLink size={11} />, label: L(CONTACT.contact),
+                   href: b.contactUrl, tip: L(CONTACT.contactTip) });
+  } else if (webStatus(b) === 'HAS' && b.website) {
+    methods.push({ key: 'web', icon: <Globe size={11} />, label: L(CONTACT.web),
+                   href: b.website, tip: L(CONTACT.webTip) });
+  }
 
   if (b.phone && mobile) {
     methods.push({ key: 'call', icon: <PhoneCall size={11} />, label: L(CONTACT.call),
@@ -201,7 +239,13 @@ function ContactStrategy({ b, locale }: { b: BusinessResult; locale: string }) {
                    href: `mailto:${b.email}`, tip: L(CONTACT.emailTip) });
   }
 
-  if (methods.length === 0) return null;
+  // Only when nothing else worked. A row from ARES has a name, an address and an IČO and
+  // nothing you can call — leaving it with no action at all is what made the whole list feel
+  // broken, even though every fact on it was true.
+  if (methods.length === 0) {
+    methods.push({ key: 'lookup', icon: <Search size={11} />, label: L(CONTACT.lookup),
+                   href: lookupHref(b), tip: L(CONTACT.lookupTip) });
+  }
 
   return (
     <div className="mt-3 border-t border-line pt-3">
@@ -214,6 +258,8 @@ function ContactStrategy({ b, locale }: { b: BusinessResult; locale: string }) {
             <a
               href={m.href}
               target={m.key !== 'call' && m.key !== 'email' ? '_blank' : undefined}
+              // A search engine has no business knowing which firm our user is about to call.
+              referrerPolicy="no-referrer"
               rel="noopener noreferrer"
               className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs shrink-0 border transition-colors ${
                 i === 0

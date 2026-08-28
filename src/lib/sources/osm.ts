@@ -3,7 +3,21 @@ import { resolveNiche } from '../nace-map';
 import { CRAWLER_UA } from '../robots';
 import type { DiscoverySource, RawLead } from './types';
 
-const ENDPOINT = 'https://overpass-api.de/api/interpreter';
+/**
+ * The main instance and one mirror.
+ *
+ * Not an optimisation: the public Overpass answers 504 often enough that a search can come back
+ * with no phones, no e-mails and no websites at all — the user then sees a list of firms and no
+ * way to reach any of them, with nothing on screen saying why. Measured by hand: the same query
+ * for dentists in Ostrava returned 504 and then 200 with sixteen results a minute later.
+ *
+ * The mirrors are flaky too, so this is not a guarantee — it just stops one bad minute from
+ * emptying the whole search.
+ */
+const ENDPOINTS = [
+  { url: 'https://overpass-api.de/api/interpreter', timeoutMs: 12_000 },
+  { url: 'https://overpass.kumi.systems/api/interpreter', timeoutMs: 8_000 },
+];
 // Kept under the caller's discovery budget: whatever Overpass has not answered in twenty
 // seconds is time the website probes need more.
 const TIMEOUT_MS = 20_000;
@@ -80,28 +94,36 @@ export const osmSource: DiscoverySource = {
     const hit = cache.get(key);
     if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.leads;
 
-    try {
-      const res = await axios.post(ENDPOINT, buildQuery(osm, city, limit), {
-        timeout: TIMEOUT_MS,
-        signal: AbortSignal.timeout(TIMEOUT_MS),
-        // Overpass answers 406 to the default axios User-Agent — it wants callers to say who
-        // they are. Verified against the live endpoint: same query, 406 without this, 200 with.
-        headers: { 'Content-Type': 'text/plain', 'User-Agent': CRAWLER_UA },
-        validateStatus: () => true,
-      });
-      if (res.status !== 200) return [];
+    const query = buildQuery(osm, city, limit);
 
-      const elements: OverpassElement[] = res.data?.elements ?? [];
-      const leads = elements
-        .map(toLead)
-        .filter((l): l is RawLead => l !== null)
-        .slice(0, limit);
+    for (const endpoint of ENDPOINTS) {
+      try {
+        const res = await axios.post(endpoint.url, query, {
+          timeout: endpoint.timeoutMs,
+          signal: AbortSignal.timeout(endpoint.timeoutMs),
+          // Overpass answers 406 to the default axios User-Agent — it wants callers to say who
+          // they are. Verified against the live endpoint: same query, 406 without this, 200 with.
+          headers: { 'Content-Type': 'text/plain', 'User-Agent': CRAWLER_UA },
+          validateStatus: () => true,
+        });
+        if (res.status !== 200) continue;
 
-      cache.set(key, { at: Date.now(), leads });
-      return leads;
-    } catch {
-      return [];
+        const elements: OverpassElement[] = res.data?.elements ?? [];
+        const leads = elements
+          .map(toLead)
+          .filter((l): l is RawLead => l !== null)
+          .slice(0, limit);
+
+        // An empty answer from a healthy server is an answer: cache it and stop. Only an error
+        // or a timeout is worth asking the next instance about.
+        cache.set(key, { at: Date.now(), leads });
+        return leads;
+      } catch {
+        /* try the next instance */
+      }
     }
+
+    return [];
   },
 };
 

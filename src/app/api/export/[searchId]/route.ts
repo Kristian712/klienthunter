@@ -7,7 +7,7 @@ import { resolveStatus } from '@/lib/website-status';
 function toCsv(businesses: Parameters<typeof exportToExcel>[0]): string {
   const headers = [
     'Název firmy', 'IČO', 'Telefon', 'Email', 'Adresa', 'Web',
-    'Má web', 'Facebook', 'Instagram', 'LinkedIn',
+    'Kontaktní stránka', 'Má web', 'Facebook', 'Instagram', 'LinkedIn',
     'Plátce DPH', 'Nespolehlivý plátce',
     'Zdroj',
   ];
@@ -30,6 +30,7 @@ function toCsv(businesses: Parameters<typeof exportToExcel>[0]): string {
     b.email ?? '',
     b.address ?? '',
     b.website ?? '',
+    b.contactUrl ?? '',
     WEBSITE_LABEL_CS[resolveStatus(b)],
     // Empty, not "NE", on a row where nobody ever looked — see `socialLabel`.
     socialLabel(b.hasFacebook, b.socialsChecked),

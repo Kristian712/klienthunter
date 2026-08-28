@@ -94,6 +94,9 @@ model BusinessResult {
   // reason that nobody looked — and the UI used to print that as "Bez soc. sítí". Defaults to
   // false, which reads older rows as unchecked: the honest way round.
   socialsChecked Boolean @default(false)
+  // The firm's own "Kontakt" page, taken from the link on its site. The shortest path from a
+  // result to an actual conversation, and usually the only page carrying a person's name.
+  contactUrl    String?
   facebookUrl   String?
   instagramUrl  String?
   linkedInUrl   String?

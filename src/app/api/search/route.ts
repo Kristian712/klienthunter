@@ -101,7 +101,7 @@ export async function POST(req: NextRequest) {
 
     // A nationwide run would need thousands of probes and would never finish, so it skips the
     // network entirely and yields only HAS / UNKNOWN from what the sources already said.
-    const verified = await enrichAndVerify(candidates, { probeNetwork: !wholeCz, deadlineAt });
+    const verified = await enrichAndVerify(candidates, { probeNetwork: !wholeCz, deadlineAt, region, industry });
     const results = await persistResults(search.id, verified, profile?.targetFilters);
 
     return NextResponse.json({ searchId: search.id, results });

@@ -79,3 +79,52 @@ export function extractContacts(html: string, siteUrl?: string): Pick<RawLead, '
 
   return out;
 }
+
+/**
+ * The link the site itself labels "Kontakt".
+ *
+ * Read out of HTML the probe already downloaded, so it costs no request. Used for the row's
+ * button: on a firm that publishes nothing but a website, its contact page is the shortest path
+ * from a result to an actual conversation — and it is the page where the address, the opening
+ * hours and the person's name live.
+ *
+ * Only links back to the same host are accepted. A "kontakt" link pointing somewhere else is the
+ * web designer's own page, or a booking platform, not the firm's contacts.
+ */
+export function contactPageUrl(html: string, siteUrl: string): string | undefined {
+  let host: string;
+  try {
+    host = new URL(siteUrl).hostname.replace(/^www\./, '').toLowerCase();
+  } catch {
+    return undefined;
+  }
+
+  const anchors = /<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]{0,150}?)<\/a>/gi;
+  let best: { score: number; url: string } | undefined;
+
+  for (const m of Array.from(html.matchAll(anchors))) {
+    const href = m[1];
+    const label = m[2].replace(/<[^>]+>/g, ' ').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    // The visible label beats the path: plenty of sites route contacts through /page/17.
+    const score = /\bkontakt/.test(label) || /\bcontact/.test(label) ? 3
+      : /kontakt|contact/i.test(href) ? 2
+      : 0;
+    if (score === 0 || score <= (best?.score ?? 0)) continue;
+
+    try {
+      const url = new URL(href, siteUrl);
+      if (!/^https?:$/.test(url.protocol)) continue;
+      if (url.hostname.replace(/^www\./, '').toLowerCase() !== host) continue;
+      // The fragment is kept on purpose: plenty of one-page sites keep their contacts in a
+      // `#kontakt` section, and that anchor is exactly where the reader wants to land. Without
+      // it the link would quietly resolve to the home page the button already offers.
+      const resolved = url.toString();
+      if (resolved.replace(/\/$/, '') === siteUrl.replace(/\/$/, '')) continue;
+      best = { score, url: resolved };
+    } catch {
+      /* a malformed href is not a contact page */
+    }
+  }
+
+  return best?.url;
+}

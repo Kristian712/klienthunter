@@ -1,5 +1,7 @@
 import { createRobotsCache } from './robots';
 import { ENRICHMENT_SOURCES, type RawLead } from './sources';
+import { resolveNiche } from './nace-map';
+import { buildNameIndex, discoverWebsite, tldForRegion } from './website-discovery';
 import {
   classify,
   createProbeCache,
@@ -25,6 +27,15 @@ import {
  */
 export const CONCURRENCY = 12;
 const ENRICH_CONCURRENCY = 8;
+
+/**
+ * Headroom kept back from the pool's deadline for the discovery probes.
+ *
+ * `runPool` only checks the clock before it *starts* a task, and one discovery can still spend
+ * several seconds on dead hosts after that. Stopping it early leaves the persist step the time
+ * it needs, and a firm whose website we ran out of time for is simply reported without one.
+ */
+const DISCOVERY_HEADROOM_MS = 6_000;
 
 /** One business awaiting a website verdict, with everything the sources told us about it. */
 export interface Candidate {
@@ -149,10 +160,22 @@ export interface VerifiedCandidate {
  */
 export async function enrichAndVerify(
   candidates: Candidate[],
-  { probeNetwork, deadlineAt }: { probeNetwork: boolean; deadlineAt: number },
+  { probeNetwork, deadlineAt, region = '', industry = '' }:
+    { probeNetwork: boolean; deadlineAt: number; region?: string; industry?: string },
 ): Promise<VerifiedCandidate[]> {
   const robots = createRobotsCache();
   const probe = createProbeCache(robots);
+
+  // Built from the whole result set, because that is what makes "dental" generic and "ajna"
+  // distinctive without anyone maintaining a word list per trade.
+  const nameIndex = buildNameIndex(candidates.map(c => c.name));
+  const tld = tldForRegion(region);
+  const discoveryDeadline = deadlineAt - DISCOVERY_HEADROOM_MS;
+  // The trade the user searched for, as words a Czech page would actually contain. Used as the
+  // second fact a guessed domain has to satisfy — see `verifyPage`.
+  const tradeWords = Array.from(new Set([industry, ...resolveNiche(industry).keywords]))
+    .map(w => w.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim())
+    .filter(w => w.length >= 4);
 
   const enrichOne = async (c: Candidate) => {
     const lead: RawLead = {
@@ -183,9 +206,30 @@ export async function enrichAndVerify(
     const signals: WebsiteSignals = { ...c.signals, emailDomainUrl: siteFromEmail(c.email) };
     if (!probeNetwork) return classify(signals);
 
-    // One probe per candidate. A URL a source actually stated outranks a domain we derived.
+    // A URL a source actually stated outranks a domain we derived.
     const target = isRealWebsite(signals.claimedUrl) ? signals.claimedUrl : signals.emailDomainUrl;
-    return classify(signals, target ? await probe(target) : undefined);
+    const verdict = classify(signals, target ? await probe(target) : undefined);
+    if (verdict.status === 'HAS') return verdict;
+
+    /**
+     * Nothing the sources gave us led to a website — which is the normal case, not the
+     * exception: ARES has no website column at all. Rather than leave the row blank, look the
+     * firm up under the domains its own name suggests. `discoverWebsite` only reports a hit the
+     * fetched page proves, so this can add websites but never invent one.
+     */
+    const found = await discoverWebsite(
+      { name: c.name, ico: c.ico },
+      nameIndex,
+      { tld, deadlineAt: discoveryDeadline, probe, tradeWords },
+    );
+    if (!found) return verdict;
+    return {
+      status: 'HAS',
+      url: found.url,
+      evidence: found.evidence,
+      elapsedMs: found.elapsedMs,
+      html: found.html,
+    };
   };
 
   const [verdicts] = await Promise.all([

@@ -5,7 +5,7 @@ import { dphSource } from './dph';
 import type { DiscoverySource, EnrichmentSource, RawLead } from './types';
 
 export type { RawLead, DiscoverySource, EnrichmentSource } from './types';
-export { extractContacts } from './site-contacts';
+export { extractContacts, contactPageUrl } from './site-contacts';
 export { OSM_ATTRIBUTION } from './osm';
 
 /**

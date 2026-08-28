@@ -1,7 +1,7 @@
 import { analyzeBusinessFull } from './business-checks';
 import { prisma } from './db';
 import { leadScore } from './lead-score';
-import { extractContacts } from './sources';
+import { contactPageUrl, extractContacts } from './sources';
 import { socialFromUrl } from './website-status';
 import type { VerifiedCandidate } from './lead-pipeline';
 
@@ -28,6 +28,9 @@ export async function persistResults(
       ? await analyzeBusinessFull(verdict.url, verdict.html)
       : null;
     const contacts = verdict.html ? extractContacts(verdict.html, verdict.url) : {};
+    // Free: the same HTML the probe already downloaded. Gives the row a button that opens the
+    // page where the firm actually publishes how to reach it.
+    const contactPage = verdict.html && verdict.url ? contactPageUrl(verdict.html, verdict.url) : undefined;
     const social = checks ? {} : socialFromUrl(c.signals.claimedUrl ?? '');
 
     const row = {
@@ -56,6 +59,7 @@ export async function persistResults(
         name:            c.name,
         address:         c.address,
         website:         verdict.url,
+        contactUrl:      contactPage,
         ico:             c.ico,
         hasWebsite:      verdict.status === 'HAS',
         websiteEvidence: verdict.evidence,
