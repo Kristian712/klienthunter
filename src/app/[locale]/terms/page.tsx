@@ -6,12 +6,15 @@ import { OPERATOR, type LegalBlock } from '@/lib/legal';
 /**
  * Podmínky použití.
  *
- * Původní verze měla šest vět a mlčela přesně tam, kde je riziko: aplikace píše obchodní
- * e-maily. Odesílá je ale uživatel ze své schránky — a tím se z něj podle § 7 zákona
- * č. 480/2004 Sb. stává šiřitel obchodního sdělení se všemi povinnostmi, které z toho plynou
- * (pokuta až 10 000 000 Kč). Zároveň se stává správcem osobních údajů, které si vyexportoval.
- * Oddíly o oslovování a o exportu to říkají nahlas, protože uživatel, který to netuší, si může
- * udělat vážný problém.
+ * Původní verze měla šest vět a mlčela přesně tam, kde je riziko: uživatel z vyexportovaných
+ * kontaktů rozesílá obchodní e-maily a tím se z něj podle § 7 zákona č. 480/2004 Sb. stává
+ * šiřitel obchodního sdělení se všemi povinnostmi, které z toho plynou (pokuta až 10 000 000 Kč).
+ * Zároveň se stává správcem osobních údajů, které si vyexportoval. Oddíly o oslovování a
+ * o exportu to říkají nahlas, protože uživatel, který to netuší, si může udělat vážný problém.
+ *
+ * Třetí kolo z těch oddílů vyškrtlo generátor konceptů oslovovacích e-mailů — ta funkce byla
+ * napsaná pro jednoho člověka, který prodává weby, a byla z aplikace odstraněna. Právní dokument
+ * nesmí slibovat funkci, která neexistuje, stejně jako ji nesmí slibovat ceník.
  *
  * Druhé kolo přidalo dva oddíly, které chyběly:
  *
@@ -61,9 +64,9 @@ const BLOCKS: LegalBlock[] = [
     heading: { cs: 'Co služba dělá', sk: 'Čo služba robí', en: 'What the service does' },
     body: [
       {
-        cs: 'KlientHunter vyhledává firmy ve veřejných rejstřících a mapách, řadí je podle kritérií, která si nastavíte, a umožňuje výsledky exportovat. Kromě toho umí připravit koncept oslovovacího e-mailu.',
-        sk: 'KlientHunter vyhľadáva firmy vo verejných registroch a mapách, zoraďuje ich podľa kritérií, ktoré si nastavíte, a umožňuje výsledky exportovať. Okrem toho vie pripraviť koncept oslovovacieho e-mailu.',
-        en: 'KlientHunter searches public registers and maps, ranks the results by criteria you choose, and lets you export them. It can also prepare a draft outreach e-mail.',
+        cs: 'KlientHunter vyhledává firmy ve veřejných rejstřících a mapách, řadí je podle kritérií, která si nastavíte, a umožňuje výsledky exportovat. Samotné oslovení firem je na vás — službou žádná zpráva neodchází.',
+        sk: 'KlientHunter vyhľadáva firmy vo verejných registroch a mapách, zoraďuje ich podľa kritérií, ktoré si nastavíte, a umožňuje výsledky exportovať. Samotné oslovenie firiem je na vás — službou žiadna správa neodchádza.',
+        en: 'KlientHunter searches public registers and maps, ranks the results by criteria you choose, and lets you export them. Approaching the businesses is up to you — the service sends no messages.',
       },
       {
         cs: 'Službu nelze používat k žádnému účelu, který zákon zakazuje, ani k obtěžování nalezených firem nebo osob. Zakázané je zejména rozesílání nevyžádaných sdělení v rozporu se zákonem, podvodné jednání, získávání údajů pro jejich další prodej a jakýkoli pokus službu automatizovaně vytěžit nad rámec běžného používání.',
@@ -105,9 +108,9 @@ const BLOCKS: LegalBlock[] = [
     },
     body: [
       {
-        cs: 'Aplikace koncept zprávy pouze napíše. Nikdy nic neodesílá. Zprávu odesíláte vy, ze své vlastní schránky, a tím se z vás podle § 7 zákona č. 480/2004 Sb. stává šiřitel obchodního sdělení.',
-        sk: 'Aplikácia koncept správy iba napíše. Nikdy nič neodosiela. Správu odosielate vy, zo svojej vlastnej schránky, a tým sa z vás podľa § 7 zákona č. 480/2004 Zb. stáva šíriteľ obchodného oznámenia.',
-        en: 'The app only writes the draft. It never sends anything. You send the message, from your own mailbox, and in doing so you become the sender of a commercial communication under § 7 of Czech Act No. 480/2004 Coll.',
+        cs: 'Aplikace žádnou zprávu nepíše ani neodesílá — dá vám jen kontakty. Zprávu formulujete a odesíláte vy, ze své vlastní schránky, a tím se z vás podle § 7 zákona č. 480/2004 Sb. stává šiřitel obchodního sdělení.',
+        sk: 'Aplikácia žiadnu správu nepíše ani neodosiela — dá vám len kontakty. Správu formulujete a odosielate vy, zo svojej vlastnej schránky, a tým sa z vás podľa § 7 zákona č. 480/2004 Zb. stáva šíriteľ obchodného oznámenia.',
+        en: 'The app neither writes nor sends any message — it only gives you the contacts. You write and send the message yourself, from your own mailbox, and in doing so you become the sender of a commercial communication under § 7 of Czech Act No. 480/2004 Coll.',
       },
       {
         cs: 'Z toho pro vás plyne, že obchodní sdělení musí být jako obchodní sdělení zřetelně označeno, musí být zjevné, kdo je odesílá, a musí obsahovat funkční způsob, jak další zprávy odmítnout. Za dodržení těchto povinností odpovídáte vy, nikoli provozovatel. Česká obchodní inspekce může za jejich porušení uložit pokutu až 10 000 000 Kč. To, že adresa je veřejně uvedená, sama o sobě souhlas s oslovením nezakládá — Úřad pro ochranu osobních údajů to opakovaně potvrdil.',

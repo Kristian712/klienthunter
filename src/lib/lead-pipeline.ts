@@ -7,6 +7,7 @@ import {
   isSameBusiness,
   runPool,
   significantTokens,
+  siteFromEmail,
   type WebsiteSignals,
   type WebsiteVerdict,
 } from './website-status';
@@ -173,9 +174,18 @@ export async function enrichAndVerify(
     }
   };
 
+  /**
+   * The e-mail domain is resolved here rather than in `toCandidate` because `absorb` can still
+   * add an e-mail from a second source after the candidate was created. Reading it at the last
+   * moment means the merge order cannot decide whether we look.
+   */
   const verify = async (c: Candidate): Promise<WebsiteVerdict> => {
-    const probeIt = probeNetwork && isRealWebsite(c.signals.claimedUrl);
-    return classify(c.signals, probeIt ? await probe(c.signals.claimedUrl!) : undefined);
+    const signals: WebsiteSignals = { ...c.signals, emailDomainUrl: siteFromEmail(c.email) };
+    if (!probeNetwork) return classify(signals);
+
+    // One probe per candidate. A URL a source actually stated outranks a domain we derived.
+    const target = isRealWebsite(signals.claimedUrl) ? signals.claimedUrl : signals.emailDomainUrl;
+    return classify(signals, target ? await probe(target) : undefined);
   };
 
   const [verdicts] = await Promise.all([

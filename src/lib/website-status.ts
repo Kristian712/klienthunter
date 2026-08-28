@@ -6,6 +6,12 @@ export interface WebsiteSignals {
   /** Non-social URL reported by a source (OSM `website` tag, an uploaded CSV column). */
   claimedUrl?: string;
   /**
+   * The firm's own mail domain, turned into a URL — see `siteFromEmail`. Not a claim by any
+   * source, so on its own it proves nothing; it only becomes a verdict once the probe confirms
+   * that the domain actually serves a page.
+   */
+  emailDomainUrl?: string;
+  /**
    * The business is mapped in OSM with contact details but carries no website tag. Weak:
    * OSM contributors record what they can see on the door, and a missing tag is far more
    * often an unmapped detail than a business with no site.
@@ -71,6 +77,99 @@ export function isRealWebsite(url: string | undefined): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * Mailbox providers, which say nothing about a website.
+ *
+ * The distinction this list draws is the whole point of `siteFromEmail`: `info@seznam.cz` is a
+ * free mailbox anyone can open, while `info@klempirstvi-novak.cz` means the firm registered and
+ * pays for that domain. The second is worth checking for a website; the first is not.
+ */
+const FREEMAIL_DOMAINS = [
+  'seznam.cz', 'email.cz', 'centrum.cz', 'volny.cz', 'post.cz', 'atlas.cz', 'tiscali.cz',
+  'quick.cz', 'chello.cz', 'iol.cz', 'razdva.cz', 'inmail.cz',
+  'centrum.sk', 'azet.sk', 'zoznam.sk', 'pobox.sk', 'szm.sk',
+  'googlemail.com', 'icloud.com', 'me.com', 'mac.com',
+  'proton.me', 'protonmail.com', 'protonmail.ch', 'pm.me',
+  'web.de', 'freemail.hu', 'mail.ru', 'yandex.ru',
+  'zoho.com', 'fastmail.com', 'mailbox.org',
+];
+
+/**
+ * The same thing, but for providers that run a mailbox on dozens of country domains — Microsoft
+ * alone has `outlook.com`, `outlook.cz`, `outlook.sk`, `outlook.co.uk` and more. Enumerating every
+ * one is a losing game, so these match on the first label whatever the TLD.
+ *
+ * It costs us the occasional real firm that happens to be called "Live s.r.o." on `live.cz`. That
+ * is the cheap mistake: we simply say nothing about its website. The expensive mistake is the
+ * other way round — probing `outlook.co.uk`, finding it alive, and telling the user that
+ * Microsoft's login page is the firm's website. That is exactly the lie this whole change exists
+ * to kill, so the doubt gets resolved against ourselves.
+ */
+const FREEMAIL_BRANDS = [
+  'gmail', 'outlook', 'hotmail', 'live', 'msn', 'yahoo', 'ymail', 'rocketmail',
+  'gmx', 'aol', 'inbox', 'mail', 'email', 'seznam', 'centrum', 'azet', 'zoznam',
+];
+
+/**
+ * The firm's own website, derived from the domain it takes mail on.
+ *
+ * This exists because our sources know contact details far better than they know websites:
+ * ARES has no website column at all and OpenStreetMap carries a `website` tag on only a
+ * fraction of the businesses it maps. A firm that publishes `info@example.cz` has told us it
+ * owns `example.cz` — that is a fact from the data, not a guess about a name.
+ *
+ * Deliberately *not* guessing a domain from the company name. Turning "Klempířství Novák" into
+ * `klempirstvi-novak.cz` and probing it would sooner or later attach a stranger's website to a
+ * firm, which is precisely the kind of confident wrong answer this app must never produce.
+ *
+ * Returns a URL to *check*, never a verdict. See `classify`: it only counts once a probe has
+ * confirmed the domain serves something.
+ */
+export function siteFromEmail(email: string | undefined): string | undefined {
+  if (!email) return undefined;
+  const at = email.lastIndexOf('@');
+  // `at < 1` and not `at < 0`: "@nic.cz" has no local part, so it is not an address at all and
+  // whoever owns nic.cz never told us anything.
+  if (at < 1) return undefined;
+
+  const domain = email
+    .slice(at + 1)
+    .trim()
+    .toLowerCase()
+    .replace(/^www\./, '')
+    .replace(/[.,;:>)\]]+$/, '');
+
+  // Must look like a hostname with a TLD. Anything else is a malformed address, not a domain.
+  if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(domain)) {
+    return undefined;
+  }
+
+  const isUnder = (list: readonly string[]) =>
+    list.some(d => domain === d || domain.endsWith('.' + d));
+  if (isUnder(FREEMAIL_DOMAINS)) return undefined;
+  // A Facebook page is not a website, and it is not one when it arrives as a mail domain either.
+  if (isUnder(SOCIAL_DOMAINS)) return undefined;
+  if (FREEMAIL_BRANDS.includes(brandLabel(domain))) return undefined;
+
+  return `https://${domain}`;
+}
+
+/** Second-level domains that behave like a TLD, so the name people pay for sits one label left. */
+const PSEUDO_TLDS = ['co', 'com', 'net', 'org', 'ac', 'gov', 'edu', 'or', 'ne'];
+
+/**
+ * The label a domain is actually known by: `outlook` in `outlook.co.uk`, but `firma` in
+ * `mail.firma.cz` — a company's own mail server, which must not be mistaken for the provider
+ * `mail.ru`. Approximated without the public suffix list, which is a dependency and a download
+ * this one check does not justify.
+ */
+function brandLabel(domain: string): string {
+  const parts = domain.split('.');
+  if (parts.length < 2) return domain;
+  const take = parts.length > 2 && PSEUDO_TLDS.includes(parts[parts.length - 2]) ? 3 : 2;
+  return parts[parts.length - take];
 }
 
 export function socialFromUrl(url: string): { fb?: string; ig?: string; li?: string } {
@@ -308,6 +407,28 @@ export function classify(signals: WebsiteSignals, probe?: ProbeResult): WebsiteV
     return { status: 'UNKNOWN', url: claimedUrl, evidence: `zdroj uvádí web, ale ${probe.reason}` };
   }
 
+  // No source named a website, but the firm takes mail on a domain of its own and that domain
+  // answers. The domain is theirs and the page is real, so the page is their website — the same
+  // standard of proof as a claimed URL that we loaded, reached from a different direction.
+  //
+  // The probe is not optional here. Without it this is only an inference, and an inference is
+  // exactly what must not be printed as a fact.
+  if (signals.emailDomainUrl && probe?.alive) {
+    return probe.blockedByRobots
+      ? {
+          status: 'HAS',
+          url: probe.finalUrl ?? signals.emailDomainUrl,
+          evidence: `web na doméně z e-mailu firmy, ${probe.reason} – stránku jsme nestahovali`,
+        }
+      : {
+          status: 'HAS',
+          url: probe.finalUrl ?? signals.emailDomainUrl,
+          evidence: `web na doméně z e-mailu firmy, ${probe.reason}`,
+          elapsedMs: probe.elapsedMs,
+          html: probe.html,
+        };
+  }
+
   let weight = 0;
   const reasons: string[] = [];
 
@@ -321,6 +442,11 @@ export function classify(signals: WebsiteSignals, probe?: ProbeResult): WebsiteV
   if (signals.registryHasNoField) {
     // Deliberately weightless: ARES has no website column, so its silence says nothing at all.
     reasons.push('registr web neeviduje');
+  }
+  if (signals.emailDomainUrl && probe) {
+    // Also weightless. Plenty of firms run mail on a domain that serves no page, and plenty of
+    // servers refuse us while serving everyone else.
+    reasons.push('doména z e-mailu firmy neodpověděla');
   }
 
   if (weight >= NONE_THRESHOLD) {

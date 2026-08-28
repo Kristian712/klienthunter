@@ -39,6 +39,10 @@ export async function persistResults(
       hasFacebook:   checks?.hasFacebook  ?? Boolean(social.fb),
       hasInstagram:  checks?.hasInstagram ?? Boolean(social.ig),
       hasLinkedIn:   checks?.hasLinkedIn  ?? Boolean(social.li),
+      // The three flags above are only an answer when we had a page to read them off, or when a
+      // source handed us a social URL outright. Otherwise they are all false because we never
+      // looked, and the UI has to be able to tell the difference.
+      socialsChecked: checks !== null || Boolean(social.fb || social.ig || social.li),
       foundedAt:     c.foundedAt,
       vatPayer:      c.vatPayer,
       vatUnreliable: c.vatUnreliable,

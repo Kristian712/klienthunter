@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { exportToExcel, WEBSITE_LABEL_CS } from '@/lib/excel-export';
+import { exportToExcel, socialLabel, WEBSITE_LABEL_CS } from '@/lib/excel-export';
 import { resolveStatus } from '@/lib/website-status';
 
 function toCsv(businesses: Parameters<typeof exportToExcel>[0]): string {
@@ -9,7 +9,7 @@ function toCsv(businesses: Parameters<typeof exportToExcel>[0]): string {
     'Název firmy', 'IČO', 'Telefon', 'Email', 'Adresa', 'Web',
     'Má web', 'Facebook', 'Instagram', 'LinkedIn',
     'Plátce DPH', 'Nespolehlivý plátce',
-    'Recenze', 'Hodnocení', 'Zdroj',
+    'Zdroj',
   ];
 
   const escape = (v: unknown) => {
@@ -31,13 +31,14 @@ function toCsv(businesses: Parameters<typeof exportToExcel>[0]): string {
     b.address ?? '',
     b.website ?? '',
     WEBSITE_LABEL_CS[resolveStatus(b)],
-    b.hasFacebook ? 'ANO' : 'NE',
-    b.hasInstagram ? 'ANO' : 'NE',
-    b.hasLinkedIn ? 'ANO' : 'NE',
+    // Empty, not "NE", on a row where nobody ever looked — see `socialLabel`.
+    socialLabel(b.hasFacebook, b.socialsChecked),
+    socialLabel(b.hasInstagram, b.socialsChecked),
+    socialLabel(b.hasLinkedIn, b.socialsChecked),
     vat(b.vatPayer),
     vat(b.vatUnreliable),
-    b.reviewCount,
-    b.rating ?? '',
+    // Recenze a hodnocení pocházely jen z Google Places, které muselo pryč z licenčních důvodů.
+    // Sloupce proto vyvážely samé nuly a prázdno — a nula recenzí je tvrzení, ne mezera.
     b.source,
   ].map(escape).join(','));
 

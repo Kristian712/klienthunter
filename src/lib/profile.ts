@@ -12,7 +12,6 @@ import { localized } from './lead-filters';
  */
 
 export interface UserProfile {
-  /** Carried here, not just on the account row, because the outreach draft signs with it. */
   name: string | null;
   profession: string | null;
   professionText: string | null;
@@ -22,8 +21,6 @@ export interface UserProfile {
   /** Ids from LEAD_FILTERS. */
   targetFilters: string[];
   onboardedAt: string | null;
-  /** One free line under the signature of the outreach draft. See `lib/outreach.ts`. */
-  outreachSignature: string | null;
 }
 
 export const EMPTY_PROFILE: UserProfile = {
@@ -35,7 +32,6 @@ export const EMPTY_PROFILE: UserProfile = {
   targetCity: null,
   targetFilters: [],
   onboardedAt: null,
-  outreachSignature: null,
 };
 
 export interface Profession {

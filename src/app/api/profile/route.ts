@@ -43,13 +43,11 @@ const UpdateSchema = z.object({
   /** Sent as `true` on both finishing and skipping the modal — we ask once either way. */
   onboarded:      z.boolean().optional(),
   // Roomier than the rest: it usually holds a URL and a phone number on one line.
-  outreachSignature: nullableText(160),
 });
 
 const PROFILE_SELECT = {
   profession: true, professionText: true, targetIndustry: true,
   targetRegion: true, targetCity: true, targetFilters: true, onboardedAt: true,
-  outreachSignature: true,
 } as const;
 
 export async function GET(req: NextRequest) {

@@ -45,6 +45,11 @@ export interface FilterableLead {
   hasFacebook?: boolean | null;
   hasInstagram?: boolean | null;
   hasLinkedIn?: boolean | null;
+  /**
+   * True when we actually had a page to read the social links off. Three `false`s on a row we
+   * never opened mean "we did not look", not "the firm has no profiles".
+   */
+  socialsChecked?: boolean | null;
 }
 
 export type FilterGroup = 'web' | 'contact' | 'company';
@@ -109,12 +114,11 @@ export function webStatusOf(b: FilterableLead): 'HAS' | 'NONE' | 'UNKNOWN' {
 }
 
 /** Same fallback as `webStatusOf`, expressed for the database. */
-const STATUS_UNKNOWN = {
-  OR: [{ websiteStatus: 'UNKNOWN' }, { websiteStatus: null, hasWebsite: false }],
-};
 const STATUS_HAS = {
   OR: [{ websiteStatus: 'HAS' }, { websiteStatus: null, hasWebsite: true }],
 };
+/** Everything we could not confirm a website for — the unproven and the proven-absent alike. */
+const STATUS_NOT_HAS = { NOT: STATUS_HAS };
 
 function hasSocial(b: FilterableLead): boolean {
   return Boolean(b.hasFacebook || b.hasInstagram || b.hasLinkedIn);
@@ -149,11 +153,22 @@ export const LEAD_FILTERS: LeadFilter[] = [
   {
     id: 'no_website',
     group: 'web',
-    label: { cs: 'Web neuveden', sk: 'Web neuvedený', en: 'No website found' },
-    // Deliberately UNKNOWN, not NONE. Since the directory sources were removed, nothing can
-    // prove a business has no site, so NONE is empty and this is the bucket worth selling to.
-    where: STATUS_UNKNOWN,
-    test: b => webStatusOf(b) === 'UNKNOWN',
+    /**
+     * The wording is the whole point. "Web neuveden" was read as a statement about the firm, and
+     * for most rows it was false — ARES has no website column and OpenStreetMap tags one on a
+     * minority of what it maps, so the app was calling firms websiteless on the strength of
+     * having never looked. This label says who did the not-finding.
+     */
+    label: { cs: 'Web jsme nenašli', sk: 'Web sme nenašli', en: 'We found no website' },
+    where: STATUS_NOT_HAS,
+    test: b => webStatusOf(b) !== 'HAS',
+    /**
+     * And this is what keeps the score honest. As a chip the filter is a work queue and may
+     * hand back everything unconfirmed; as a *criterion* it is the claim "this firm has no
+     * website", which today no source can support. Half credit, never a confirmed match, never
+     * printed in the "Proč" column as a reason the firm ranked where it did.
+     */
+    unknown: b => webStatusOf(b) === 'UNKNOWN',
   },
   {
     id: 'has_website',
@@ -161,6 +176,8 @@ export const LEAD_FILTERS: LeadFilter[] = [
     label: { cs: 'Má web', sk: 'Má web', en: 'Has website' },
     where: STATUS_HAS,
     test: b => webStatusOf(b) === 'HAS',
+    // Symmetrically: a row we never resolved is not a firm that demonstrably lacks a website.
+    unknown: b => webStatusOf(b) === 'UNKNOWN',
   },
   {
     id: 'slow_website',
@@ -223,9 +240,21 @@ export const LEAD_FILTERS: LeadFilter[] = [
   {
     id: 'no_social',
     group: 'contact',
-    label: { cs: 'Bez sociálních sítí', sk: 'Bez sociálnych sietí', en: 'No social profiles' },
+    /**
+     * Named after the not-finding, exactly like `no_website` above — and for the same reason.
+     * The chip prints how many rows it would leave, so on a run where nobody's homepage was
+     * fetched the old wording read „Bez sociálních sítí 500": a claim about 500 firms, made
+     * without opening a single page. „Sítě jsme nenašli" is the same number and true.
+     */
+    label: { cs: 'Sítě jsme nenašli', sk: 'Siete sme nenašli', en: 'We found no profiles' },
     where: { hasFacebook: false, hasInstagram: false, hasLinkedIn: false },
     test: b => !hasSocial(b),
+    /**
+     * Social profiles are only ever read off the firm's own homepage. With no page there was
+     * nothing to read, and three untouched `false`s are not a finding — scoring them as one
+     * handed a free point to every row we knew least about.
+     */
+    unknown: b => !hasSocial(b) && !b.socialsChecked,
   },
   {
     id: 'no_category',

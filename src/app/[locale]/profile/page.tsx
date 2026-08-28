@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
-import { Crown, Shield, User, Mail, Calendar, Search, BarChart3, Edit2, Check, X, Lock, Send, Target } from 'lucide-react';
+import { Crown, Shield, User, Mail, Calendar, Search, BarChart3, Edit2, Check, X, Lock, Target } from 'lucide-react';
 import { localized } from '@/lib/lead-filters';
 import { EMPTY_PROFILE, type UserProfile } from '@/lib/profile';
 import {
@@ -30,12 +30,6 @@ const T = {
   lead:       { cs: 'Odpovědi z úvodního dotazníku. Předvyplňují hledání a určují pořadí výsledků — nic neodfiltrují.',
                 sk: 'Odpovede z úvodného dotazníka. Predvypĺňajú hľadanie a určujú poradie výsledkov — nič neodfiltrujú.',
                 en: 'Your onboarding answers. They pre-fill the search and set the ranking — they filter nothing out.' },
-  sigLabel:   { cs: 'Podpis pod oslovovací zprávu',
-                sk: 'Podpis pod oslovovaciu správu',
-                en: 'Signature under your outreach message' },
-  sigHint:    { cs: 'Jeden řádek pod vaše jméno — web, telefon, cokoli. Nepovinné.',
-                sk: 'Jeden riadok pod vaše meno — web, telefón, čokoľvek. Nepovinné.',
-                en: 'One line under your name — a site, a phone number, anything. Optional.' },
   save:       { cs: 'Uložit',        sk: 'Uložiť',        en: 'Save' },
   savingNow:  { cs: 'Ukládám…',      sk: 'Ukladám…',      en: 'Saving…' },
   saved:      { cs: 'Profil uložen', sk: 'Profil uložený', en: 'Profile saved' },
@@ -62,8 +56,6 @@ export default function ProfilePage() {
   // never written — the user presses Save, or nothing happens.
   const [draft, setDraft] = useState<ProfileDraft>(EMPTY_DRAFT);
   const [savingProfile, setSavingProfile] = useState(false);
-  // Not part of the draft: the onboarding modal asks four questions and this is not one of them.
-  const [signature, setSignature] = useState('');
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
 
@@ -71,10 +63,7 @@ export default function ProfilePage() {
     fetch('/api/profile').then(r => r.json()).then(d => {
       setData(d);
       setNameVal(d.user?.name ?? '');
-      if (d.user) {
-        setDraft(toDraft({ ...EMPTY_PROFILE, ...d.user }));
-        setSignature(d.user.outreachSignature ?? '');
-      }
+      if (d.user) setDraft(toDraft({ ...EMPTY_PROFILE, ...d.user }));
       setLoading(false);
     });
   }, []);
@@ -101,7 +90,7 @@ export default function ProfilePage() {
     const res = await fetch('/api/profile', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...draftToPayload(draft), outreachSignature: signature }),
+      body: JSON.stringify(draftToPayload(draft)),
     });
     if (res.ok) {
       const d = await res.json();
@@ -249,19 +238,6 @@ export default function ProfilePage() {
             <IndustryField   draft={draft} patch={patch} locale={locale} />
             <RegionField     draft={draft} patch={patch} locale={locale} />
             <CriteriaField   draft={draft} patch={patch} locale={locale} />
-
-            <div>
-              <label className="label">{localized(T.sigLabel, locale)}</label>
-              <input
-                type="text"
-                className="input"
-                maxLength={160}
-                placeholder="https://…  ·  +420 …"
-                value={signature}
-                onChange={e => setSignature(e.target.value)}
-              />
-              <p className="text-[11px] text-ink-faint mt-1">{localized(T.sigHint, locale)}</p>
-            </div>
           </div>
 
           <div className="mt-6 pt-4 border-t border-line">
@@ -311,23 +287,18 @@ export default function ProfilePage() {
           )}
         </div>
 
-        {/* Oslovovací e-maily */}
-        <div className="card">
-          <h2 className="font-semibold text-ink flex items-center gap-2 mb-1">
-            <Send size={16} className="text-ink-faint" /> Oslovovací e-maily
-          </h2>
-          <p className="text-xs text-ink-faint mb-4">
-            KlientHunter e-maily neodesílá. Připraví ti u každé firmy koncept, který zkopíruješ
-            nebo otevřeš ve své schránce a odešleš sám. Hromadné obchodní sdělení bez souhlasu
-            příjemce zakazuje § 7 zákona 480/2004 Sb. – pokuta až 10 000 000 Kč.
-          </p>
-          {/*
-            Tady dřív visel odkaz „smazat uložené údaje k Brevo“. Sloupce `brevoApiKey`
-            a `brevoSenderEmail` už v databázi nejsou — držet nepoužívaný přístupový klíč
-            k cizí službě odporuje zásadě minimalizace údajů (čl. 5 odst. 1 písm. c) GDPR)
-            a je to bezpečnostní riziko zadarmo. Smazané je lepší než smazatelné.
-          */}
-        </div>
+        {/*
+          Tady stávala karta „Oslovovací e-maily“ a nad ní pole na podpis. Aplikace psala
+          uživateli první zprávu za něj — jenže ty šablony vznikly pro jednoho člověka, který
+          prodává weby, a každý další uživatel se jimi představoval jako někdo, kdo není.
+          Napsat si vlastní zprávu umí každý líp než my; najít firmu, které stojí za to psát,
+          je to, co tahle appka umí. Zbylo tedy jen hledání.
+
+          Předtím tu byl ještě odkaz „smazat uložené údaje k Brevo“. Sloupce `brevoApiKey`
+          a `brevoSenderEmail` už v databázi nejsou — držet nepoužívaný přístupový klíč
+          k cizí službě odporuje zásadě minimalizace údajů (čl. 5 odst. 1 písm. c) GDPR)
+          a je to bezpečnostní riziko zadarmo. Smazané je lepší než smazatelné.
+        */}
 
         {/* Search history */}
         <div className="card p-0 overflow-hidden">

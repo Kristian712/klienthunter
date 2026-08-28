@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useLocale } from 'next-intl';
 import { Mail, Send, CheckCircle2 } from 'lucide-react';
+import { OPERATOR } from '@/lib/legal';
 
 export default function ContactPage() {
   const locale = useLocale();
@@ -17,7 +18,7 @@ export default function ContactPage() {
     // mailto fallback (no backend email service needed)
     const subject = encodeURIComponent(`KlientHunter – zpráva od ${form.name}`);
     const body = encodeURIComponent(`Jméno: ${form.name}\nEmail: ${form.email}\n\n${form.message}`);
-    window.open(`mailto:krstnjanku@gmail.com?subject=${subject}&body=${body}`);
+    window.open(`mailto:${OPERATOR.email}?subject=${subject}&body=${body}`);
     setSent(true);
     setLoading(false);
   };
@@ -72,7 +73,7 @@ export default function ContactPage() {
             </button>
             <p className="text-xs text-ink-faint text-center">
               {isCs ? 'Nebo nás kontaktujte přímo: ' : 'Or contact us directly: '}
-              <a href="mailto:krstnjanku@gmail.com" className="text-ink underline underline-offset-2 hover:text-accent transition-colors">krstnjanku@gmail.com</a>
+              <a href={`mailto:${OPERATOR.email}`} className="text-ink underline underline-offset-2 hover:text-accent transition-colors">{OPERATOR.email}</a>
             </p>
           </form>
         )}

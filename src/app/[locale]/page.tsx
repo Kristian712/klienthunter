@@ -103,9 +103,12 @@ const STEPS: Array<[Text, Text]> = [
   ],
   [
     { cs: 'Seřadíme podle tvých kritérií', sk: 'Zoradíme podľa tvojich kritérií', en: 'We rank by your criteria' },
-    { cs: 'Nahoře je firma, která splňuje nejvíc z toho, co sis nastavil. U každé vidíš, co přesně splnila. Export do Excelu i CSV.',
-      sk: 'Hore je firma, ktorá spĺňa najviac z toho, čo si si nastavil. Pri každej vidíš, čo presne splnila. Export do Excelu aj CSV.',
-      en: 'Top of the list is whoever meets most of what you set. Each row shows exactly what it met. Export to Excel or CSV.' },
+    // Export do Excelu je zamčený za plán PRO, který si zatím nikdo koupit nemůže (žádné platby
+    // neexistují). Slibovat ho na titulce by byl přesně ten druh tvrzení, kvůli kterému šly z
+    // ceníku pryč vymyšlené funkce. CSV dostane každý, tak se píše jen CSV.
+    { cs: 'Nahoře je firma, která splňuje nejvíc z toho, co sis nastavil. U každé vidíš, co přesně splnila. Výsledky si stáhneš v CSV.',
+      sk: 'Hore je firma, ktorá spĺňa najviac z toho, čo si si nastavil. Pri každej vidíš, čo presne splnila. Výsledky si stiahneš v CSV.',
+      en: 'Top of the list is whoever meets most of what you set. Each row shows exactly what it met. Download the results as CSV.' },
   ],
 ];
 
@@ -135,10 +138,10 @@ const FAQ: Array<{ q: Text; a: Text }> = [
          en: 'The four opening questions are one click to skip. We then rank by a neutral default — a reachable contact and at least three years of trading — and you can set your own criteria later in settings.' },
   },
   {
-    q: { cs: 'Proč u některých firem píšete „web neuveden" místo „bez webu"?', sk: 'Prečo pri niektorých firmách píšete „web neuvedený" namiesto „bez webu"?', en: 'Why "no website found" instead of "no website"?' },
-    a: { cs: 'Protože to je pravda. Žádný veřejný rejstřík neeviduje weby, takže nikdo nemůže dokázat, že firma web nemá – jen že jsme žádný nenašli. Radši ti řekneme, co víme, než abychom hádali.',
-         sk: 'Pretože to je pravda. Žiadny verejný register neeviduje weby, takže nikto nemôže dokázať, že firma web nemá – len že sme žiadny nenašli. Radšej ti povieme, čo vieme, než aby sme hádali.',
-         en: 'Because it is the truth. No public registry records websites, so nobody can prove a business has none — only that we found none.' },
+    q: { cs: 'Jak poznáte, že firma nemá web?', sk: 'Ako poznáte, že firma nemá web?', en: 'How do you know a business has no website?' },
+    a: { cs: 'Poctivě: často to nevíme. Žádný veřejný rejstřík weby neeviduje, takže adresu buď někde najdeme a ověříme, že se stránka opravdu načte, nebo ji zkusíme odvodit z domény firemního e-mailu. Když ani to nevyjde, u firmy nenapíšeme o webu nic. Prázdno je poctivější než tvrzení, které neumíme doložit.',
+         sk: 'Poctivo: často to nevieme. Žiadny verejný register weby neeviduje, takže adresu buď niekde nájdeme a overíme, že sa stránka naozaj načíta, alebo ju skúsime odvodiť z domény firemného e-mailu. Keď ani to nevyjde, pri firme nenapíšeme o webe nič. Prázdno je poctivejšie než tvrdenie, ktoré nevieme doložiť.',
+         en: 'Honestly: often we do not. No public registry records websites, so we either find an address and confirm the page actually loads, or we derive it from the domain of the firm’s e-mail. When neither works, we say nothing about a website at all. Silence is more honest than a claim we cannot back up.' },
   },
   {
     q: { cs: 'Je to zdarma?', sk: 'Je to zadarmo?', en: 'Is it free?' },

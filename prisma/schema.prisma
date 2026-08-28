@@ -39,9 +39,6 @@ model User {
   targetFilters    String[] @default([])
   // Set once the modal has been answered *or* skipped, so we never nag twice.
   onboardedAt      DateTime?
-  // One free line under the signature of the outreach draft — the user's site,
-  // phone, whatever they want. See src/lib/outreach.ts.
-  outreachSignature String?
 
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
@@ -92,6 +89,11 @@ model BusinessResult {
   hasFacebook   Boolean  @default(false)
   hasInstagram  Boolean  @default(false)
   hasLinkedIn   Boolean  @default(false)
+  // Whether the three flags above are an answer at all. Social links are only ever read off the
+  // firm's own homepage, so on a row where we found no page they are all false for the sole
+  // reason that nobody looked — and the UI used to print that as "Bez soc. sítí". Defaults to
+  // false, which reads older rows as unchecked: the honest way round.
+  socialsChecked Boolean @default(false)
   facebookUrl   String?
   instagramUrl  String?
   linkedInUrl   String?

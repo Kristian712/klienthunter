@@ -4,10 +4,9 @@ import { useState, useEffect } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import {
   Search, Globe, Users, ExternalLink,
-  Phone, Mail, MapPin, X, Clock, ChevronDown, Check, Send,
-  FileText, Table2, MessageSquare, Copy, Smartphone, PhoneCall,
+  Phone, Mail, MapPin, X, Clock, ChevronDown,
+  FileText, Table2, Smartphone, PhoneCall,
 } from 'lucide-react';
-import { outreachBody, toSender } from '@/lib/outreach';
 import { LEAD_FILTERS, GROUP_LABELS, GROUP_ORDER, matchesAll, localized } from '@/lib/lead-filters';
 import { scoreBreakdown } from '@/lib/lead-score';
 import { EMPTY_PROFILE, type UserProfile } from '@/lib/profile';
@@ -30,6 +29,13 @@ interface BusinessResult {
   hasFacebook: boolean;
   hasInstagram: boolean;
   hasLinkedIn: boolean;
+  /**
+   * Whether the three flags above are an answer at all. They are only ever read off the firm's
+   * own homepage, so on a row where we found no page they are all false because nobody looked.
+   * Rows written before this column existed default to false — read as unchecked, which is the
+   * honest way round.
+   */
+  socialsChecked: boolean;
   facebookUrl?: string;
   instagramUrl?: string;
   linkedInUrl?: string;
@@ -234,30 +240,19 @@ function ContactStrategy({ b, locale }: { b: BusinessResult; locale: string }) {
  * measured, whereas the old "Potřebuje nový web" was a sales opinion the data cannot support.
  */
 const S = {
-  noSocial:    { cs: 'Bez soc. sítí',   sk: 'Bez soc. sietí',   en: 'No social profiles' },
+  // I tady mluvíme o tom, co jsme našli my, ne o tom, co firma má: sítě čteme jen z odkazů na
+  // jejím webu a firma může mít Facebook, na který ze svých stránek neodkazuje.
+  noSocial:    { cs: 'Sítě jsme nenašli', sk: 'Siete sme nenašli', en: 'We found no profiles' },
+  noSocialTip: { cs: 'Na webu firmy jsme nenašli odkaz na žádnou sociální síť.',
+                 sk: 'Na webe firmy sme nenašli odkaz na žiadnu sociálnu sieť.',
+                 en: 'We found no link to a social profile on the firm’s website.' },
   webNone:     { cs: 'Web nenalezen',   sk: 'Web nenájdený',    en: 'No website found' },
-  webUnknown:  { cs: 'Web neuveden',    sk: 'Web neuvedený',    en: 'Website not stated' },
+  webUnverifiedTip: { cs: 'Tuhle adresu uvedl zdroj, ale při našem ověření neodpověděla. Web může být dočasně mimo provoz, nebo už nefunguje.',
+                      sk: 'Túto adresu uviedol zdroj, ale pri našom overení neodpovedala. Web môže byť dočasne mimo prevádzky, alebo už nefunguje.',
+                      en: 'A source gave this address, but it did not answer when we checked. The site may be temporarily down, or gone.' },
   webOld:      { cs: 'Zastaralý web',   sk: 'Zastaraný web',    en: 'Outdated website' },
   webHas:      { cs: 'Mají web',        sk: 'Majú web',         en: 'Has a website' },
-  webNoSource: { cs: 'Žádný zdroj web nepotvrdil ani nevyvrátil',
-                 sk: 'Žiadny zdroj web nepotvrdil ani nevyvrátil',
-                 en: 'No source confirmed or ruled out a website' },
   scoreWord:   { cs: 'Skóre',           sk: 'Skóre',            en: 'Score' },
-  showMsg:     { cs: 'Zobrazit zprávu pro oslovení',
-                 sk: 'Zobraziť správu na oslovenie',
-                 en: 'Show outreach message' },
-  hideMsg:     { cs: 'Skrýt zprávu',    sk: 'Skryť správu',     en: 'Hide message' },
-  copy:        { cs: 'Kopírovat',       sk: 'Kopírovať',        en: 'Copy' },
-  copied:      { cs: 'Zkopírováno',     sk: 'Skopírované',      en: 'Copied' },
-  copyDraft:   { cs: 'Zkopírovat koncept', sk: 'Skopírovať koncept', en: 'Copy draft' },
-  preparing:   { cs: 'Připravuji…',     sk: 'Pripravujem…',     en: 'Preparing…' },
-  openMail:    { cs: 'Zkopírováno – otevřít ve schránce',
-                 sk: 'Skopírované – otvoriť v schránke',
-                 en: 'Copied – open in your mail app' },
-  draftFailed: { cs: 'Koncept se nepodařilo připravit.',
-                 sk: 'Koncept sa nepodarilo pripraviť.',
-                 en: 'Could not prepare the draft.' },
-  error:       { cs: 'Chyba',           sk: 'Chyba',            en: 'Error' },
   // ODbL je share-alike: cokoliv odvozeného z OSM musí zdroj pojmenovat. Byla to jediná věta
   // v tomhle bloku, která zůstala natvrdo česky — a přitom je to licenční podmínka, ne popisek.
   // Hledání selhává čtyřmi různými způsoby a každý znamená pro uživatele něco jiného. Dokud
@@ -292,11 +287,20 @@ const S = {
                  en: ' · no data for {k}' },
 };
 
+/**
+ * Same rule as the website badge. Social profiles are only ever read off the firm's own
+ * homepage, so on a row where no page was found all three flags are false because nobody
+ * looked — and "Bez soc. sítí" was the app saying so out loud. `socialsChecked` records
+ * whether there was ever an answer to give.
+ */
 function SocialLinks({ b, locale }: { b: BusinessResult; locale: string }) {
   const hasSocial = b.hasFacebook || b.hasInstagram || b.hasLinkedIn;
   if (!hasSocial) {
+    if (!b.socialsChecked) return null;
     return (
-      <span className="badge"><Users size={10} />{localized(S.noSocial, locale)}</span>
+      <span className="badge" title={localized(S.noSocialTip, locale)}>
+        <Users size={10} />{localized(S.noSocial, locale)}
+      </span>
     );
   }
   const links: Array<[boolean, string, React.ReactNode, string]> = [
@@ -316,21 +320,26 @@ function SocialLinks({ b, locale }: { b: BusinessResult; locale: string }) {
   );
 }
 
+/**
+ * The website badge — and the rule the whole row follows: we print what we found, and stay
+ * quiet about what we did not.
+ *
+ * This used to render "Web neuveden" for every unresolved row, in the same strip as "IČO" and
+ * "Mají web", where everything else is a fact about the firm. Readers took it for one, and for
+ * most rows it was wrong: ARES has no website column at all and OpenStreetMap tags a website on
+ * a minority of what it maps, so a firm with a perfectly good site was labelled as lacking one
+ * on the strength of us never having looked. There is no wording that fixes that, because the
+ * problem was making a statement at all. So UNKNOWN now renders nothing.
+ */
 function WebsiteStatusBadge({ b, locale }: { b: BusinessResult; locale: string }) {
   const status = webStatus(b);
+  if (status === 'UNKNOWN') return null;
   if (status === 'NONE') {
-    // Never "nemají web": no registry records websites, so all we can honestly say is that our
-    // own check found none. The landing FAQ makes the same promise, in the same words.
+    // Reachable only from a source that can carry real negative evidence. None does today, so
+    // this stays unentered — but it is the one case where saying "no website" would be earned.
     return (
       <span className="badge-red" title={b.websiteEvidence || undefined}>
         <Globe size={10} />{localized(S.webNone, locale)}
-      </span>
-    );
-  }
-  if (status === 'UNKNOWN') {
-    return (
-      <span className="badge" title={b.websiteEvidence || localized(S.webNoSource, locale)}>
-        <Globe size={10} />{localized(S.webUnknown, locale)}
       </span>
     );
   }
@@ -379,121 +388,6 @@ function SourceBadge({ source }: { source?: string }) {
         </span>
       ))}
     </>
-  );
-}
-
-/**
- * The first message, assembled from the *user's* profile by `lib/outreach.ts`.
- *
- * What stood here before were four Czech templates hard-coded to the author's own name and
- * agency URL. Every other user was silently made to introduce themselves as a web developer
- * they are not.
- */
-function MessageBox({ b, profile, locale }: { b: BusinessResult; profile: UserProfile; locale: string }) {
-  const [open, setOpen] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const msg = outreachBody(toSender(profile), b.name, locale);
-
-  const copy = () => {
-    navigator.clipboard.writeText(msg).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  };
-
-  return (
-    <div className="mt-3 border-t border-line pt-3">
-      <button
-        onClick={() => setOpen(o => !o)}
-        className="flex items-center gap-1.5 text-xs text-ink-faint hover:text-ink transition-colors font-medium"
-      >
-        <MessageSquare size={12} />
-        {localized(open ? S.hideMsg : S.showMsg, locale)}
-        <ChevronDown size={12} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
-      </button>
-
-      {open && (
-        <div className="mt-2 relative">
-          {/*
-            Pevných osm řádků koncept ořízlo přesně v místě podpisu — a protože `resize-none`
-            zároveň schová posuvník, vypadalo to, že se zpráva podepsat zapomněla. Text je
-            jen ke čtení a ke zkopírování, takže není důvod ho svírat: `rows` se dopočítá
-            z obsahu. `whitespace-pre-wrap` drží prázdné řádky mezi odstavci.
-          */}
-          <div
-            className="w-full text-xs text-ink-muted bg-surface-subtle border border-line rounded-lg p-3 pr-24 font-mono leading-relaxed whitespace-pre-wrap"
-          >
-            {msg}
-          </div>
-          <button
-            onClick={copy}
-            className={`absolute top-2 right-2 flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
-              copied
-                ? 'bg-ink text-white'
-                : 'bg-white border border-line text-ink-muted hover:text-ink hover:border-ink'
-            }`}
-          >
-            {copied
-              ? <><Check size={11} /> {localized(S.copied, locale)}</>
-              : <><Copy size={11} /> {localized(S.copy, locale)}</>}
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/**
- * Prepares the e-mail and hands it over — the app never sends it. Unsolicited commercial mail
- * needs the recipient's prior consent under § 7 zákona 480/2004 Sb., and we have none, so the
- * decision to press send stays with the user, in the user's own mailbox.
- */
-function DraftEmailButton({ businessId, email, locale }: { businessId: string; email: string; locale: string }) {
-  const [status, setStatus] = useState<'idle'|'loading'|'ready'|'error'>('idle');
-  const [errMsg, setErrMsg] = useState('');
-  const [mailto, setMailto] = useState('');
-
-  const prepare = async () => {
-    setStatus('loading');
-    try {
-      const res = await fetch('/api/draft-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ businessResultId: businessId, locale }),
-      });
-      const d = await res.json();
-      if (!res.ok) { setStatus('error'); setErrMsg(d.error || localized(S.error, locale)); return; }
-
-      await navigator.clipboard.writeText(d.body).catch(() => {});
-      setMailto(
-        `mailto:${encodeURIComponent(d.to || email)}` +
-        `?subject=${encodeURIComponent(d.subject)}&body=${encodeURIComponent(d.body)}`,
-      );
-      setStatus('ready');
-    } catch {
-      setStatus('error');
-      setErrMsg(localized(S.draftFailed, locale));
-    }
-  };
-
-  if (status === 'ready') {
-    return (
-      <a href={mailto} className="flex items-center gap-1 text-xs font-medium text-accent hover:text-accent-ink">
-        <Check size={12} /> {localized(S.openMail, locale)}
-      </a>
-    );
-  }
-  if (status === 'error') {
-    return <span className="text-xs font-medium text-ink" title={errMsg}>{errMsg || localized(S.error, locale)}</span>;
-  }
-
-  return (
-    <button onClick={prepare} disabled={status === 'loading'}
-      className="flex items-center gap-1 text-xs font-medium text-ink-muted hover:text-accent disabled:opacity-40 transition-colors">
-      {status === 'loading'
-        ? <><svg className="animate-spin h-3 w-3" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>{localized(S.preparing, locale)}</>
-        : <><Send size={12} /> {localized(S.copyDraft, locale)}</>}
-    </button>
   );
 }
 
@@ -926,12 +820,17 @@ export default function SearchPage() {
                           </a>
                         )}
                         {b.website && (
+                          // On an UNKNOWN row this address is a source's claim that did not answer
+                          // when we probed it. Keeping the link is right — a site can be down for a
+                          // minute and a dead site is a lead in itself — but the tooltip has to say
+                          // that we could not confirm it, rather than let a dead link pass for a
+                          // checked one. The note is about our check, not a verdict about the firm.
                           <a href={b.website} target="_blank" rel="noopener noreferrer"
+                             title={webStatus(b) === 'UNKNOWN' ? localized(S.webUnverifiedTip, locale) : undefined}
                              className="flex items-center gap-1 text-xs text-ink-muted hover:text-accent transition-colors truncate max-w-[220px]">
                             <Globe size={11} />{b.website.replace(/^https?:\/\//, '')}
                           </a>
                         )}
-                        {b.email && <DraftEmailButton businessId={b.id} email={b.email} locale={locale} />}
                       </div>
 
                       {/* Badges */}
@@ -949,7 +848,6 @@ export default function SearchPage() {
                       </div>
 
                       <ContactStrategy b={b} locale={locale} />
-                      <MessageBox b={b} profile={profile} locale={locale} />
                     </div>
 
                     {/* Why this score (desktop) */}
