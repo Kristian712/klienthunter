@@ -51,15 +51,12 @@ async function runCase(niche: string, city: string) {
   const status = { HAS: 0, NONE: 0, UNKNOWN: 0 };
   for (const v of verified) status[v.verdict.status]++;
 
-  // Vlna 3: the two new fields the lead score leans on. If `foundedAt` coverage collapses,
-  // ARES changed its response shape; if the median jumps, we are measuring our own timeouts.
+  // Vlna 3: pokrytí datem vzniku. Když spadne, změnil ARES tvar odpovědi.
+  //
+  // Medián načtení webu a počet pomalých webů odsud zmizel spolu s filtrem „Pomalý web":
+  // rychlost stránky není signál, který by aplikace k něčemu potřebovala, a měřit ji jen kvůli
+  // řádku ve výpisu by znamenalo držet celou cestu tou hodnotou přes databázi až do UI.
   const withFounded = verified.filter(v => v.c.foundedAt).length;
-  const times = verified
-    .map(v => v.verdict.elapsedMs)
-    .filter((ms): ms is number => typeof ms === 'number')
-    .sort((a, b) => a - b);
-  const medianMs = times.length ? times[Math.floor(times.length / 2)] : null;
-  const slowSites = times.filter(ms => ms >= 2500).length;
 
   const elapsed = Date.now() - started;
 
@@ -70,8 +67,7 @@ async function runCase(niche: string, city: string) {
   console.log(`telefon ${withPhone} (${pct(withPhone, total)}) · e-mail ${withEmail} (${pct(withEmail, total)})`);
   console.log(`IČO ${withIco} (${pct(withIco, total)}) · DPH zjištěno ${withVat} (${pct(withVat, total)})`);
   console.log(`web: HAS ${status.HAS} · NONE ${status.NONE} · UNKNOWN ${status.UNKNOWN}`);
-  console.log(`datum vzniku ${withFounded} (${pct(withFounded, total)})`
-    + ` · medián načtení webu ${medianMs ?? '—'} ms · pomalých ${slowSites}`);
+  console.log(`datum vzniku ${withFounded} (${pct(withFounded, total)})`);
 
   return { elapsed, total, withPhone, withEmail, status };
 }

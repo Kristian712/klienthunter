@@ -47,7 +47,6 @@ interface BusinessResult {
   websiteIsOld: boolean;
   websiteScore: number;
   websiteAgeNote: string;
-  websiteMs?: number | null;
   reviewCount: number;
   rating?: number;
   googleMapsUrl?: string;

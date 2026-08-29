@@ -256,7 +256,6 @@ export async function enrichAndVerify(
       status: 'HAS',
       url: found.url,
       evidence: found.evidence,
-      elapsedMs: found.elapsedMs,
       html: found.html,
     };
   };

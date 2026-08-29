@@ -19,9 +19,6 @@
  * lead-score → lead-filters, and never back.
  */
 
-/** A page slower than this to first byte reads as slow. Used by a filter and by the UI. */
-export const SLOW_WEBSITE_MS = 2_500;
-
 export function yearsSince(date: Date | string | null | undefined): number | null {
   if (!date) return null;
   const d = date instanceof Date ? date : new Date(date);
@@ -38,7 +35,6 @@ export interface FilterableLead {
   /** Stránka „Kontakt" na webu firmy, přečtená z odkazu na její vlastní homepage. */
   contactUrl?: string | null;
   websiteIsOld?: boolean | null;
-  websiteMs?: number | null;
   phone?: string | null;
   email?: string | null;
   category?: string | null;
@@ -182,15 +178,6 @@ export const LEAD_FILTERS: LeadFilter[] = [
     test: b => webStatusOf(b) === 'HAS',
     // Symmetrically: a row we never resolved is not a firm that demonstrably lacks a website.
     unknown: b => webStatusOf(b) === 'UNKNOWN',
-  },
-  {
-    id: 'slow_website',
-    group: 'web',
-    label: { cs: `Pomalý web (${SLOW_WEBSITE_MS / 1000}s+)`, sk: `Pomalý web (${SLOW_WEBSITE_MS / 1000}s+)`, en: `Slow website (${SLOW_WEBSITE_MS / 1000}s+)` },
-    where: { websiteMs: { gte: SLOW_WEBSITE_MS } },
-    test: b => typeof b.websiteMs === 'number' && b.websiteMs >= SLOW_WEBSITE_MS,
-    // A page we never timed is not a fast page. Nationwide runs skip every probe.
-    unknown: b => typeof b.websiteMs !== 'number',
   },
   {
     id: 'old_website',

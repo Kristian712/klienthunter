@@ -25,8 +25,6 @@ export interface WebsiteVerdict {
   status: WebsiteStatus;
   url?: string;
   evidence: string;
-  /** Response time of the verified page in ms. Only set when we actually loaded it. */
-  elapsedMs?: number;
   /** HTML of the verified page, so callers can score it without a second request. */
   html?: string;
 }
@@ -37,12 +35,6 @@ export interface ProbeResult {
   httpStatus?: number;
   html?: string;
   reason: string;
-  /**
-   * Milliseconds until the server sent its response headers — not a Lighthouse score, but the
-   * one honest speed number a single request can produce, and enough to spot a site that keeps
-   * a visitor waiting. Absent when nothing answered or when robots.txt kept us out.
-   */
-  elapsedMs?: number;
   /** The host served a robots.txt that forbids us. Proof the site exists, not that it is dead. */
   blockedByRobots?: boolean;
 }
@@ -320,7 +312,6 @@ async function readCapped(stream: NodeJS.ReadableStream): Promise<string | undef
 }
 
 async function attempt(url: string): Promise<ProbeResult | null> {
-  const startedAt = Date.now();
   try {
     const res = await axios.get(url, {
       timeout: PROBE_TIMEOUT,
@@ -337,24 +328,20 @@ async function attempt(url: string): Promise<ProbeResult | null> {
     });
 
     const finalUrl: string = res.request?.res?.responseUrl ?? url;
-    // Measured before the body is drained on purpose: reading up to 500 kB over a slow link
-    // would blame the server for our own download.
-    const elapsedMs = Date.now() - startedAt;
 
     if (res.status < 400) {
       return {
         alive: true,
         finalUrl,
         httpStatus: res.status,
-        elapsedMs,
         html: await readCapped(res.data),
-        reason: `web odpověděl ${res.status} za ${elapsedMs} ms`,
+        reason: `web odpověděl ${res.status}`,
       };
     }
 
     (res.data as unknown as { destroy?: () => void }).destroy?.();
     if (res.status === 401 || res.status === 403 || res.status === 429) {
-      return { alive: true, finalUrl, httpStatus: res.status, elapsedMs, reason: `web žije, ale blokuje boty (${res.status})` };
+      return { alive: true, finalUrl, httpStatus: res.status, reason: `web žije, ale blokuje boty (${res.status})` };
     }
     return null;
   } catch {
@@ -425,7 +412,6 @@ export function classify(signals: WebsiteSignals, probe?: ProbeResult): WebsiteV
         status: 'HAS',
         url: probe.finalUrl ?? claimedUrl,
         evidence: probe.reason,
-        elapsedMs: probe.elapsedMs,
         html: probe.html,
       };
     }
@@ -463,7 +449,6 @@ export function classify(signals: WebsiteSignals, probe?: ProbeResult): WebsiteV
           status: 'HAS',
           url: probe.finalUrl ?? signals.emailDomainUrl,
           evidence: `web na doméně z e-mailu firmy, ${probe.reason}`,
-          elapsedMs: probe.elapsedMs,
           html: probe.html,
         };
   }

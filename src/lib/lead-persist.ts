@@ -37,7 +37,6 @@ export async function persistResults(
       phone:         c.phone ?? contacts.phone,
       email:         c.email ?? contacts.email ?? checks?.email,
       websiteStatus: verdict.status,
-      websiteMs:     verdict.elapsedMs,
       websiteIsOld:  checks?.websiteIsOld ?? false,
       hasFacebook:   checks?.hasFacebook  ?? Boolean(social.fb),
       hasInstagram:  checks?.hasInstagram ?? Boolean(social.ig),

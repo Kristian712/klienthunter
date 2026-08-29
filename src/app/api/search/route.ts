@@ -76,7 +76,6 @@ function toDemoRow(v: VerifiedCandidate) {
   const scored = {
     websiteStatus: verdict.status,
     hasWebsite: verdict.status === 'HAS',
-    websiteMs: verdict.elapsedMs,
     phone: c.phone,
     email: c.email,
     category: c.category,

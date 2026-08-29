@@ -184,7 +184,6 @@ function domainLabel(url: string): string {
 export interface DiscoveredSite {
   url: string;
   html?: string;
-  elapsedMs?: number;
   /** Czech sentence naming what convinced us, shown in the row's tooltip and in exports. */
   evidence: string;
 }
@@ -291,7 +290,7 @@ export async function discoverWebsite(
     const url = result.finalUrl ?? `https://${domain}`;
     const why = verifyPage(result.html, firm, url, index, opts.tradeWords ?? []);
     if (why) {
-      return { url, html: result.html, elapsedMs: result.elapsedMs, evidence: `web dohledán podle názvu firmy: ${why}` };
+      return { url, html: result.html, evidence: `web dohledán podle názvu firmy: ${why}` };
     }
   }
 
