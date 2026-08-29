@@ -361,9 +361,19 @@ const S = {
   errBurst:   { cs: 'Hledání jde rychle za sebou. Dejte tomu pár minut — data taháme z veřejných rejstříků, které je potřeba šetřit.',
                 sk: 'Hľadania idú rýchlo za sebou. Dajte tomu pár minút — dáta ťaháme z verejných registrov, ktoré treba šetriť.',
                 en: 'That is a lot of searches in a row. Give it a few minutes — the data comes from public registers we have to go easy on.' },
-  errTimeout: { cs: 'Hledání trvalo moc dlouho a vypršelo. Zkuste užší kraj místo celé ČR.',
-                sk: 'Hľadanie trvalo príliš dlho a vypršalo. Skúste užší kraj namiesto celej ČR.',
-                en: 'The search timed out. Try a single region instead of the whole country.' },
+  /**
+   * Rada „zvolte jeden kraj" tu stála i pro uživatele, který jeden kraj vybraný měl — takže mu
+   * aplikace poradila udělat to, co už udělal, a on neměl co zkusit. Zúžení navíc není to, co
+   * tenhle stav způsobuje: hledání padá na čase, který trvá ověřování webů, ne na velikosti
+   * kraje. Nová hláška říká, co se stalo, a nabízí jen to, co uživatel opravdu udělat může.
+   */
+  errTimeout: { cs: 'Hledání nestihlo doběhnout v časovém limitu — trvá to ověřování webů u nalezených firem, ne velikost kraje. Zkuste to prosím znovu; když to spadne i podruhé, dejte mi vědět.',
+                sk: 'Hľadanie nestihlo dobehnúť v časovom limite — spôsobuje to overovanie webov u nájdených firiem, nie veľkosť kraja. Skúste to prosím znova; ak to spadne aj druhýkrát, dajte mi vedieť.',
+                en: 'The search ran out of time — that is the website checking on the firms we found, not the size of the region. Please try again; if it fails a second time, tell me.' },
+  /** Celá ČR je jediný případ, kde je zúžení skutečně ta správná rada. */
+  errTimeoutWholeCz: { cs: 'Hledání přes celou ČR nestihlo doběhnout v časovém limitu. Zvolte prosím jeden kraj — nad celou republikou je firem tolik, že se ověřování webů do limitu nevejde.',
+                sk: 'Hľadanie cez celú ČR nestihlo dobehnúť v časovom limite. Zvoľte prosím jeden kraj — nad celou republikou je firiem toľko, že sa overovanie webov do limitu nezmestí.',
+                en: 'A nationwide search ran out of time. Please pick a single region — across the whole country there are too many firms for the website checks to finish in time.' },
   errServer:  { cs: 'Hledání se nepodařilo — chyba na naší straně. Zkuste to prosím znovu.',
                 sk: 'Hľadanie sa nepodarilo — chyba na našej strane. Skúste to prosím znova.',
                 en: 'The search failed on our side. Please try again.' },
@@ -651,7 +661,8 @@ export default function SearchPage() {
           res.status === 403 ? S.errPlan   :
           code === 'DEMO_USED' ? S.errDemoUsed :
           res.status === 429 ? S.errBurst  :
-          res.status === 504 || res.status === 408 ? S.errTimeout :
+          res.status === 504 || res.status === 408
+            ? (isWholeCzech(effectiveRegion) ? S.errTimeoutWholeCz : S.errTimeout) :
           S.errServer;
         setError(localized(byStatus, locale));
         return;
