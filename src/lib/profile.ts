@@ -38,6 +38,14 @@ export interface Profession {
   id: string;
   label: { cs: string; sk?: string; en: string };
   /**
+   * Tři obory, které se téhle profesi nabídnou hned na první obrazovce.
+   *
+   * Není to doporučení, koho oslovovat — na to aplikace data nemá. Je to zkratka k prvnímu
+   * hledání, aby člověk nemusel vybírat ze čtyřiceti oborů dřív, než vůbec uvidí, co mu
+   * aplikace vrátí. Kdykoli si vybere jiný.
+   */
+  industries: string[];
+  /**
    * Criteria pre-ticked in step four for this trade. A starting point the user can change, not
    * a claim about what their clients need — every id here is something the public data actually
    * tells us, and the user sees each one spelled out before they continue.
@@ -53,51 +61,70 @@ export const PROFESSIONS: Profession[] = [
   {
     id: 'web',
     label: { cs: 'Tvorba webů', sk: 'Tvorba webov', en: 'Web design' },
+    industries: ['hair salon', 'restaurant', 'car repair'],
     suggests: ['no_website', 'has_contact'],
   },
   {
     id: 'marketing',
     label: { cs: 'Marketing a reklama', sk: 'Marketing a reklama', en: 'Marketing and advertising' },
+    industries: ['restaurant', 'hair salon', 'gym'],
     suggests: ['no_social', 'has_contact'],
   },
   {
     id: 'accounting',
     label: { cs: 'Účetnictví a daně', sk: 'Účtovníctvo a dane', en: 'Accounting and tax' },
+    industries: ['builder', 'freight', 'hair salon'],
     suggests: ['new_firm', 'has_contact'],
   },
   {
     id: 'photo',
     label: { cs: 'Fotografie a video', sk: 'Fotografia a video', en: 'Photography and video' },
+    industries: ['restaurant', 'hotel', 'hair salon'],
     suggests: ['has_contact', 'no_social'],
   },
   {
     id: 'realestate',
     label: { cs: 'Reality', sk: 'Reality', en: 'Real estate' },
+    industries: ['builder', 'hotel', 'restaurant'],
     suggests: ['established_3y', 'has_contact'],
   },
   {
     id: 'legal',
     label: { cs: 'Právní služby', sk: 'Právne služby', en: 'Legal services' },
+    industries: ['builder', 'freight', 'restaurant'],
     suggests: ['new_firm', 'has_contact'],
   },
   {
     id: 'cleaning',
     label: { cs: 'Úklid a údržba', sk: 'Upratovanie a údržba', en: 'Cleaning and maintenance' },
+    industries: ['restaurant', 'hotel', 'gym'],
     suggests: ['has_contact', 'established_3y'],
   },
   {
     id: 'it',
     label: { cs: 'IT podpora', sk: 'IT podpora', en: 'IT support' },
+    industries: ['accountant', 'lawyer', 'dentist'],
     suggests: ['has_contact', 'established_3y'],
   },
   {
     id: 'consulting',
     label: { cs: 'Poradenství a školení', sk: 'Poradenstvo a školenia', en: 'Consulting and training' },
+    industries: ['restaurant', 'car repair', 'builder'],
     suggests: ['has_contact', 'established_3y'],
+  },
+  {
+    // Doplněno ve vlně 5: pojišťováci a finanční poradci jsou jedna z profesí, pro které se
+    // tahle aplikace staví, a v seznamu chyběli. Hledají čerstvě vzniklé firmy, protože ty
+    // ještě nemají nic sjednané.
+    id: 'finance',
+    label: { cs: 'Finance a pojištění', sk: 'Financie a poistenie', en: 'Finance and insurance' },
+    industries: ['freight', 'builder', 'restaurant'],
+    suggests: ['new_firm_6m', 'has_contact'],
   },
   {
     id: 'other',
     label: { cs: 'Něco jiného', sk: 'Niečo iné', en: 'Something else' },
+    industries: ['restaurant', 'hair salon', 'car repair'],
     suggests: ['has_contact'],
   },
 ];

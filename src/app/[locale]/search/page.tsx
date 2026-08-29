@@ -8,7 +8,10 @@ import {
   FileText, Table2, Smartphone, PhoneCall,
 } from 'lucide-react';
 import { LEAD_FILTERS, GROUP_LABELS, GROUP_ORDER, matchesAll, localized } from '@/lib/lead-filters';
+import { leadReason } from '@/lib/lead-reason';
 import { scoreBreakdown } from '@/lib/lead-score';
+import { YIELD_NOTE, yieldFor } from '@/lib/nace-map';
+import { SCENARIOS, SCENARIO_BY_PROFESSION, scenarioById } from '@/lib/scenarios';
 import { EMPTY_PROFILE, type UserProfile } from '@/lib/profile';
 import { REGIONS, INDUSTRIES, POPULAR_CHIPS } from '@/lib/search-options';
 import { LeadScore, GOOD_LEAD } from '@/components/LeadScore';
@@ -75,27 +78,21 @@ function webStatus(b: BusinessResult): WebStatus {
  * new filter appears here the moment it is added to the registry.
  */
 
-const UNRELIABLE_NOTE = {
-  cs: 'Nespolehlivý plátce DPH', sk: 'Nespoľahlivý platiteľ DPH', en: 'Unreliable VAT payer',
-};
-
 /**
- * Why this row sits where it does: the user's own criteria that this firm meets.
+ * Proč tenhle řádek sedí tam, kde sedí.
  *
- * This used to be a fixed list led by "Nemá dohledatelný web", which is only a reason to call
- * if you happen to sell websites. Now the reasons are whatever the user said mattered, so an
- * accountant reads "Nová firma (do 1 roku)" and a photographer reads "Bez sociálních sítí".
- *
- * Two lines, not five: everything slightly notable about a firm is noise, the first two are
- * what a person actually says on the phone. An unreliable VAT payer takes a slot regardless —
- * that is the one thing you want to know before dialling.
+ * Dřív to byly dvě nálepky s názvy splněných kritérií („Nová firma (do 1 roku)"). Nálepka je
+ * jméno filtru, ne důvod k telefonátu — a u dvaceti řádků si ten důvod nikdo nedomýšlí. Teď je
+ * to věta z `lead-reason.ts`, složená ze stejných splněných kritérií, takže vysvětluje přesně
+ * to pořadí, které uživatel vidí. Varování o nespolehlivém plátci DPH je součástí té věty.
  */
 function rowSummary(b: BusinessResult, criteria: string[], locale: string) {
-  const { matched, unanswered, total, unreliable } = scoreBreakdown(b, criteria);
+  const { matched, unanswered, total } = scoreBreakdown(b, criteria);
 
-  const reasons: string[] = [];
-  if (unreliable) reasons.push(localized(UNRELIABLE_NOTE, locale));
-  reasons.push(...matched.map(f => localized(f.label, locale)));
+  // Celá věta místo dvou útržků. Skládá se ze stejných splněných kritérií, takže říká totéž
+  // co nálepky — jen tak, že si to člověk může přečíst a rovnou podle toho zavolat. Varování
+  // o nespolehlivém plátci DPH je součástí věty, proto tady už nestojí zvlášť.
+  const reason = leadReason(b, criteria, locale);
 
   // The hover on the number says what the number counted. A bare "78 / 100" is a verdict the
   // user has to trust; "splňuje 2 ze 3 kritérií" is a claim they can check.
@@ -106,7 +103,7 @@ function rowSummary(b: BusinessResult, criteria: string[], locale: string) {
     scoreTitle += localized(S.unanswered, locale).replace('{k}', String(unanswered.length));
   }
 
-  return { reasons: reasons.slice(0, 2), scoreTitle };
+  return { reason, scoreTitle };
 }
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
@@ -122,6 +119,16 @@ function LiIcon() {
 }
 function WaIcon() {
   return <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>;
+}
+
+/** Lidský název oboru podle slugu. Slug, který v nabídce není, se ukáže tak, jak přišel. */
+function industryLabelFor(value: string, locale: string): string {
+  const groups = INDUSTRIES[locale] ?? INDUSTRIES.en;
+  for (const g of groups) {
+    const hit = g.items.find(i => i.value === value);
+    if (hit) return hit.label;
+  }
+  return value;
 }
 
 // ── Phone helpers ─────────────────────────────────────────────────────────────
@@ -492,6 +499,11 @@ export default function SearchPage() {
   const [customRegion, setCustomRegion]   = useState('');
   const [industry, setIndustry]           = useState('');
   const [customIndustry, setCustomIndustry] = useState('');
+  /** Text v našeptávači oborů. Prázdný, dokud uživatel nezačne psát. */
+  const [industryQuery, setIndustryQuery] = useState('');
+  const [industryOpen, setIndustryOpen]   = useState(false);
+  /** Id ze SCENARIOS. Předvyplní se podle profese z onboardingu, uživatel ho může přepnout. */
+  const [scenario, setScenario]           = useState('all');
 
   // ── Profile ───────────────────────────────────────────────────────────────
   // The profile decides two things: what the form starts out as, and how the results are
@@ -503,7 +515,16 @@ export default function SearchPage() {
   function applyProfile(p: UserProfile) {
     setProfile(p);
     if (p.targetRegion)   setRegion(r => r || p.targetRegion!);
-    if (p.targetIndustry) setIndustry(i => i || p.targetIndustry!);
+    if (p.targetIndustry) {
+      setIndustry(i => i || p.targetIndustry!);
+      // Bez tohohle by našeptávač zůstal prázdný, i když je obor z profilu vybraný — uživatel
+      // by viděl prázdné pole a nevěděl, co se vlastně bude hledat.
+      setIndustryQuery(q => q || industryLabelFor(p.targetIndustry!, locale));
+    }
+    // Scénář je jen výchozí hodnota přepínače; jakmile s ním uživatel hnul, profil ho nepřebíjí.
+    if (p.profession && SCENARIO_BY_PROFESSION[p.profession]) {
+      setScenario(sc => (sc === 'all' ? SCENARIO_BY_PROFESSION[p.profession!] : sc));
+    }
   }
 
   useEffect(() => {
@@ -541,7 +562,32 @@ export default function SearchPage() {
   const [hasSearched, setHasSearched]     = useState(false);
 
   const effectiveRegion   = region === '__custom__'   ? customRegion   : region;
-  const effectiveIndustry = industry === '__custom__' ? customIndustry : industry;
+  /**
+   * Co se pošle do API. Vybraná položka vyhrává; když uživatel jen píše a nic nevybral, jde
+   * jeho text — pipeline si s ním poradí (`resolveNiche` hledá i podle českých slov), takže
+   * „jiný obor" už nepotřebuje vlastní volbu v seznamu.
+   */
+  const effectiveIndustry = industry || industryQuery.trim() || customIndustry;
+
+  /** Obory, které odpovídají tomu, co uživatel napsal. Bez diakritiky, aby „zubar" našel „Zubaři". */
+  const industryMatches = (() => {
+    const groups = INDUSTRIES[locale] ?? INDUSTRIES.en;
+    const all = groups.flatMap(g => g.items.map(i => ({ ...i, group: g.group })));
+    const q = industryQuery.trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    if (!q) return all.slice(0, 40);
+    const norm = (x: string) => x.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    return all.filter(i => norm(i.label).includes(q) || norm(i.group).includes(q)).slice(0, 40);
+  })();
+
+  /**
+   * Očekávaná výtěžnost pro vybraný obor. Ukazuje se před hledáním, aby uživatel dopředu věděl,
+   * že u kadeřnic bude webů málo — jinak by po hledání usoudil, že je aplikace rozbitá.
+   */
+  const yieldNote = (() => {
+    if (!effectiveIndustry) return null;
+    const note = YIELD_NOTE[yieldFor(effectiveIndustry)];
+    return note ? localized(note, locale) : null;
+  })();
 
   /** Every active filter has to hold — combining is always AND. Best opportunities first. */
   const filtered = results
@@ -609,6 +655,9 @@ export default function SearchPage() {
       setResults(data.results);
       setSearchId(data.searchId ?? null);
       setIsDemo(Boolean(data.demo));
+      // Scénář se promítne až tady, jako předem zapnuté filtry. Uživatel je pak vidí mezi
+      // ostatními chipy a může je vypnout — nic se před ním neschovává.
+      setActive(new Set(scenarioById(scenario).filters));
     } catch {
       setError(localized(S.errNetwork, locale));
     } finally {
@@ -654,12 +703,33 @@ export default function SearchPage() {
               <button
                 key={chip.value}
                 type="button"
-                onClick={() => setIndustry(chip.value)}
+                onClick={() => { setIndustry(chip.value); setIndustryQuery(chip.label); }}
                 className={industry === chip.value ? 'chip-active' : 'chip'}
               >
                 {chip.label}
               </button>
             ))}
+          </div>
+
+          {/* Scénář. Jen vybírá a řadí to, co se stáhne — do vyhledávání nezasahuje. */}
+          <div className="flex flex-wrap items-center gap-2 mb-4 pb-4 border-b border-line">
+            <span className="w-full md:w-auto md:mr-1 text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
+              {localized({ cs: 'Scénář', sk: 'Scenár', en: 'Scenario' }, locale)}
+            </span>
+            {SCENARIOS.map(sc => (
+              <button
+                key={sc.id}
+                type="button"
+                onClick={() => setScenario(sc.id)}
+                title={localized(sc.hint, locale)}
+                className={scenario === sc.id ? 'chip-active' : 'chip'}
+              >
+                {localized(sc.label, locale)}
+              </button>
+            ))}
+            <p className="w-full text-[11px] text-ink-faint leading-snug mt-0.5">
+              {localized(scenarioById(scenario).hint, locale)}
+            </p>
           </div>
 
           <div className="grid md:grid-cols-5 gap-4 items-end">
@@ -701,7 +771,11 @@ export default function SearchPage() {
               )}
             </div>
 
-            {/* Industry select */}
+            {/* Industry — našeptávač.
+                Dřív to byl rozbalovací seznam se 41 položkami v sedmi skupinách plus zvláštní
+                volba „jiný obor". Kdo hledá zubaře, musel je najít očima; kdo hledá něco, co
+                v seznamu není, musel napřed pochopit, že si má rozkliknout poslední položku.
+                Psaní zvládne obojí naráz: filtruje seznam a zároveň je to ten volný text. */}
             <div className="md:col-span-2">
               <label className="label">
                 <Search size={13} className="inline mr-1" />
@@ -709,37 +783,46 @@ export default function SearchPage() {
               </label>
 
               <div className="relative">
-                <select
-                  className="input appearance-none pr-9 cursor-pointer"
-                  value={industry}
-                  onChange={e => setIndustry(e.target.value)}
-                  required={industry !== '__custom__'}
-                >
-                  <option value="">
-                    {locale === 'cs' ? '— Nebo vyberte obor —' : locale === 'sk' ? '— Alebo vyberte odbor —' : '— Or select industry —'}
-                  </option>
-                  {(INDUSTRIES[locale] ?? INDUSTRIES.en).map(group => (
-                    <optgroup key={group.group} label={group.group}>
-                      {group.items.map(item => (
-                        <option key={item.value} value={item.value}>{item.label}</option>
-                      ))}
-                    </optgroup>
-                  ))}
-                  <option value="__custom__">
-                    {locale === 'cs' ? 'Jiný obor (zadat ručně)' : locale === 'sk' ? 'Iný odbor (zadať ručne)' : 'Other (type manually)'}
-                  </option>
-                </select>
-                <ChevronDown size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none" />
-              </div>
-              {industry === '__custom__' && (
                 <input
-                  className="input mt-2"
-                  placeholder={isCs ? 'Název oboru…' : 'Industry name…'}
-                  value={customIndustry}
-                  onChange={e => setCustomIndustry(e.target.value)}
-                  required
-                  autoFocus
+                  className="input pr-9"
+                  value={industryQuery}
+                  placeholder={isCs ? 'Začněte psát: zubaři, restaurace, autoservis…' : 'Start typing: dentists, restaurants…'}
+                  onChange={e => { setIndustryQuery(e.target.value); setIndustry(''); setIndustryOpen(true); }}
+                  onFocus={() => setIndustryOpen(true)}
+                  // Kliknutí na položku seznamu způsobí blur dřív, než se stihne zpracovat —
+                  // proto se zavírá se zpožděním, ne okamžitě.
+                  onBlur={() => setTimeout(() => setIndustryOpen(false), 150)}
+                  aria-expanded={industryOpen}
+                  aria-autocomplete="list"
+                  role="combobox"
                 />
+                <ChevronDown size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none" />
+
+                {industryOpen && industryMatches.length > 0 && (
+                  <ul className="absolute z-20 left-0 right-0 mt-1 max-h-64 overflow-y-auto bg-white border border-ink">
+                    {industryMatches.map(item => (
+                      <li key={item.value}>
+                        <button
+                          type="button"
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-ink hover:text-white transition-colors"
+                          onMouseDown={e => e.preventDefault()}
+                          onClick={() => {
+                            setIndustry(item.value);
+                            setIndustryQuery(item.label);
+                            setIndustryOpen(false);
+                          }}
+                        >
+                          {item.label}
+                          <span className="text-ink-faint ml-2 text-xs">{item.group}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              {yieldNote && (
+                <p className="text-[11px] text-ink-faint mt-1.5 leading-snug">{yieldNote}</p>
               )}
             </div>
 
@@ -868,7 +951,7 @@ export default function SearchPage() {
             <div className="border-t border-line">
               {filtered.map((b, i) => {
                 const good = b.leadScore >= GOOD_LEAD;
-                const { reasons, scoreTitle } = rowSummary(b, profile.targetFilters, locale);
+                const { reason, scoreTitle } = rowSummary(b, profile.targetFilters, locale);
                 return (
                   <div
                     key={b.id}
@@ -960,17 +1043,20 @@ export default function SearchPage() {
                       {isDemo
                         ? <LockedContacts locale={locale} />
                         : <ContactStrategy b={b} locale={locale} />}
+
+                      {/* Věta „proč oslovit" pro úzké obrazovky. Pravý sloupec se pod 1024 px
+                          schovává, takže na telefonu by ji jinak nikdo nikdy neviděl — a je to
+                          ta jediná věta, kvůli které má řádek smysl číst. */}
+                      <p className="lg:hidden text-xs text-ink-muted leading-relaxed mt-3">{reason}</p>
                     </div>
 
                     {/* Why this score (desktop) */}
-                    {reasons.length > 0 && (
-                      <div className="hidden lg:block shrink-0 w-44 text-right">
+                    {(
+                      <div className="hidden lg:block shrink-0 w-52 min-w-0 text-right">
                         <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint mb-1">
                           {isCs ? 'Proč' : 'Why'}
                         </p>
-                        {reasons.map(r => (
-                          <p key={r} className="text-xs text-ink-muted leading-relaxed">{r}</p>
-                        ))}
+                        <p className="text-xs text-ink-muted leading-relaxed">{reason}</p>
                       </div>
                     )}
                   </div>

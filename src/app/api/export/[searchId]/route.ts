@@ -2,13 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { exportToExcel, socialLabel, WEBSITE_LABEL_CS } from '@/lib/excel-export';
+import { leadReason } from '@/lib/lead-reason';
 import { resolveStatus } from '@/lib/website-status';
 
-function toCsv(businesses: Parameters<typeof exportToExcel>[0]): string {
+function toCsv(
+  businesses: Parameters<typeof exportToExcel>[0],
+  criteria?: readonly string[] | null,
+): string {
   const headers = [
     'Název firmy', 'IČO', 'Telefon', 'Email', 'Adresa', 'Web',
     'Kontaktní stránka', 'Má web', 'Facebook', 'Instagram', 'LinkedIn',
     'Plátce DPH', 'Nespolehlivý plátce',
+    'Skóre', 'Proč oslovit',
     'Zdroj',
   ];
 
@@ -38,6 +43,8 @@ function toCsv(businesses: Parameters<typeof exportToExcel>[0]): string {
     socialLabel(b.hasLinkedIn, b.socialsChecked),
     vat(b.vatPayer),
     vat(b.vatUnreliable),
+    b.leadScore,
+    leadReason(b, criteria, 'cs'),
     // Recenze a hodnocení pocházely jen z Google Places, které muselo pryč z licenčních důvodů.
     // Sloupce proto vyvážely samé nuly a prázdno — a nula recenzí je tvrzení, ne mezera.
     b.source,
@@ -69,10 +76,18 @@ export async function GET(
 
     if (!search) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
+    // Věta „proč oslovit" se počítá ze stejných kritérií jako skóre uložené v řádku, takže
+    // export a obrazovka vysvětlují pořadí stejně. Profil bereme aktuální — kdyby si uživatel
+    // kritéria mezitím změnil, dostane vysvětlení podle toho, co ho zajímá teď.
+    const profile = await prisma.user.findUnique({
+      where: { id: payload.userId },
+      select: { targetFilters: true },
+    });
+
     const slug = `${search.region}-${search.query}`.replace(/[^a-z0-9áčďéěíňóřšťúůýžÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ\-]/gi, '-').slice(0, 60);
 
     if (format === 'csv') {
-      const csv = toCsv(search.results);
+      const csv = toCsv(search.results, profile?.targetFilters);
       return new NextResponse(csv, {
         headers: {
           'Content-Type': 'text/csv; charset=utf-8',
@@ -81,7 +96,7 @@ export async function GET(
       });
     }
 
-    const buffer = exportToExcel(search.results);
+    const buffer = exportToExcel(search.results, 'klienthunter-export', profile?.targetFilters);
     return new NextResponse(buffer as unknown as BodyInit, {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

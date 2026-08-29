@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
 import { BusinessResult } from '@prisma/client';
+import { leadReason } from './lead-reason';
 import { resolveStatus, type WebsiteStatus } from './website-status';
 
 /**
@@ -33,7 +34,17 @@ export function socialLabel(has: boolean, checked: boolean): string {
   return has ? 'ANO' : 'NE';
 }
 
-export function exportToExcel(businesses: BusinessResult[], filename = 'klienthunter-export'): Buffer {
+/**
+ * Skóre a důvod patří do exportu ze stejného důvodu, z jakého jsou v tabulce: soubor se sype do
+ * CRM nebo do sdíleného listu a člověk, který ho tam otevře, u řádku nemá jak zjistit, proč
+ * zrovna tahle firma. Věta je počítaná z týchž kritérií jako pořadí, takže export a obrazovka
+ * říkají totéž.
+ */
+export function exportToExcel(
+  businesses: BusinessResult[],
+  filename = 'klienthunter-export',
+  criteria?: readonly string[] | null,
+): Buffer {
   const rows = businesses.map((b) => ({
     'Název firmy': b.name,
     'IČO': b.ico || '',
@@ -51,6 +62,8 @@ export function exportToExcel(businesses: BusinessResult[], filename = 'klienthu
     // Ratings and review counts came only from Google Places, which had to go for licensing
     // reasons. `reviewCount` is written as a hard 0 and `rating` is never set, so the two columns
     // exported nothing but zeroes and blanks — a made-up "0 recenzí" about every firm in the file.
+    'Skóre': b.leadScore,
+    'Proč oslovit': leadReason(b, criteria, 'cs'),
     'Kategorie': b.category || '',
     'Zdroj': b.source,
   }));
@@ -61,7 +74,8 @@ export function exportToExcel(businesses: BusinessResult[], filename = 'klienthu
   ws['!cols'] = [
     { wch: 30 }, { wch: 10 }, { wch: 18 }, { wch: 28 }, { wch: 35 },
     { wch: 30 }, { wch: 34 }, { wch: 10 }, { wch: 12 }, { wch: 14 },
-    { wch: 12 }, { wch: 12 }, { wch: 18 }, { wch: 20 }, { wch: 16 },
+    { wch: 12 }, { wch: 12 }, { wch: 18 }, { wch: 7 }, { wch: 70 },
+    { wch: 20 }, { wch: 16 },
   ];
 
   const wb = XLSX.utils.book_new();

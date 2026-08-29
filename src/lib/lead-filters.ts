@@ -33,6 +33,10 @@ export function yearsSince(date: Date | string | null | undefined): number | nul
 export interface FilterableLead {
   websiteStatus?: string | null;
   hasWebsite?: boolean | null;
+  /** Adresa ověřeného webu. Protokol v ní je jediný zdroj informace o HTTPS — nikde jinde ho nemáme. */
+  website?: string | null;
+  /** Stránka „Kontakt" na webu firmy, přečtená z odkazu na její vlastní homepage. */
+  contactUrl?: string | null;
   websiteIsOld?: boolean | null;
   websiteMs?: number | null;
   phone?: string | null;
@@ -198,6 +202,36 @@ export const LEAD_FILTERS: LeadFilter[] = [
     unknown: b => !b.websiteIsOld && webStatusOf(b) !== 'HAS',
   },
   {
+    id: 'insecure_website',
+    group: 'web',
+    /**
+     * Web bez HTTPS. Protokol čteme z uložené adresy, takže to nestojí ani jeden další request —
+     * `website` je ta adresa, na které stránka při ověřování skutečně odpověděla.
+     *
+     * Proč je to signál a ne jen technický detail: prohlížeče u takové stránky píšou „Nezabezpečeno",
+     * a firma, která to nechala být, s webem pravděpodobně roky nikdo nehnul.
+     */
+    label: { cs: 'Web bez HTTPS', sk: 'Web bez HTTPS', en: 'No HTTPS' },
+    where: { AND: [STATUS_HAS, { website: { startsWith: 'http://' } }] },
+    test: b => webStatusOf(b) === 'HAS' && Boolean(b.website?.startsWith('http://')),
+    // U firmy, které jsme web nenašli, se nedá říct nic — ani že HTTPS má, ani že nemá.
+    unknown: b => webStatusOf(b) !== 'HAS',
+  },
+  {
+    id: 'has_contact_page',
+    group: 'contact',
+    /**
+     * Firma má na webu stránku „Kontakt". Čteme ji z odkazu na její vlastní homepage, takže
+     * i tohle je zadarmo. Pro oslovení je to nejkratší cesta: bývá tam adresa, otvírací doba
+     * a často jméno člověka, se kterým budete mluvit.
+     */
+    label: { cs: 'Má kontaktní stránku', sk: 'Má kontaktnú stránku', en: 'Has a contact page' },
+    where: { NOT: [{ contactUrl: null }, { contactUrl: '' }] },
+    test: b => Boolean(b.contactUrl),
+    // Odkaz na kontakty čteme jen z homepage. Bez webu jsme neměli kde hledat.
+    unknown: b => !b.contactUrl && webStatusOf(b) !== 'HAS',
+  },
+  {
     id: 'has_contact',
     group: 'contact',
     // Part of the neutral default scoring in lead-score.ts: whatever you sell, a firm you
@@ -271,6 +305,16 @@ export const LEAD_FILTERS: LeadFilter[] = [
     label: { cs: 'Nová firma (do 1 roku)', sk: 'Nová firma (do 1 roka)', en: 'New firm (under 1 year)' },
     where: { foundedAt: { gt: foundedBefore(1) } },
     test: youngerThan(1),
+    unknown: ageUnknown,
+  },
+  {
+    id: 'new_firm_6m',
+    group: 'company',
+    // Užší varianta `new_firm`. Datum vzniku v ARESu je přesné, takže i tenhle půlrok je fakt,
+    // ne odhad — a je to celý seznam pro účetní nebo pojišťováka, který chce být první.
+    label: { cs: 'Nová firma (do 6 měsíců)', sk: 'Nová firma (do 6 mesiacov)', en: 'New firm (under 6 months)' },
+    where: { foundedAt: { gt: foundedBefore(0.5) } },
+    test: youngerThan(0.5),
     unknown: ageUnknown,
   },
   {

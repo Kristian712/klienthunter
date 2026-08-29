@@ -3,41 +3,41 @@
 import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { localized } from '@/lib/lead-filters';
-import type { UserProfile } from '@/lib/profile';
-import {
-  CriteriaField, IndustryField, ProfessionField, RegionField,
-  draftToPayload, toDraft, type ProfileDraft,
-} from './ProfileFields';
+import { INDUSTRIES } from '@/lib/search-options';
+import { PROFESSIONS, professionById, type UserProfile } from '@/lib/profile';
+import { SCENARIO_BY_PROFESSION, scenarioById } from '@/lib/scenarios';
+import { draftToPayload, toDraft, type ProfileDraft } from './ProfileFields';
 
 /**
- * Four questions, once, right after registering.
+ * Jedna otázka, hned po registraci: čím se živíte.
  *
- * The point is not the data — it is that the second visit costs one click. Without it the user
- * faces an empty form that assumes nothing about them, and the app has to guess how to rank
- * results, which is exactly the guess that used to hard-code "sells websites".
+ * Dřív to byly čtyři kroky — profese, obor, kraj, kritéria. Každý z nich byl obhajitelný a
+ * dohromady stály mezi člověkem a prvním výsledkem. Onboarding, který se dá odklikat za pět
+ * vteřin, vyplní víc profilů než ten, který se vyplní pořádně a jen zřídka.
  *
- * Skipping is a first-class outcome, not a dark pattern: the button sits in the header on every
- * step, and skipping still marks the user as asked so they are never nagged again.
+ * Z jedné odpovědi se odvodí dvě věci: kritéria, podle kterých se výsledky řadí (ta u profesí
+ * byla vždycky), a výchozí scénář hledání. Obor se nabídne jako tři tlačítka, kraj zůstává ve
+ * formuláři, kde ho uživatel stejně vidí. Cokoli z toho jde později změnit v účtu.
+ *
+ * Přeskočení je plnohodnotný výsledek, ne dark pattern: tlačítko je v hlavičce a i po přeskočení
+ * se uživatel označí za dotázaného, takže se ho aplikace už nikdy neptá.
  */
 
 const T = {
-  title:   { cs: 'Než začnete',            sk: 'Než začnete',              en: 'Before you start' },
-  lead:    { cs: 'Čtyři otázky a hledání budete mít předvyplněné. Příště stačí kliknout na Hledat.',
-             sk: 'Štyri otázky a hľadanie budete mať predvyplnené. Nabudúce stačí kliknúť na Hľadať.',
-             en: 'Four questions and your search arrives pre-filled. Next time it is one click.' },
-  step:    { cs: 'Krok',                   sk: 'Krok',                     en: 'Step' },
-  of:      { cs: 'ze',                     sk: 'zo',                       en: 'of' },
-  skip:    { cs: 'Přeskočit',              sk: 'Preskočiť',                en: 'Skip' },
-  back:    { cs: 'Zpět',                   sk: 'Späť',                     en: 'Back' },
-  next:    { cs: 'Pokračovat',             sk: 'Pokračovať',               en: 'Continue' },
-  finish:  { cs: 'Hotovo, hledat',         sk: 'Hotovo, hľadať',           en: 'Done, search' },
-  saving:  { cs: 'Ukládám…',               sk: 'Ukladám…',                 en: 'Saving…' },
+  title:   { cs: 'Čím se živíte?', sk: 'Čím sa živíte?', en: 'What do you do?' },
+  lead:    { cs: 'Jedna odpověď a hledání bude předvyplněné. Kdykoli to změníte v účtu.',
+             sk: 'Jedna odpoveď a hľadanie bude predvyplnené. Kedykoľvek to zmeníte v účte.',
+             en: 'One answer and your search arrives pre-filled. Change it any time in your account.' },
+  skip:    { cs: 'Přeskočit', sk: 'Preskočiť', en: 'Skip' },
+  pick:    { cs: 'Co budete hledat', sk: 'Čo budete hľadať', en: 'What you will look for' },
+  scenario:{ cs: 'Výchozí scénář:', sk: 'Východiskový scenár:', en: 'Default scenario:' },
+  finish:  { cs: 'Hotovo, hledat', sk: 'Hotovo, hľadať', en: 'Done, search' },
+  saving:  { cs: 'Ukládám…', sk: 'Ukladám…', en: 'Saving…' },
+  otherLabel: { cs: 'Čemu se věnujete?', sk: 'Čomu sa venujete?', en: 'What is your trade?' },
   failed:  { cs: 'Uložení se nepovedlo. Zkuste to znovu, nebo onboarding přeskočte.',
              sk: 'Uloženie sa nepodarilo. Skúste to znova, alebo onboarding preskočte.',
              en: 'Saving failed. Try again, or skip the onboarding.' },
 };
-
-const STEPS = [ProfessionField, IndustryField, RegionField, CriteriaField];
 
 interface Props {
   locale: string;
@@ -46,9 +46,18 @@ interface Props {
   onDone: (profile: UserProfile | null) => void;
 }
 
+/** Lidský název oboru v jazyce uživatele; klíč je slug z NICHE_MAP. */
+function industryLabel(value: string, locale: string): string {
+  const groups = INDUSTRIES[locale] ?? INDUSTRIES.en;
+  for (const g of groups) {
+    const hit = g.items.find(i => i.value === value);
+    if (hit) return hit.label;
+  }
+  return value;
+}
+
 export function OnboardingModal({ locale, initial, onDone }: Props) {
   const [draft, setDraft] = useState<ProfileDraft>(() => toDraft(initial));
-  const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState(false);
 
@@ -72,6 +81,15 @@ export function OnboardingModal({ locale, initial, onDone }: Props) {
     return data.user as UserProfile;
   }
 
+  /**
+   * Výběr profese rovnou přednastaví kritéria. Uživatel je uvidí vypsaná na obrazovce hledání
+   * a může je tam přepnout — tady by čtvrtá otázka o kritériích jen zdržovala.
+   */
+  function choose(id: string) {
+    const p = professionById(id);
+    patch({ profession: id, criteria: p ? [...p.suggests] : [] });
+  }
+
   async function finish() {
     setSaving(true);
     setFailed(false);
@@ -91,8 +109,8 @@ export function OnboardingModal({ locale, initial, onDone }: Props) {
     onDone(null);
   }
 
-  const Step = STEPS[step];
-  const last = step === STEPS.length - 1;
+  const chosen = professionById(draft.profession);
+  const scenario = scenarioById(draft.profession ? SCENARIO_BY_PROFESSION[draft.profession] : 'all');
 
   return (
     <div
@@ -104,7 +122,7 @@ export function OnboardingModal({ locale, initial, onDone }: Props) {
       <div className="bg-white border border-ink w-full max-w-2xl my-4">
 
         <div className="flex items-start justify-between gap-6 px-6 pt-6 pb-4 border-b border-line">
-          <div>
+          <div className="min-w-0">
             <h2 className="text-xl font-extrabold tracking-tight">{localized(T.title, locale)}</h2>
             <p className="text-sm text-ink-muted mt-1">{localized(T.lead, locale)}</p>
           </div>
@@ -116,11 +134,52 @@ export function OnboardingModal({ locale, initial, onDone }: Props) {
           </button>
         </div>
 
-        <div className="px-6 py-6 min-h-[15rem]">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint mb-4">
-            {localized(T.step, locale)} {step + 1} {localized(T.of, locale)} {STEPS.length}
-          </p>
-          <Step draft={draft} patch={patch} locale={locale} />
+        <div className="px-6 py-6">
+          <div className="flex flex-wrap gap-2">
+            {PROFESSIONS.map(p => (
+              <button
+                key={p.id}
+                onClick={() => choose(p.id)}
+                className={draft.profession === p.id ? 'chip-active' : 'chip'}
+              >
+                {localized(p.label, locale)}
+              </button>
+            ))}
+          </div>
+
+          {draft.profession === 'other' && (
+            <div className="mt-4">
+              <label className="label">{localized(T.otherLabel, locale)}</label>
+              <input
+                className="input"
+                value={draft.professionText ?? ''}
+                onChange={e => patch({ professionText: e.target.value })}
+                autoFocus
+              />
+            </div>
+          )}
+
+          {chosen && (
+            <div className="mt-6 border-t border-line pt-5">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint mb-3">
+                {localized(T.pick, locale)}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {chosen.industries.map(value => (
+                  <button
+                    key={value}
+                    onClick={() => patch({ industry: value })}
+                    className={draft.industry === value ? 'chip-active' : 'chip'}
+                  >
+                    {industryLabel(value, locale)}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-ink-faint mt-3">
+                {localized(T.scenario, locale)} {localized(scenario.label, locale)}
+              </p>
+            </div>
+          )}
         </div>
 
         {failed && (
@@ -129,33 +188,10 @@ export function OnboardingModal({ locale, initial, onDone }: Props) {
           </p>
         )}
 
-        <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-line">
-          <div className="flex gap-1.5">
-            {STEPS.map((_, i) => (
-              <span
-                key={i}
-                className={`h-1 w-6 ${i <= step ? 'bg-ink' : 'bg-line'}`}
-                aria-hidden
-              />
-            ))}
-          </div>
-
-          <div className="flex items-center gap-2">
-            {step > 0 && (
-              <button onClick={() => setStep(s => s - 1)} className="btn-outline btn-sm" disabled={saving}>
-                {localized(T.back, locale)}
-              </button>
-            )}
-            {last ? (
-              <button onClick={finish} className="btn-primary" disabled={saving}>
-                {saving ? localized(T.saving, locale) : localized(T.finish, locale)}
-              </button>
-            ) : (
-              <button onClick={() => setStep(s => s + 1)} className="btn-primary">
-                {localized(T.next, locale)}
-              </button>
-            )}
-          </div>
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-line">
+          <button onClick={finish} className="btn-primary" disabled={saving || !draft.profession}>
+            {saving ? localized(T.saving, locale) : localized(T.finish, locale)}
+          </button>
         </div>
       </div>
     </div>
