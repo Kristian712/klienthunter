@@ -403,8 +403,21 @@ export function classify(signals: WebsiteSignals, probe?: ProbeResult): WebsiteV
         html: probe.html,
       };
     }
-    // The source claims a site but nothing answered. That is not proof of absence.
-    return { status: 'UNKNOWN', url: claimedUrl, evidence: `zdroj uvádí web, ale ${probe.reason}` };
+    /**
+     * The source claims a site but nothing answered. That is not proof of absence — and it is
+     * not proof of a website either, which is why the URL does **not** travel with this verdict.
+     *
+     * It used to. The row then landed in the database with `websiteStatus: 'UNKNOWN'` and a
+     * filled-in `website` column at the same time, and those two fields have different readers:
+     * the "web jsme nenašli" filter looks at the status, the results table prints the address.
+     * So a firm showed up in a list of firms without a website with its web address next to it,
+     * clickable. Measured on one search for restaurants in Brno: 21 of the 240 rows that passed
+     * the filter, and 156 rows across the whole database.
+     *
+     * The address itself is not lost — it goes into the evidence, which is where a claim we
+     * could not confirm belongs. `website` from now on means one thing only: a page we loaded.
+     */
+    return { status: 'UNKNOWN', evidence: `zdroj uvádí web ${claimedUrl}, ale ${probe.reason}` };
   }
 
   // No source named a website, but the firm takes mail on a domain of its own and that domain

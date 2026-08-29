@@ -36,7 +36,15 @@ export const SCENARIOS: Scenario[] = [
   },
   {
     id: 'no_web',
-    label: { cs: 'Firmy bez webu', sk: 'Firmy bez webu', en: 'Firms with no website' },
+    /**
+     * Jméno scénáře je schválně totožné s filtrem, který zapíná.
+     *
+     * Předtím se jmenoval „Firmy bez webu" — což je tvrzení o firmách, a to my doložit neumíme:
+     * ARES weby needviduje. Filtr pod ním se přitom vždycky jmenoval „Web jsme nenašli", tedy
+     * tvrzení o našem hledání. Uživatel klikl na jedno a dostal druhé, a rozdíl mezi tím vypadal
+     * jako chyba filtru. Teď říkají obě nálepky totéž a v seznamu chipů se rozsvítí ta stejná.
+     */
+    label: { cs: 'Web jsme nenašli', sk: 'Web sme nenašli', en: 'We found no website' },
     hint: {
       // Přesně to, co filtr dělá. „Firmy bez webu" je název scénáře, ne tvrzení o firmách:
       // že jsme web nenašli, neznamená, že žádný nemají — ARES weby needviduje.

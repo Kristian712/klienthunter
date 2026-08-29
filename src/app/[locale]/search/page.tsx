@@ -347,6 +347,11 @@ const S = {
   demoPerk:   { cs: '5 hledání měsíčně, 20 výsledků na hledání, kontakty a export do CSV.',
                 sk: '5 hľadaní mesačne, 20 výsledkov na hľadanie, kontakty a export do CSV.',
                 en: '5 searches a month, 20 results each, contacts and CSV export.' },
+  emptyByFilter: {
+    cs: 'Firem jsme našli {n}, ale zvolenému filtru nevyhověla ani jedna. To je platný výsledek, ne chyba — zkuste filtr vypnout nebo zvolit jiný scénář.',
+    sk: 'Firiem sme našli {n}, ale zvolenému filtru nevyhovela ani jedna. To je platný výsledok, nie chyba — skúste filter vypnúť alebo zvoliť iný scenár.',
+    en: 'We found {n} firms, but not one matches the filter you picked. That is a valid result, not a fault — try turning the filter off or picking another scenario.',
+  },
   demoLocked: { cs: 'Kontakty jsou jen pro přihlášené',
                 sk: 'Kontakty sú len pre prihlásených',
                 en: 'Contacts are for signed-in users' },
@@ -1065,7 +1070,16 @@ export default function SearchPage() {
 
               {filtered.length === 0 && (
                 <div className="text-center py-20 text-ink-faint">
-                  <p className="mb-4">{t('no_results')}</p>
+                  {/*
+                    Dvě různé prázdnoty. „Nic jsme nenašli" a „našli jsme 500 firem, ale žádná
+                    neprošla filtrem" znamenají pro uživatele něco úplně jiného, a rada „zkus
+                    jiný region" je u toho druhého případu falešná stopa — region byl v pořádku.
+                  */}
+                  <p className="mb-4">
+                    {results.length > 0
+                      ? localized(S.emptyByFilter, locale).replace('{n}', String(results.length))
+                      : t('no_results')}
+                  </p>
                   {active.size > 0 && (
                     <button onClick={() => setActive(new Set())} className="btn-outline btn-sm mx-auto">
                       {isCs ? 'Zrušit filtry' : 'Clear filters'}
