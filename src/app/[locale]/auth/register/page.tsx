@@ -17,6 +17,10 @@ const ERR: Record<string, { cs: string; sk?: string; en: string }> = {
   'Invite code already used': { cs: 'Tento kód už byl použitý.',   sk: 'Tento kód už bol použitý.',   en: 'This invite code has already been used.' },
   'Invite code expired':      { cs: 'Platnost kódu vypršela.',     sk: 'Platnosť kódu vypršala.',     en: 'This invite code has expired.' },
   'Email already in use':     { cs: 'Na tento e-mail už účet existuje.', sk: 'Na tento e-mail už účet existuje.', en: 'An account with this e-mail already exists.' },
+  'Too many accounts created from this address':
+    { cs: 'Z této adresy už dnes vzniklo příliš mnoho účtů. Zkuste to zítra.',
+      sk: 'Z tejto adresy už dnes vzniklo priveľa účtov. Skúste to zajtra.',
+      en: 'Too many accounts have been created from this address today. Try again tomorrow.' },
 };
 
 const UI = {
@@ -30,12 +34,15 @@ const UI = {
               sk: 'Nepodarilo sa spojiť so serverom. Skontrolujte pripojenie a skúste to znova.',
               en: 'Could not reach the server. Check your connection and try again.' },
   perksTitle: { cs: 'Co získáš zdarma', sk: 'Čo získaš zadarmo', en: 'What you get for free' },
-  inviteOnly: { cs: 'Přístup pouze na pozvánku.', sk: 'Prístup iba na pozvánku.', en: 'Invite-only access.' },
-  needCode:   { cs: 'Pro registraci potřebuješ platný kód pozvánky.',
-                sk: 'Na registráciu potrebuješ platný kód pozvánky.',
-                en: 'You need a valid invite code to register.' },
+  inviteOnly: { cs: 'Registrace je zdarma a bez platební karty.',
+                sk: 'Registrácia je zadarmo a bez platobnej karty.',
+                en: 'Registration is free and needs no card.' },
+  needCode:   { cs: 'Stačí e-mail a heslo.', sk: 'Stačí e-mail a heslo.', en: 'An e-mail and a password is all it takes.' },
   codeLabel:  { cs: 'Kód pozvánky', sk: 'Kód pozvánky', en: 'Invite code' },
-  codeHint:   { cs: 'Kód ti pošle administrátor.', sk: 'Kód ti pošle administrátor.', en: 'The code is sent by an administrator.' },
+  codeOptional: { cs: 'nepovinné', sk: 'nepovinné', en: 'optional' },
+  codeHint:   { cs: 'Máš-li kód od administrátora, vlož ho sem. Bez kódu se zaregistruješ taky.',
+                sk: 'Ak máš kód od administrátora, vlož ho sem. Bez kódu sa zaregistruješ tiež.',
+                en: 'If an administrator gave you a code, put it here. You can register without one.' },
   pwHint:     { cs: 'Alespoň 8 znaků', sk: 'Aspoň 8 znakov', en: 'At least 8 characters' },
 
   // Podmínky se stávají součástí smlouvy jen tehdy, když je druhá strana zná nebo je k nim
@@ -147,7 +154,9 @@ export default function RegisterPage() {
               <label className="label flex items-center gap-1">
                 <Ticket size={13} />
                 {localized(UI.codeLabel, locale)}
-                <span className="text-accent ml-0.5">*</span>
+                <span className="text-ink-faint ml-1 font-normal normal-case tracking-normal">
+                  ({localized(UI.codeOptional, locale)})
+                </span>
               </label>
               <input
                 type="text"
@@ -155,8 +164,6 @@ export default function RegisterPage() {
                 placeholder="XXXXX-XXXXX"
                 value={form.inviteCode}
                 onChange={e => setForm({ ...form, inviteCode: e.target.value.toUpperCase() })}
-                required
-                autoFocus={!form.inviteCode}
               />
               <p className="text-[11px] text-ink-faint mt-1">
                 {localized(UI.codeHint, locale)}

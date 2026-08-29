@@ -171,6 +171,25 @@ const BLOCKS: LegalBlock[] = [
   },
   {
     heading: {
+      cs: 'Ukázkové hledání bez přihlášení',
+      sk: 'Ukážkové hľadanie bez prihlásenia',
+      en: 'The preview search without an account',
+    },
+    body: [
+      {
+        cs: 'Jedno hledání si můžete vyzkoušet i bez účtu. Aby to nešlo opakovat donekonečna — každé hledání se ptá veřejných rejstříků a stahuje stovky cizích stránek — potřebujeme rozeznat, že jde o stejného návštěvníka. Vaši IP adresu k tomu neukládáme: počítá se z ní otisk (SHA-256 se serverovou solí), do databáze jde jen ten otisk a po 24 hodinách záznam mažeme. Zpátky na IP adresu se z otisku dostat nedá, protože sůl server nikdy neopouští.',
+        sk: 'Jedno hľadanie si môžete vyskúšať aj bez účtu. Aby sa to nedalo opakovať donekonečna — každé hľadanie sa pýta verejných registrov a sťahuje stovky cudzích stránok — potrebujeme rozoznať, že ide o rovnakého návštevníka. Vašu IP adresu na to neukladáme: počíta sa z nej odtlačok (SHA-256 so serverovou soľou), do databázy ide len ten odtlačok a po 24 hodinách záznam mažeme. Späť na IP adresu sa z odtlačku dostať nedá, pretože soľ server nikdy neopúšťa.',
+        en: 'You can try one search without an account. To stop that being repeated endlessly — every search queries public registers and fetches hundreds of third-party pages — we need to recognise the same visitor. We do not store your IP address for this: we derive a fingerprint from it (SHA-256 with a server-side salt), store only the fingerprint, and delete the record after 24 hours. The fingerprint cannot be turned back into an IP address, because the salt never leaves the server.',
+      },
+      {
+        cs: 'I tak jde podle GDPR o osobní údaj — otisk je pseudonymizace, ne anonymizace — a proto je tady popsaný. Právním základem je oprávněný zájem na tom, aby služba nešla zneužít a aby nám veřejné zdroje dat kvůli přetížení nezablokovaly přístup (čl. 6 odst. 1 písm. f) GDPR). Stejný otisk používáme i na strop počtu účtů založených z jedné adresy. Ukázkové hledání se do databáze neukládá a kontakty firem se v něm vůbec nestahují.',
+        sk: 'Aj tak ide podľa GDPR o osobný údaj — odtlačok je pseudonymizácia, nie anonymizácia — a preto je tu popísaný. Právnym základom je oprávnený záujem na tom, aby sa služba nedala zneužiť a aby nám verejné zdroje dát kvôli preťaženiu nezablokovali prístup (čl. 6 ods. 1 písm. f) GDPR). Rovnaký odtlačok používame aj na strop počtu účtov založených z jednej adresy. Ukážkové hľadanie sa do databázy neukladá a kontakty firiem sa v ňom vôbec nesťahujú.',
+        en: 'It is still personal data under the GDPR — a fingerprint is pseudonymisation, not anonymisation — which is why it is described here. The legal basis is our legitimate interest in keeping the service from being abused and in not getting blocked by the public data sources for overloading them (Art. 6(1)(f) GDPR). The same fingerprint caps how many accounts can be created from one address. The preview search is never stored in the database and never downloads a firm\u2019s contacts.',
+      },
+    ],
+  },
+  {
+    heading: {
       cs: 'Cookies a úložiště prohlížeče',
       sk: 'Cookies a úložisko prehliadača',
       en: 'Cookies and browser storage',

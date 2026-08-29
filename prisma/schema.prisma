@@ -146,3 +146,23 @@ model SavedResult {
 
   @@unique([userId, businessResultId])
 }
+
+/// Kolikrát z jedné (hashované) IP adresy přišel drahý anonymní požadavek.
+///
+/// Hledání stojí dotaz do ARESu, dotaz na Overpass a stovky DNS a HTTP requestů na cizí weby.
+/// Pro přihlášené to hlídá strop v `/api/search` počítaný z tabulky Search, jenže anonym žádné
+/// hledání neukládá — nemá k čemu ho přiřadit. Tohle je jeho obdoba.
+///
+/// Ukládá se jen SHA-256 z IP a soli, nikdy IP samotná, a záznamy se mažou po 24 hodinách.
+/// I tak je to podle GDPR osobní údaj (hash je pseudonymizace, ne anonymizace), takže je
+/// popsaný v Ochraně údajů.
+model AnonymousHit {
+  id        String   @id @default(cuid())
+  ipHash    String
+  /// `search` nebo `register` — jedna tabulka, dva různé stropy.
+  kind      String
+  createdAt DateTime @default(now())
+
+  @@index([ipHash, kind, createdAt])
+  @@index([createdAt])
+}

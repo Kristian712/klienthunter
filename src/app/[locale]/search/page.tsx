@@ -201,6 +201,30 @@ const CONTACT = {
              en: 'Written and on the record. Unsolicited offers fall under § 7 of Act 480/2004 — see the terms.' },
 };
 
+/**
+ * Co je na řádku místo kontaktů, dokud není uživatel přihlášený.
+ *
+ * Rozmazané pruhy jsou schválně **prázdné** — nejsou to skutečné údaje pod filtrem. Kdyby tu
+ * telefon byl a jen se zamlžil přes CSS, přečte si ho kdokoli v odpovědi na síti; ukázka proto
+ * kontakty vůbec nestahuje a server je ani neposílá. Popisek to říká nahlas, protože slibovat
+ * „skryto" nad něčím, co je ve skutečnosti čitelné, je přesně ta lež, kterou tahle aplikace
+ * nikde nedělá.
+ */
+function LockedContacts({ locale }: { locale: string }) {
+  return (
+    <div className="mt-3 border-t border-line pt-3">
+      <p className="text-[11px] font-semibold text-ink-faint uppercase tracking-wider mb-2">
+        {localized(S.demoLocked, locale)}
+      </p>
+      <div className="flex items-center gap-2 flex-wrap" aria-hidden="true">
+        <span className="h-6 w-28 rounded-lg bg-ink/10" />
+        <span className="h-6 w-36 rounded-lg bg-ink/[0.07]" />
+        <span className="h-6 w-20 rounded-lg bg-ink/[0.05]" />
+      </div>
+    </div>
+  );
+}
+
 function ContactStrategy({ b, locale }: { b: BusinessResult; locale: string }) {
   const mobile = b.phone ? isCzMobile(b.phone) : false;
   const L = (x: { cs: string; sk?: string; en: string }) => localized(x, locale);
@@ -305,6 +329,20 @@ const S = {
   // se všechny slily do jedné hlášky (nebo do žádné), nedalo se z ní poznat, jestli má počkat,
   // přihlásit se znovu, nebo zúžit dotaz.
   errLogin:   { cs: 'Přihlaste se prosím znovu.', sk: 'Prihláste sa prosím znova.', en: 'Please sign in again.' },
+  errDemoUsed:{ cs: 'Ukázkové hledání jste už využili. Zaregistrujte se zdarma a hledejte dál — registrace je bez platební karty.',
+                sk: 'Ukážkové hľadanie ste už využili. Zaregistrujte sa zadarmo a hľadajte ďalej — registrácia je bez platobnej karty.',
+                en: 'You have used the demo search. Register for free to keep going — no card required.' },
+  demoTitle:  { cs: 'Ukázka bez přihlášení',  sk: 'Ukážka bez prihlásenia',  en: 'Preview without an account' },
+  demoBody:   { cs: 'Tohle je prvních pět firem z hledání. Telefony, e-maily a weby posíláme jen přihlášeným — v ukázce se nestahují vůbec, takže tu nejsou ani skryté.',
+                sk: 'Toto je prvých päť firiem z hľadania. Telefóny, e-maily a weby posielame len prihláseným — v ukážke sa nesťahujú vôbec, takže tu nie sú ani skryté.',
+                en: 'These are the first five firms from the search. Phones, e-mails and websites go to signed-in users only — the preview never downloads them, so they are not hidden here, they are absent.' },
+  demoCta:    { cs: 'Registrovat se zdarma',  sk: 'Registrovať sa zadarmo',  en: 'Register for free' },
+  demoPerk:   { cs: '5 hledání měsíčně, 20 výsledků na hledání, kontakty a export do CSV.',
+                sk: '5 hľadaní mesačne, 20 výsledkov na hľadanie, kontakty a export do CSV.',
+                en: '5 searches a month, 20 results each, contacts and CSV export.' },
+  demoLocked: { cs: 'Kontakty jsou jen pro přihlášené',
+                sk: 'Kontakty sú len pre prihlásených',
+                en: 'Contacts are for signed-in users' },
   errPlan:    { cs: 'Vyčerpali jste počet hledání ve svém plánu.',
                 sk: 'Vyčerpali ste počet hľadaní vo svojom pláne.',
                 en: 'You have used up the searches in your plan.' },
@@ -495,6 +533,8 @@ export default function SearchPage() {
   const [active, setActive]               = useState<Set<string>>(new Set());
   const [results, setResults]             = useState<BusinessResult[]>([]);
   const [searchId, setSearchId]           = useState<string | null>(null);
+  /** Výsledky pocházejí z ukázky pro nepřihlášené: pět řádků, kontakty server vůbec neposlal. */
+  const [isDemo, setIsDemo]               = useState(false);
   const [loading, setLoading]             = useState(false);
   const [loadingMsg, setLoadingMsg]       = useState('');
   const [error, setError]                 = useState('');
@@ -548,9 +588,17 @@ export default function SearchPage() {
         // Podle stavu, ne podle těla odpovědi: u 504 vrací platforma HTML, ne JSON, takže
         // `res.json()` na něm vyhodí výjimku — a dřív spadl celý handler, spinner zmizel
         // a uživatel zůstal koukat na prázdnou stránku bez vysvětlení.
+        // 429 znamená dvě různé věci: přihlášenému „moc rychle za sebou", nepřihlášenému
+        // „ukázka je vyčerpaná". Rozliší je kód v těle, a když tělo není JSON, zůstane
+        // původní hláška.
+        let code = '';
+        if (res.status === 429) {
+          code = await res.json().then(d => d?.code ?? '').catch(() => '');
+        }
         const byStatus =
           res.status === 401 ? S.errLogin  :
           res.status === 403 ? S.errPlan   :
+          code === 'DEMO_USED' ? S.errDemoUsed :
           res.status === 429 ? S.errBurst  :
           res.status === 504 || res.status === 408 ? S.errTimeout :
           S.errServer;
@@ -559,7 +607,8 @@ export default function SearchPage() {
       }
       const data = await res.json();
       setResults(data.results);
-      setSearchId(data.searchId);
+      setSearchId(data.searchId ?? null);
+      setIsDemo(Boolean(data.demo));
     } catch {
       setError(localized(S.errNetwork, locale));
     } finally {
@@ -729,6 +778,21 @@ export default function SearchPage() {
                 Rendered by looping the registry, so a filter added in lead-filters.ts shows up
                 here with no change to this file. The number on a chip is how many firms would
                 remain if it were switched on next — filters combine with AND. */}
+            {isDemo && (
+              <div className="mb-8 border border-line rounded-xl p-5">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint mb-1">
+                  {localized(S.demoTitle, locale)}
+                </p>
+                <p className="text-sm text-ink-muted max-w-2xl">{localized(S.demoBody, locale)}</p>
+                <div className="flex items-center gap-3 flex-wrap mt-4">
+                  <a href={`/${locale}/auth/register`} className="btn-primary">
+                    {localized(S.demoCta, locale)}
+                  </a>
+                  <span className="text-xs text-ink-faint">{localized(S.demoPerk, locale)}</span>
+                </div>
+              </div>
+            )}
+
             <div className="mb-8">
               <div className="flex items-baseline justify-between flex-wrap gap-3 pb-3 mb-4 border-b border-line">
                 <div className="flex items-baseline gap-3">
@@ -893,7 +957,9 @@ export default function SearchPage() {
                         )}
                       </div>
 
-                      <ContactStrategy b={b} locale={locale} />
+                      {isDemo
+                        ? <LockedContacts locale={locale} />
+                        : <ContactStrategy b={b} locale={locale} />}
                     </div>
 
                     {/* Why this score (desktop) */}

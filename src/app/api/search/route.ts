@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { verifyToken, getPlanLimits } from '@/lib/auth';
+import { getPlanLimits, sessionFrom } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { leadScore } from '@/lib/lead-score';
 import { persistResults } from '@/lib/lead-persist';
-import { enrichAndVerify, mergeLeads } from '@/lib/lead-pipeline';
+import { enrichAndVerify, mergeLeads, type VerifiedCandidate } from '@/lib/lead-pipeline';
+import {
+  ANONYMOUS_RESULTS, ANONYMOUS_SEARCHES, countHits, hashIp, recordHit,
+} from '@/lib/rate-limit';
 import { discoverAll } from '@/lib/sources';
 
 export const maxDuration = 60;
@@ -42,12 +46,90 @@ const NETWORK_BUDGET_MS = 45_000;
 const BURST_WINDOW_MS = 5 * 60 * 1000;
 const BURST_MAX = 12;
 
+/**
+ * Co z výsledku uvidí někdo bez účtu.
+ *
+ * Kontakty se neškrtají v prohlížeči, ale tady: rozmazání přes CSS je jen obrázek přes text,
+ * který si kdokoli přečte v odpovědi na síti. Ukázkový řádek proto telefon, e-mail, adresu webu
+ * ani kontaktní stránku vůbec **neobsahuje** — nejde je odkrýt, protože tam nejsou.
+ *
+ * Co zůstává: jméno a sídlo (veřejný údaj z ARESu), skóre a to, jestli jsme web našli. To je
+ * přesně ta část, kvůli které má smysl se registrovat, a nic z toho není kontakt.
+ */
+function toDemoRow(v: VerifiedCandidate) {
+  const { c, verdict } = v;
+  const scored = {
+    websiteStatus: verdict.status,
+    hasWebsite: verdict.status === 'HAS',
+    websiteMs: verdict.elapsedMs,
+    phone: c.phone,
+    email: c.email,
+    category: c.category,
+    address: c.address,
+    foundedAt: c.foundedAt,
+    vatPayer: c.vatPayer,
+    vatUnreliable: c.vatUnreliable,
+  };
+  return {
+    // Bez `id` z databáze — ukázkové hledání se neukládá, takže žádné id neexistuje.
+    id: `demo:${c.placeId}`,
+    name: c.name,
+    address: c.address,
+    ico: c.ico,
+    category: c.category,
+    source: c.source,
+    websiteStatus: verdict.status,
+    hasWebsite: verdict.status === 'HAS',
+    // Skóre počítáme z plných dat, jen je nezveřejňujeme — číslo samo kontakt neprozradí.
+    leadScore: leadScore(scored, null),
+    vatUnreliable: c.vatUnreliable,
+    foundedAt: c.foundedAt ?? null,
+  };
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const token = req.cookies.get('auth-token')?.value;
-    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const session = sessionFrom(req);
 
-    const payload = verifyToken(token);
+    // Propadlá session není totéž co „nikdo tu není". Kdyby se vypršelý token tiše propadl do
+    // ukázky, uživatel s účtem by najednou dostal pět rozmazaných řádků a nikde by se nedozvěděl,
+    // že se má znovu přihlásit. Cookie, která nesedí, tedy končí 401 jako dřív.
+    if (!session && req.cookies.get('auth-token')) {
+      return NextResponse.json({ error: 'Unauthorized', code: 'SESSION_EXPIRED' }, { status: 401 });
+    }
+
+    // ── Ukázka pro nepřihlášené ────────────────────────────────────────────────
+    // Jedno hledání na IP za 24 hodin, pět řádků, žádné kontakty a nic se neukládá do databáze.
+    // Přísné je to schválně: jedno hledání znamená dotaz do ARESu, dotaz na Overpass a stovky
+    // DNS i HTTP requestů na cizí weby, takže bez stropu by to byl nástroj na to, nechat si
+    // zablokovat IP u Overpassu.
+    if (!session) {
+      const body = await req.json();
+      const { region, industry } = SearchSchema.parse(body);
+      const ipHash = hashIp(req);
+
+      if (await countHits(ipHash, 'search') >= ANONYMOUS_SEARCHES) {
+        return NextResponse.json(
+          { error: 'Demo search already used', code: 'DEMO_USED' },
+          { status: 429 },
+        );
+      }
+      await recordHit(ipHash, 'search');
+
+      const deadlineAt = Date.now() + NETWORK_BUDGET_MS;
+      const wholeCz = isWholeCz(region);
+      const city = wholeCz ? '' : region.split(',')[0].trim();
+
+      const [aresLeads, osmLeads] = await discoverAll(industry, city, ANONYMOUS_RESULTS);
+      const candidates = mergeLeads([osmLeads, aresLeads], ANONYMOUS_RESULTS);
+      const verified = await enrichAndVerify(candidates, {
+        probeNetwork: !wholeCz, deadlineAt, region, industry,
+      });
+
+      return NextResponse.json({ demo: true, results: verified.map(toDemoRow) });
+    }
+
+    const payload = session;
     const body = await req.json();
     const { region, industry } = SearchSchema.parse(body);
 
