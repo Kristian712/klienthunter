@@ -24,11 +24,26 @@ function isWholeCz(region: string): boolean {
 }
 
 /**
- * Leaves roughly ten seconds of the function's minute for the database writes and the
- * response itself. Everything that does not fit is skipped, not waited for: a lead with an
- * unverified website is still a lead, a timed-out request is a 504.
+ * Kolik z minuty, kterou funkce má, smí strávit na síti.
+ *
+ * Číslo není odhad, je to odečet. `maxDuration` je 60 s a musí se do něj vejít tři věci po sobě:
+ *
+ *     rozpočet na síť  +  strop na jednu firmu  +  zápis do databáze a odpověď
+ *          40 s        +         8 s            +          ~5 s               = 53 s
+ *
+ * Prostřední člen tam musí být, protože `runPool` kontroluje hodiny jen *než* úlohu spustí —
+ * úloha nastartovaná v poslední vteřině rozpočtu doběhne až o svůj strop později (viz
+ * `PER_CANDIDATE_MS` v lead-pipeline.ts). Dřív ten člen nebyl ohraničený vůbec a hledání
+ * přebíhalo rozpočet o šest i víc sekund, takže se celkem dostalo přes 60 s a Vercel funkci
+ * zabil — uživatel dostal 504 a hlášku o vypršení.
+ *
+ * Rozpočet běží od tohohle okamžiku, tedy včetně dotazů do ARESu a na Overpass. Ty samy kolísají
+ * mezi třemi a dvanácti sekundami, takže je nelze nechat mimo.
+ *
+ * Co se do rozpočtu nevejde, se přeskočí, nečeká se na to: firma s neověřeným webem je pořád
+ * firma, kdežto požadavek, který vypršel, není k ničemu.
  */
-const NETWORK_BUDGET_MS = 45_000;
+const NETWORK_BUDGET_MS = 40_000;
 
 /**
  * Nárazová pojistka nad rámec měsíčního limitu plánu.

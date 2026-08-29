@@ -247,7 +247,7 @@ export async function discoverWebsite(
     tld: string;
     deadlineAt: number;
     /** Injected so this shares the pipeline's robots.txt cache and per-host memo. */
-    probe: (url: string) => Promise<ProbeResult>;
+    probe: (url: string, mode?: 'all' | 'first-only') => Promise<ProbeResult>;
     /** Words of the searched trade; a page that mentions none of them is somebody else's. */
     tradeWords?: readonly string[];
   },
@@ -270,7 +270,20 @@ export async function discoverWebsite(
     // eat the budget the rest of the search needs.
     if (Date.now() >= opts.deadlineAt) return null;
 
-    const result = await opts.probe(`https://${domain}`);
+    /**
+     * Jen jedna podoba adresy, ne tři.
+     *
+     * `probeWebsite` umí zkusit `https://`, pak `https://www.` a nakonec `http://`. U adresy,
+     * kterou uvedl zdroj, to dává smysl — víme, že web existuje, hledáme jen jeho správný zápis.
+     * Tady je ale nejistá už sama doména: uhodli jsme ji z názvu firmy. Tři pokusy na každou
+     * takovou hypotézu dělaly 2,7 požadavku na doménu a většinu času celého hledání, a zaplatili
+     * jsme je i za domény, které nikomu nepatří.
+     *
+     * Cena: firma, která web servíruje výhradně na `www.` a holou doménu nechá bez odpovědi,
+     * nám unikne. Odpovídá to pravidlu, které tenhle modul dodržuje jinde — radši ticho než
+     * dohady — jen posunuté o kus dřív.
+     */
+    const result = await opts.probe(`https://${domain}`, 'first-only');
     // Blocked by robots.txt means a site exists but we may not read it — and without reading it
     // we cannot show it belongs to this firm, so it stays unsaid.
     if (!result.alive || !result.html) continue;

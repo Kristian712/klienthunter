@@ -50,7 +50,18 @@ export interface ProbeResult {
 /** Injected so the probe can respect robots.txt without this module importing the fetcher. */
 export type RobotsCheck = (url: string) => Promise<{ allowed: boolean; reason: string }>;
 
-const PROBE_TIMEOUT = 5_000;
+/**
+ * Limit jednoho HTTP dotazu na cizí web.
+ *
+ * Bylo 5 s. Změřeno na hledání autoservisů v Libereckém kraji: 38 požadavků z 941 (4 %) ten
+ * limit vyčerpalo a spolykalo 190 s z celkových 479 s — necelá čtyři procenta dotazů stála
+ * čtyřicet procent času. Dvě sekundy stačí na server, který odpovídá; server, který za dvě
+ * sekundy nezvedne, je buď mrtvý, nebo tak pomalý, že je to samo o sobě odpověď.
+ *
+ * Cena: přijdeme o weby na opravdu líných serverech. U nich ale platí, že pomalý web je přesně
+ * ten, kvůli kterému uživatel firmu oslovuje — takže i tak zůstane ve výsledku, jen bez adresy.
+ */
+const PROBE_TIMEOUT = 2_000;
 const MAX_HTML = 500_000;
 const BROWSER_UA =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
@@ -249,7 +260,17 @@ export function isSameBusiness(
 
 // ── HTTP probe ────────────────────────────────────────────────────────────────
 
-function urlVariants(raw: string): string[] {
+/**
+ * Kolik podob adresy zkoušet.
+ *
+ * `all` je pro adresy, které uvedl zdroj: ty jsou skoro jistě správné, jen mohou být zapsané
+ * v jiné podobě, takže stojí za to zkusit i `www.` a `http://`. `first-only` je pro domény,
+ * které jsme uhodli z názvu firmy — tam je hypotéza samotná nejistá a tři pokusy na každou
+ * z nich znamenaly 2,7 požadavku na doménu a většinu celkového času.
+ */
+export type ProbeVariants = 'all' | 'first-only';
+
+function urlVariants(raw: string, mode: ProbeVariants = 'all'): string[] {
   let parsed: URL;
   try {
     parsed = new URL(raw);
@@ -258,6 +279,7 @@ function urlVariants(raw: string): string[] {
   }
 
   const variants = [parsed.toString()];
+  if (mode === 'first-only') return variants;
 
   // Try the other www form — some hosts serve only one of them.
   const swapped = new URL(parsed.toString());
@@ -341,7 +363,11 @@ async function attempt(url: string): Promise<ProbeResult | null> {
 }
 
 /** Tries https/http and both www forms. Never throws. */
-export async function probeWebsite(url: string, robots?: RobotsCheck): Promise<ProbeResult> {
+export async function probeWebsite(
+  url: string,
+  robots?: RobotsCheck,
+  mode: ProbeVariants = 'all',
+): Promise<ProbeResult> {
   if (robots) {
     const verdict = await robots(url);
     if (!verdict.allowed) {
@@ -351,7 +377,7 @@ export async function probeWebsite(url: string, robots?: RobotsCheck): Promise<P
     }
   }
 
-  for (const variant of urlVariants(url)) {
+  for (const variant of urlVariants(url, mode)) {
     const result = await attempt(variant);
     if (result) return result;
   }
@@ -523,10 +549,16 @@ export async function runPool<T, R>(
   return results;
 }
 
-/** Per-request memo so franchise branches sharing a domain cost one probe. */
+/**
+ * Per-request memo so franchise branches sharing a domain cost one probe.
+ *
+ * Klíčem je jen hostitel, ne režim variant. Když tentýž hostitel přijde jednou jako uhodnutá
+ * doména a podruhé jako adresa ze zdroje, vyhraje první výsledek — což je správně: druhý dotaz
+ * na stejný server by nic nového nezjistil a jen bychom ho obtěžovali.
+ */
 export function createProbeCache(robots?: RobotsCheck) {
   const cache = new Map<string, Promise<ProbeResult>>();
-  return (url: string): Promise<ProbeResult> => {
+  return (url: string, mode: ProbeVariants = 'all'): Promise<ProbeResult> => {
     let key: string;
     try {
       key = new URL(url).hostname.replace(/^www\./, '').toLowerCase();
@@ -535,7 +567,7 @@ export function createProbeCache(robots?: RobotsCheck) {
     }
     const hit = cache.get(key);
     if (hit) return hit;
-    const pending = probeWebsite(url, robots);
+    const pending = probeWebsite(url, robots, mode);
     cache.set(key, pending);
     return pending;
   };

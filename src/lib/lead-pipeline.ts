@@ -37,6 +37,35 @@ const ENRICH_CONCURRENCY = 8;
  */
 const DISCOVERY_HEADROOM_MS = 6_000;
 
+/**
+ * Nejdelší doba, kterou smí zabrat jedna firma. Po ní se bere, co je, a jde se dál.
+ *
+ * Tohle je ta věc, která dělala z hledání ruletu. `runPool` se dívá na hodiny jen *než* úlohu
+ * spustí — úloha nastartovaná těsně před koncem rozpočtu si pak mohla vzít, kolik chtěla, a
+ * `Promise.all` čekal na všechny. V praxi to znamenalo, že o době běhu nerozhodoval počet firem,
+ * ale nejpomalejší řetěz čekání: Liberecký kraj se 443 firmami trval 51 s, Moravskoslezský
+ * s 86 firmami 47 s. Pětinásobně méně práce, skoro stejný čas.
+ *
+ * Osm sekund je nad rámec toho, co poctivá firma potřebuje: čtyři DNS dotazy paralelně plus
+ * nejvýš čtyři HTTP dotazy po dvou sekundách. Firma, která se do toho nevejde, se vrátí bez
+ * ověřeného webu — což je stav, se kterým aplikace odjakživa počítá.
+ */
+const PER_CANDIDATE_MS = 8_000;
+
+/**
+ * Vrátí, co stihne práce, jinak náhradní výsledek. Nikdy nevyhodí výjimku.
+ *
+ * Požadavky, které v tu chvíli letí, doběhnou na pozadí a nikoho nezajímají — mají vlastní
+ * dvousekundový limit, takže brzy zemřou samy.
+ */
+function withCap<T>(work: Promise<T>, onTimeout: () => T, ms: number): Promise<T> {
+  return new Promise<T>(resolve => {
+    const timer = setTimeout(() => resolve(onTimeout()), ms);
+    const settle = (value: T) => { clearTimeout(timer); resolve(value); };
+    work.then(settle, () => settle(onTimeout()));
+  });
+}
+
 /** One business awaiting a website verdict, with everything the sources told us about it. */
 export interface Candidate {
   /** One or more source ids joined by `+`, e.g. `osm+ares`. */
@@ -235,14 +264,21 @@ export async function enrichAndVerify(
   const [verdicts] = await Promise.all([
     runPool<Candidate, VerifiedCandidate>(
       candidates,
-      async c => ({ c, verdict: await verify(c) }),
+      async c => ({
+        c,
+        // Když se firma do stropu nevejde, platí verdikt z toho, co řekly zdroje — tedy totéž,
+        // co dostane celostátní hledání, které se po síti neptá vůbec.
+        verdict: await withCap(verify(c), () => classify(c.signals), PER_CANDIDATE_MS),
+      }),
       CONCURRENCY,
       deadlineAt,
       c => ({ c, verdict: classify(c.signals) }),
     ),
     runPool<Candidate, void>(
       candidates.filter(c => c.ico),
-      enrichOne,
+      // Dotazy do rejstříků mají vlastní timeouty, ale ty jsou delší než náš strop. Bez tohohle
+      // by celý požadavek mohl viset na jednom pomalém dotazu do ARESu i po konci rozpočtu.
+      c => withCap(enrichOne(c), () => undefined, PER_CANDIDATE_MS),
       ENRICH_CONCURRENCY,
       deadlineAt,
       () => undefined,
