@@ -123,13 +123,15 @@ export function ResultsMap({ leads, total, locale, onSetStatus }: Props) {
       );
     }
 
-    // Po prvním naplnění doskoč na výsledky. Později už ne — uživatel si mapu posouvá sám
-    // a skákat mu pod rukama při každé dávce by bylo nepoužitelné.
+    // Po prvním naplnění doskoč na výsledky. Bez animace: `duration` běží přes requestAnimationFrame,
+    // a když je záložka na pozadí, rAF nejede — kamera by zůstala na výchozím pohledu na celou ČR
+    // a `fitted` už je nastavené, takže by se to nikdy nedohnalo. Později se nedoskakuje: uživatel
+    // si mapu posouvá sám a skákat mu pod rukama při každé dávce by bylo nepoužitelné.
     if (placeable.length > 0 && !fitted.current) {
       fitted.current = true;
       const b = new LngLatBounds();
       placeable.forEach(l => b.extend([l.lon!, l.lat!]));
-      m.fitBounds(b, { padding: 48, maxZoom: 14, duration: 400 });
+      m.fitBounds(b, { padding: 48, maxZoom: 14, duration: 0 });
     }
   }, [placeable.map(l => `${l.id}:${l.status ?? ''}`).join(',')]);
 
