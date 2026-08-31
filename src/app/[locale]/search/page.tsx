@@ -665,14 +665,25 @@ export default function SearchPage() {
    */
   const effectiveIndustry = industry || industryQuery.trim() || customIndustry;
 
+  /**
+   * Text v poli je zároveň vybraná hodnota — po výběru oboru v něm stojí jeho název. Kdyby se
+   * ten text bral i jako filtr nabídky, propustil by od té chvíle jedinou položku: právě ten
+   * vybraný obor. Uživatel by pak obor nemohl přepnout, protože by mu nabídka nabízela jen to,
+   * co už má. Vybraná hodnota se proto jako filtr nepočítá — jakmile uživatel začne psát,
+   * `onChange` výběr zruší a filtrování se rozjede normálně.
+   */
+  const industryPicked = Boolean(industry) && industryQuery === industryLabelFor(industry, locale);
+
   /** Obory, které odpovídají tomu, co uživatel napsal. Bez diakritiky, aby „zubar" našel „Zubaři". */
   const industryMatches = (() => {
     const groups = INDUSTRIES[locale] ?? INDUSTRIES.en;
     const all = groups.flatMap(g => g.items.map(i => ({ ...i, group: g.group })));
-    const q = industryQuery.trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-    if (!q) return all.slice(0, 40);
     const norm = (x: string) => x.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-    return all.filter(i => norm(i.label).includes(q) || norm(i.group).includes(q)).slice(0, 40);
+    const q = industryPicked ? '' : norm(industryQuery.trim());
+    // Bez filtru se nabídne všechno. Dřív tu byl strop 40, jenže českých oborů je 41 — poslední
+    // („Podlaháři") tak nešel vybrat nikdy, ani s prázdným polem.
+    if (!q) return all;
+    return all.filter(i => norm(i.label).includes(q) || norm(i.group).includes(q));
   })();
 
   /**
@@ -942,7 +953,10 @@ export default function SearchPage() {
               <button
                 key={chip.value}
                 type="button"
-                onClick={() => { setIndustry(chip.value); setIndustryQuery(chip.label); }}
+                // Název bereme od oboru, ne od chipu: chip „Reality" míří na obor „Realitní
+                // kancelář" a jeho vlastní popisek by v poli zůstal jako text, který nesedí na
+                // žádnou položku nabídky.
+                onClick={() => { setIndustry(chip.value); setIndustryQuery(industryLabelFor(chip.value, locale)); }}
                 className={industry === chip.value ? 'chip-active' : 'chip'}
               >
                 {chip.label}
@@ -1027,7 +1041,12 @@ export default function SearchPage() {
                   value={industryQuery}
                   placeholder={isCs ? 'Začněte psát: zubaři, restaurace, autoservis…' : 'Start typing: dentists, restaurants…'}
                   onChange={e => { setIndustryQuery(e.target.value); setIndustry(''); setIndustryOpen(true); }}
-                  onFocus={() => setIndustryOpen(true)}
+                  // Text se označí, aby první stisknutá klávesa přepsala vybraný obor a nepsala se
+                  // za něj — jinak by z „Kadeřnictví" + „zub" vzniklo „Kadeřnictvízub", což
+                  // neodpovídá žádnému oboru. `onMouseUp` musí zabránit výchozímu chování, jinak
+                  // by kliknutí myší označení hned zrušilo a postavilo kurzor na konec.
+                  onFocus={e => { setIndustryOpen(true); e.currentTarget.select(); }}
+                  onMouseUp={e => e.preventDefault()}
                   // Kliknutí na položku seznamu způsobí blur dřív, než se stihne zpracovat —
                   // proto se zavírá se zpožděním, ne okamžitě.
                   onBlur={() => setTimeout(() => setIndustryOpen(false), 150)}
@@ -1037,7 +1056,7 @@ export default function SearchPage() {
                 />
                 <ChevronDown size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none" />
 
-                {industryOpen && industryMatches.length > 0 && (
+                {industryOpen && (
                   <ul className="absolute z-20 left-0 right-0 mt-1 max-h-64 overflow-y-auto bg-white border border-ink">
                     {industryMatches.map(item => (
                       <li key={item.value}>
@@ -1056,6 +1075,16 @@ export default function SearchPage() {
                         </button>
                       </li>
                     ))}
+                    {industryMatches.length === 0 && (
+                      /* Dřív se nabídka při nula shodách nevykreslila vůbec a pole vypadalo mrtvě.
+                         Uživatel ale svůj text posílá do hledání dál — pipeline si s volným
+                         výrazem poradí — takže se to říká rovnou. */
+                      <li className="px-3 py-2 text-sm text-ink-faint">
+                        {isCs
+                          ? 'Žádný obor tomu neodpovídá. Hledat půjde i tak — pošleme to jako text.'
+                          : 'No trade matches that. You can still search — we will send it as free text.'}
+                      </li>
+                    )}
                   </ul>
                 )}
               </div>
