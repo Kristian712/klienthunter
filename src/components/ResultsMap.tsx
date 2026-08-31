@@ -60,6 +60,7 @@ const T = {
   hasShort: { cs: 'má web',          sk: 'má web',         en: 'has a site' },
   noneShort:{ cs: 'web neuveden',    sk: 'web neuvedený',  en: 'no site listed' },
   openMaps: { cs: 'Otevřít na Google Maps', sk: 'Otvoriť na Google Maps', en: 'Open in Google Maps' },
+  close:    { cs: 'Zavřít',          sk: 'Zavrieť',        en: 'Close' },
   legend:   { cs: 'Legenda',         sk: 'Legenda',        en: 'Legend' },
   legWeb:   { cs: 'Web',             sk: 'Web',            en: 'Website' },
   legTags:  { cs: 'Vaše značky',     sk: 'Vaše značky',    en: 'Your tags' },
@@ -132,9 +133,17 @@ function tintVanek(m: MapLibreMap) {
  * Níž by to nemělo smysl ani s odklízením překryvů: na pohledu na celý kraj by popisek dostala
  * hrstka náhodných firem a zbytek by mlčel, což čte hůř než čistá mapa.
  */
-const LABEL_MIN_ZOOM = 12;
-/** Strop pro počet popisků. Chrání před tím, aby hustý střed města zčernal textem. */
-const MAX_LABELS = 60;
+const LABEL_MIN_ZOOM = 13;
+/**
+ * Strop pro počet popisků ve výřezu.
+ *
+ * Šedesát bylo číslo proti úplnému zčernání, ne proti nečitelnosti — v Liberci jich na běžném
+ * zoomu vyšlo přes třicet a mapa se změnila v seznam. Dvanáct je tak akorát: pořád je z čeho
+ * číst, ale mezi popisky zbude mapa. Dostanou je nejlepší leady ve výřezu, ne náhodné.
+ */
+const MAX_LABELS = 12;
+/** Odstup mezi popisky. Dva rámečky na sraz čtou jako jeden odstavec. */
+const LABEL_GAP = 6;
 
 // ── Body ──────────────────────────────────────────────────────────────────────
 
@@ -351,7 +360,10 @@ export function ResultsMap({ leads, total, locale, onSetStatus }: Props) {
         if (p.x < 0 || p.y < 0 || p.x > w || p.y > h) continue;
 
         const width = measure.current(item.el.textContent ?? '') + 10;
-        const box: [number, number, number, number] = [p.x + 14, p.y - 9, p.x + 14 + width, p.y + 9];
+        const box: [number, number, number, number] = [
+          p.x + 14 - LABEL_GAP, p.y - 9 - LABEL_GAP,
+          p.x + 14 + width + LABEL_GAP, p.y + 9 + LABEL_GAP,
+        ];
         // Popisek, který by přetekl přes okraj mapy, se ořízne v půlce slova a vypadá to jako
         // chyba. Radši ho nedat — bod je pořád vidět a po posunutí mapy se popisek objeví.
         if (box[0] < 0 || box[1] < 0 || box[2] > w || box[3] > h) continue;
@@ -404,34 +416,55 @@ export function ResultsMap({ leads, total, locale, onSetStatus }: Props) {
           )}
 
           {selected && (
-            <div className="absolute left-3 bottom-16 md:bottom-20 w-[min(20rem,calc(100%-1.5rem))] bg-surface-subtle border border-ink rounded-lg p-4">
+            /**
+             * Karta firmy.
+             *
+             * `z-30`, protože popisky zvedají svůj bod na `z-index: 1` a kreslily se přes IČO
+             * i přes přepínač stavu. Na mobilu je to spodní pruh přes celou šířku se stropem
+             * na 38 % výšky mapy — plovoucí karta by tam ukrojila skoro celou mapu.
+             */
+            <div className="absolute z-30 inset-x-2 bottom-2 md:inset-x-auto md:left-3 md:bottom-20
+                            md:w-80 max-h-[33%] md:max-h-none overflow-y-auto
+                            bg-surface-subtle border border-ink rounded-lg p-3 md:p-3.5">
               <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="font-semibold leading-tight">{selected.name}</p>
-                  {selected.category && <p className="text-[11px] text-ink-faint mt-0.5">{selected.category}</p>}
-                </div>
-                <button onClick={() => setSelected(null)} className="text-ink-faint hover:text-ink text-lg leading-none">×</button>
+                <p className="font-display font-extrabold text-[15px] leading-tight tracking-[-0.02em] min-w-0">
+                  {selected.name}
+                </p>
+                <button
+                  onClick={() => setSelected(null)}
+                  aria-label={localized(T.close, locale)}
+                  className="text-ink-faint hover:text-ink text-lg leading-none shrink-0 -mt-1"
+                >
+                  ×
+                </button>
               </div>
 
-              {selected.address && <p className="text-xs text-ink-muted mt-2">{selected.address}</p>}
-
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-[11px] text-ink-faint">
-                {!selected.hasWebsite && <span>{localized(T.webNone, locale)}</span>}
+              {/* Jeden řádek na to, co firmu identifikuje. Dřív to byly tři odstavce a dva badge. */}
+              <p className="text-[11px] text-ink-faint mt-1 leading-snug">
                 {selected.ico && <span className="font-mono">IČO {selected.ico}</span>}
-              </div>
+                {selected.ico && selected.address && ' · '}
+                {selected.address}
+              </p>
 
-              <div className="flex flex-col gap-1.5 mt-3 text-xs">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-[11px]">
+                {/* Kontakty nese jen menšina řádků (ARES je nemá), ale když je má, patří sem. */}
                 {selected.phone && (
-                  <a href={`tel:${selected.phone}`} className="text-ink hover:text-accent transition-colors">{selected.phone}</a>
+                  <a href={`tel:${selected.phone}`} className="font-mono text-ink hover:text-accent transition-colors">
+                    {selected.phone}
+                  </a>
                 )}
                 {selected.email && (
-                  <a href={`mailto:${selected.email}`} className="text-ink-muted hover:text-accent transition-colors truncate">{selected.email}</a>
+                  <a href={`mailto:${selected.email}`} className="text-ink-muted hover:text-accent transition-colors truncate max-w-[11rem]">
+                    {selected.email}
+                  </a>
                 )}
-                {selected.website && (
+                {selected.website ? (
                   <a href={selected.website} target="_blank" rel="noopener noreferrer"
-                     className="text-ink-muted hover:text-accent transition-colors truncate">
+                     className="text-ink underline underline-offset-2 hover:text-accent transition-colors truncate max-w-[11rem]">
                     {selected.website.replace(/^https?:\/\//, '')}
                   </a>
+                ) : (
+                  <span className="text-ink-muted">{localized(T.webNone, locale)}</span>
                 )}
                 <a href={googleMapsHref(selected)} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer"
                    className="text-ink-muted hover:text-accent transition-colors">
@@ -439,22 +472,37 @@ export function ResultsMap({ leads, total, locale, onSetStatus }: Props) {
                 </a>
               </div>
 
-              <div className="border-t border-line mt-3 pt-3">
-                <div className="flex flex-wrap gap-1.5">
-                  {LEAD_STATUSES.map(s => (
+              {/**
+               * Přepínač stavu. Čtyři pole v mřížce 2×2, ne pět tlačítek v řadě — ta se na úzké
+               * kartě lámala. „Neosloveno" mezi nimi není: je to výchozí stav, ne volba, a dá se
+               * do něj vrátit dalším klikem na už zapnutou možnost.
+               */}
+              <div className="grid grid-cols-2 gap-1 mt-2.5 pt-2.5 md:mt-3 md:pt-3 border-t border-line">
+                {LEAD_STATUSES.filter(st => st.id !== 'new').map(st => {
+                  const zapnuto = (selected.status ?? 'new') === st.id;
+                  return (
                     <button
-                      key={s.id}
-                      onClick={() => { onSetStatus(selected.id, s.id); setSelected({ ...selected, status: s.id }); }}
-                      className={`text-[11px] px-2 py-1 rounded-lg border transition-colors ${
-                        (selected.status ?? 'new') === s.id
-                          ? 'border-ink bg-ink text-white'
+                      key={st.id}
+                      aria-pressed={zapnuto}
+                      onClick={() => {
+                        const dalsi: LeadStatus = zapnuto ? 'new' : st.id;
+                        onSetStatus(selected.id, dalsi);
+                        setSelected({ ...selected, status: dalsi });
+                      }}
+                      className={`flex items-center gap-1.5 text-[11px] px-2 py-1 md:py-1.5 rounded-md border transition-colors ${
+                        zapnuto
+                          ? 'border-ink bg-ink text-surface'
                           : 'border-line text-ink-muted hover:border-ink hover:text-ink'
                       }`}
                     >
-                      {localized(s.label, locale)}
+                      <span
+                        className="w-2 h-2 rounded-full shrink-0"
+                        style={{ background: st.color, outline: zapnuto ? '1px solid rgba(255,255,255,.5)' : undefined }}
+                      />
+                      {localized(st.label, locale)}
                     </button>
-                  ))}
-                </div>
+                  );
+                })}
               </div>
             </div>
           )}

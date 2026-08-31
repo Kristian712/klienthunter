@@ -4,8 +4,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import {
   Search, Globe, Users, ExternalLink,
-  Phone, Mail, MapPin, X, Clock, ChevronDown,
-  FileText, Table2, Smartphone, PhoneCall,
+  Mail, MapPin, X, Clock, ChevronDown,
+  FileText, Table2, PhoneCall,
 } from 'lucide-react';
 import { LEAD_FILTERS, GROUP_LABELS, GROUP_ORDER, matchesAll, localized } from '@/lib/lead-filters';
 import { leadReason } from '@/lib/lead-reason';
@@ -244,6 +244,12 @@ const CONTACT = {
   emailTip:{ cs: 'Písemně a doložitelně. U nevyžádané nabídky platí § 7 zák. 480/2004 Sb. — viz podmínky.',
              sk: 'Písomne a doložiteľne. Pri nevyžiadanej ponuke platí § 7 zák. 480/2004 Zb. — viď podmienky.',
              en: 'Written and on the record. Unsolicited offers fall under § 7 of Act 480/2004 — see the terms.' },
+  landTip: { cs: 'Pevná linka — ozve se nejspíš provozovna, ne majitel. Ptejte se rovnou, kdo řeší web.',
+             sk: 'Pevná linka — ozve sa najskôr prevádzka, nie majiteľ. Pýtajte sa rovno, kto rieši web.',
+             en: 'A landline, so expect the premises rather than the owner. Ask straight away who handles the website.' },
+  webUnv:  { cs: 'Tuhle adresu uvedl zdroj, ale při našem ověření neodpověděla. Může být dočasně mimo provoz.',
+             sk: 'Túto adresu uviedol zdroj, ale pri našom overení neodpovedala. Môže byť dočasne mimo prevádzky.',
+             en: 'A source gave this address, but it did not answer when we checked. It may be temporarily down.' },
 };
 
 /**
@@ -274,23 +280,35 @@ function ContactStrategy({ b, locale }: { b: BusinessResult; locale: string }) {
   const mobile = b.phone ? isCzMobile(b.phone) : false;
   const L = (x: { cs: string; sk?: string; en: string }) => localized(x, locale);
 
-  type Method = { key: string; icon: React.ReactNode; label: string; href: string; tip: string };
+  /**
+   * `value` je samotný údaj — číslo, e-mail, doména. Tlačítko nese akci, `value` nese fakt:
+   * bez něj by po sloučení dvou dřívějších bloků do jednoho zmizelo z řádku telefonní číslo
+   * a nedalo by se zkopírovat.
+   */
+  type Method = { key: string; icon: React.ReactNode; label: string; href: string; tip: string; value?: string };
   const methods: Method[] = [];
 
   // First, because it is the page the firm itself keeps for being contacted on.
   if (b.contactUrl) {
     methods.push({ key: 'contact', icon: <ExternalLink size={11} />, label: L(CONTACT.contact),
                    href: b.contactUrl, tip: L(CONTACT.contactTip) });
-  } else if (webStatus(b) === 'HAS' && b.website) {
+  } else if (b.website) {
+    // I web, který zdroj uvedl a nám neodpověděl. Stránka může být chvíli mimo provoz a mrtvý
+    // web je sám o sobě důvod firmu oslovit — jen se u něj nesmí tvrdit, že jsme ho ověřili.
+    const overeny = webStatus(b) === 'HAS';
     methods.push({ key: 'web', icon: <Globe size={11} />, label: L(CONTACT.web),
-                   href: b.website, tip: L(CONTACT.webTip) });
+                   href: b.website, tip: L(overeny ? CONTACT.webTip : CONTACT.webUnv),
+                   value: b.website.replace(/^https?:\/\//, '') });
   }
 
-  if (b.phone && mobile) {
+  if (b.phone) {
     methods.push({ key: 'call', icon: <PhoneCall size={11} />, label: L(CONTACT.call),
-                   href: `tel:${b.phone}`, tip: L(CONTACT.callTip) });
-    methods.push({ key: 'wa', icon: <WaIcon />, label: L(CONTACT.wa),
-                   href: whatsappHref(b.phone), tip: L(CONTACT.waTip) });
+                   href: `tel:${b.phone}`, tip: L(mobile ? CONTACT.callTip : CONTACT.landTip),
+                   value: b.phone });
+    if (mobile) {
+      methods.push({ key: 'wa', icon: <WaIcon />, label: L(CONTACT.wa),
+                     href: whatsappHref(b.phone), tip: L(CONTACT.waTip) });
+    }
   }
 
   if (b.hasInstagram && b.instagramUrl) {
@@ -305,7 +323,7 @@ function ContactStrategy({ b, locale }: { b: BusinessResult; locale: string }) {
 
   if (b.email) {
     methods.push({ key: 'email', icon: <Mail size={11} />, label: L(CONTACT.email),
-                   href: `mailto:${b.email}`, tip: L(CONTACT.emailTip) });
+                   href: `mailto:${b.email}`, tip: L(CONTACT.emailTip), value: b.email });
   }
 
   /**
@@ -348,7 +366,11 @@ function ContactStrategy({ b, locale }: { b: BusinessResult; locale: string }) {
               {m.icon}
               {m.label}
             </a>
-            <span className="text-[11px] text-ink-faint leading-tight pt-1">{m.tip}</span>
+            <span className="text-[11px] text-ink-faint leading-tight pt-1 min-w-0">
+              {m.value && <span className="font-mono text-ink-muted break-all">{m.value}</span>}
+              {m.value && ' · '}
+              {m.tip}
+            </span>
           </div>
         ))}
       </div>
@@ -556,8 +578,18 @@ function isHistoricalSource(source?: string): boolean {
   return (source ?? '').split('+').some(id => id === 'google' || id === 'firmy');
 }
 
-function SourceBadge({ source }: { source?: string }) {
-  const ids = (source ?? 'ares').split('+').filter(Boolean);
+/**
+ * Odkud řádek pochází — ale jen když se to od zbytku tabulky liší.
+ *
+ * Když hledání vrátí 494 firem z ARESu a 6 z OpenStreetMap, napsat „ARES" na každý řádek
+ * znamená pětsetkrát zopakovat, co je vidět z toho, že to nikde nestojí. Zajímavá je menšina:
+ * šest řádků, které přišly z mapy, a u kterých proto bývá telefon. Tady je štítek informace,
+ * všude jinde šum. Když je zdroj v tabulce jediný, nezobrazí se vůbec nic.
+ */
+function SourceBadge({ source, common }: { source?: string; common?: string | null }) {
+  const own = source ?? 'ares';
+  if (own === common) return null;
+  const ids = own.split('+').filter(Boolean);
   return (
     <>
       {ids.map(id => (
@@ -711,6 +743,24 @@ export default function SearchPage() {
   const filtered = results
     .filter(b => matchesAll(b, active))
     .sort((a, b) => b.leadScore - a.leadScore || a.name.localeCompare(b.name, 'cs'));
+
+  /**
+   * Nejčastější zdroj mezi zobrazenými řádky. Řádky, které z něj pocházejí, štítek nedostanou —
+   * viz `SourceBadge`. Počítá se z filtrovaných dat, ne ze všech: co je v tabulce většina, to
+   * čtenář bere jako výchozí stav, i když to v celém výsledku většina není.
+   */
+  const commonSource = (() => {
+    const counts = new Map<string, number>();
+    for (const b of filtered) {
+      const id = b.source ?? 'ares';
+      counts.set(id, (counts.get(id) ?? 0) + 1);
+    }
+    let best: string | null = null;
+    let most = 0;
+    // `Array.from`, ne iterace přes Map — cílový ES v tsconfigu ji přímo neumí.
+    for (const [id, n] of Array.from(counts.entries())) if (n > most) { best = id; most = n; }
+    return best;
+  })();
 
   const toggle = (id: string) =>
     setActive(prev => {
@@ -1310,7 +1360,7 @@ export default function SearchPage() {
                         <div>
                           <div className="flex items-center gap-2 flex-wrap">
                             <h3 className="font-semibold text-ink leading-tight">{b.name}</h3>
-                            <SourceBadge source={b.source} />
+                            <SourceBadge source={b.source} common={commonSource} />
                           </div>
                           {b.address && (
                             <p className="text-xs text-ink-faint mt-1 flex items-center gap-1">
@@ -1323,46 +1373,6 @@ export default function SearchPage() {
                           <a href={b.googleMapsUrl} target="_blank" rel="noopener noreferrer"
                              className="shrink-0 btn-ghost btn-sm p-1.5" title="Původní zdroj záznamu">
                             <ExternalLink size={13} />
-                          </a>
-                        )}
-                      </div>
-
-                      {/* Contacts */}
-                      <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
-                        {b.phone && (() => {
-                          const mobile = isCzMobile(b.phone!);
-                          return (
-                            <span className="flex items-center gap-1.5">
-                              <a href={`tel:${b.phone}`}
-                                 className={`flex items-center gap-1 text-xs transition-colors hover:text-accent ${mobile ? 'text-ink font-medium' : 'text-ink-muted'}`}>
-                                {mobile ? <Smartphone size={11} /> : <Phone size={11} />}
-                                {b.phone}
-                                {mobile && <span className="text-[10px] text-ink-faint font-normal">(mobil)</span>}
-                              </a>
-                              {mobile && (
-                                <a href={whatsappHref(b.phone!)} target="_blank" rel="noopener noreferrer"
-                                   title="Napsat přes WhatsApp" className="badge hover:border-ink hover:text-ink transition-colors">
-                                  <WaIcon /> WA
-                                </a>
-                              )}
-                            </span>
-                          );
-                        })()}
-                        {b.email && (
-                          <a href={`mailto:${b.email}`} className="flex items-center gap-1 text-xs text-ink-muted hover:text-accent transition-colors">
-                            <Mail size={11} />{b.email}
-                          </a>
-                        )}
-                        {b.website && (
-                          // On an UNKNOWN row this address is a source's claim that did not answer
-                          // when we probed it. Keeping the link is right — a site can be down for a
-                          // minute and a dead site is a lead in itself — but the tooltip has to say
-                          // that we could not confirm it, rather than let a dead link pass for a
-                          // checked one. The note is about our check, not a verdict about the firm.
-                          <a href={b.website} target="_blank" rel="noopener noreferrer"
-                             title={webStatus(b) === 'UNKNOWN' ? localized(S.webUnverifiedTip, locale) : undefined}
-                             className="flex items-center gap-1 text-xs text-ink-muted hover:text-accent transition-colors truncate max-w-[220px]">
-                            <Globe size={11} />{b.website.replace(/^https?:\/\//, '')}
                           </a>
                         )}
                       </div>

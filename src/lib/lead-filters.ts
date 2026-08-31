@@ -54,6 +54,8 @@ export interface FilterableLead {
   legalForm?: string | null;
   /** Počet provozoven s aktivním živnostenským oprávněním. NULL = nezeptali jsme se. */
   activePremises?: number | null;
+  /** Které zdroje o firmě věděly, spojené plusem: `ares`, `osm`, `ares+osm`. */
+  source?: string | null;
 }
 
 export type FilterGroup = 'web' | 'contact' | 'company';
@@ -147,6 +149,18 @@ function hasActivePremises(b: FilterableLead): boolean {
   return typeof b.activePremises === 'number' && b.activePremises > 0;
 }
 
+/**
+ * Firmu někdo ručně zanesl do OpenStreetMap.
+ *
+ * Je to nejsilnější důkaz provozu, jaký máme: mapér u toho podniku fyzicky stál. Zároveň jsou
+ * to jediné řádky, které nesou telefon a e-mail — ARES kontakty nemá. Bez téhle větve by je
+ * filtr smetl, protože nemají IČO, a tím pádem ani provozovny, DPH a právní formu, na které
+ * se ptá zbytek pravidla.
+ */
+function isMapped(b: FilterableLead): boolean {
+  return (b.source ?? '').split('+').includes('osm');
+}
+
 function olderThan(years: number) {
   return (b: FilterableLead) => {
     const age = yearsSince(b.foundedAt);
@@ -197,14 +211,15 @@ export const LEAD_FILTERS: LeadFilter[] = [
         { activePremises: { gt: 0 } },
         { vatPayer: true },
         { legalForm: { not: null, notIn: SOLE_TRADER_FORMS } },
+        { source: { contains: 'osm' } },
       ],
     },
-    test: b => hasActivePremises(b) || b.vatPayer === true || isCompany(b),
+    test: b => hasActivePremises(b) || b.vatPayer === true || isCompany(b) || isMapped(b),
     /**
      * Nezeptali jsme se ani na jedno ze tří. Pro skórování je to mezera, ne odpověď — jinak by
      * firma bez IČO (tedy z OpenStreetMap, kde nemáme co dotazovat) vyšla jako potvrzeně mrtvá.
      */
-    unknown: b => b.activePremises == null && b.vatPayer == null && !b.legalForm,
+    unknown: b => b.activePremises == null && b.vatPayer == null && !b.legalForm && !isMapped(b),
   },
   {
     /**
@@ -215,13 +230,21 @@ export const LEAD_FILTERS: LeadFilter[] = [
     group: 'company',
     label: { cs: 'Jen prověřené', sk: 'Len preverené', en: 'Verified only' },
     where: {
-      AND: [
-        { activePremises: { gt: 0 } },
-        { OR: [{ vatPayer: true }, { legalForm: { not: null, notIn: SOLE_TRADER_FORMS } }] },
+      OR: [
+        {
+          AND: [
+            { activePremises: { gt: 0 } },
+            { OR: [{ vatPayer: true }, { legalForm: { not: null, notIn: SOLE_TRADER_FORMS } }] },
+          ],
+        },
+        // Firma na mapě s dohledaným kontaktem: někdo u ní stál a je na koho zavolat.
+        { AND: [{ source: { contains: 'osm' } }, { OR: [{ phone: { not: null } }, { email: { not: null } }] }] },
       ],
     },
-    test: b => hasActivePremises(b) && (b.vatPayer === true || isCompany(b)),
-    unknown: b => b.activePremises == null && b.vatPayer == null && !b.legalForm,
+    test: b =>
+      (hasActivePremises(b) && (b.vatPayer === true || isCompany(b)))
+      || (isMapped(b) && Boolean(b.phone || b.email)),
+    unknown: b => b.activePremises == null && b.vatPayer == null && !b.legalForm && !isMapped(b),
   },
   {
     id: 'no_website',
