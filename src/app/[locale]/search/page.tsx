@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import {
   Search, Globe, Users, ExternalLink,
@@ -59,6 +59,17 @@ interface BusinessResult {
   foundedAt?: string | null;
   vatPayer?: boolean;
   vatUnreliable?: boolean;
+}
+
+/** Průběh hledání, které běží na pozadí. Odpovídá řádku `SearchJob` v databázi. */
+interface JobState {
+  id: string;
+  searchId: string;
+  status: 'queued' | 'running' | 'done' | 'failed';
+  foundCount: number;
+  processedCount: number;
+  startedAt: string | null;
+  error: string | null;
 }
 
 type WebStatus = 'HAS' | 'NONE' | 'UNKNOWN';
@@ -383,6 +394,18 @@ const S = {
     sk: 'Firiem sme našli {n}, ale zvolenému filtru nevyhovela ani jedna. To je platný výsledok, nie chyba — skúste filter vypnúť alebo zvoliť iný scenár.',
     en: 'We found {n} firms, but not one matches the filter you picked. That is a valid result, not a fault — try turning the filter off or picking another scenario.',
   },
+  jobRunning:  { cs: 'Hledám na pozadí',  sk: 'Hľadám na pozadí',  en: 'Searching in the background' },
+  jobQueued:   { cs: 'Spouštím hledání…',  sk: 'Spúšťam hľadanie…',  en: 'Starting the search…' },
+  jobFound:    { cs: 'nalezeno firem',     sk: 'nájdených firiem',   en: 'firms found' },
+  jobDone:     { cs: 'zpracováno',         sk: 'spracovaných',       en: 'processed' },
+  jobLeft:     { cs: 'zbývá zhruba {t}',   sk: 'zostáva zhruba {t}', en: 'about {t} left' },
+  jobCanLeave: { cs: 'Kartu můžete zavřít — hledání běží dál a výsledky tu na vás počkají.',
+                 sk: 'Kartu môžete zavrieť — hľadanie beží ďalej a výsledky tu na vás počkajú.',
+                 en: 'You can close the tab — the search keeps running and the results will wait for you.' },
+  jobFailed:   { cs: 'Hledání se zastavilo',  sk: 'Hľadanie sa zastavilo',  en: 'The search stopped' },
+  jobPartial:  { cs: 'Co se stihlo najít, zůstalo uložené a dá se exportovat.',
+                 sk: 'Čo sa stihlo nájsť, zostalo uložené a dá sa exportovať.',
+                 en: 'What was found is saved and can be exported.' },
   demoLocked: { cs: 'Kontakty jsou jen pro přihlášené',
                 sk: 'Kontakty sú len pre prihlásených',
                 en: 'Contacts are for signed-in users' },
@@ -609,6 +632,10 @@ export default function SearchPage() {
   const [searchId, setSearchId]           = useState<string | null>(null);
   /** Výsledky pocházejí z ukázky pro nepřihlášené: pět řádků, kontakty server vůbec neposlal. */
   const [isDemo, setIsDemo]               = useState(false);
+  /** Běžící hledání na pozadí. `null` = žádné neběží ani nedoběhlo v tomhle okně. */
+  const [job, setJob]                     = useState<JobState | null>(null);
+  /** Kolik řádků už máme. V refu, ne ve stavu — čte to interval, který se kvůli tomu nemá restartovat. */
+  const resultsRef = useRef(0);
   const [loading, setLoading]             = useState(false);
   const [loadingMsg, setLoadingMsg]       = useState('');
   const [error, setError]                 = useState('');
@@ -666,12 +693,108 @@ export default function SearchPage() {
   const isWholeCzech = (r: string) =>
     ['celá čr', 'cela cr', 'celá cr'].includes(r.toLowerCase().trim());
 
+  /**
+   * Obnovení hledání z adresy.
+   *
+   * Bez tohohle by zavření karty znamenalo ztrátu obrazovky, i když jsou výsledky v databázi:
+   * `job` je stav komponenty a reload ho smaže. `?job=<id>` v adrese je to, co uživateli dovolí
+   * kartu zavřít a vrátit se — a je to zároveň cíl odkazů z přehledu hledání.
+   */
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get('job');
+    if (!id) return;
+    setHasSearched(true);
+    setLoading(true);
+    fetch(`/api/jobs/${id}`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => {
+        if (!d) return;
+        resultsRef.current = d.results.length;
+        setResults(d.results);
+        setSearchId(d.job.searchId);
+        setJob(d.job);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  /**
+   * Dotazování na běžící job.
+   *
+   * Co dvě sekundy se zeptáme na stav a na řádky, které od minula přibyly — posílá se jen
+   * přírůstek (`from`), ne celých pět set firem pokaždé. Interval se zruší, jakmile je job
+   * hotový nebo spadlý, i když uživatel mezitím odejde na jinou stránku.
+   *
+   * Když se dotaz nepovede, nic se nemaže: rozpracované výsledky na obrazovce zůstanou a další
+   * kolo to zkusí znovu. Jediná chyba sítě nemá zahodit práci, která už je v databázi.
+   */
+  useEffect(() => {
+    if (!job || job.status === 'done' || job.status === 'failed') return;
+    let stopped = false;
+
+    // Když jedno kolo trvá dýl než dvě sekundy, druhé se nespustí. Bez tohohle by si obě
+    // vyzvedla řádky od stejného offsetu a v seznamu by byly dvakrát.
+    let running = false;
+
+    const tick = async () => {
+      if (running || stopped) return;
+      running = true;
+      try {
+        const res = await fetch(`/api/jobs/${job.id}?from=${resultsRef.current}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (stopped) return;
+        if (data.results?.length) {
+          /**
+           * Posun offsetu patří sem, ne dovnitř `setResults`.
+           *
+           * Updater předaný do `setState` musí být čistá funkce — React ho ve vývojovém
+           * režimu schválně volá dvakrát, aby nečisté updatery odhalil. Když se v něm
+           * inkrementoval ref, napočítal dvojnásobek, klient si od serveru vyžádal řádky
+           * od příliš vysokého offsetu a doplňování se v půlce zastavilo.
+           */
+          resultsRef.current += data.results.length;
+          setResults(prev => [...prev, ...data.results]);
+        }
+        setJob(j => (j ? { ...j, ...data.job } : j));
+      } catch {
+        /* síť vypadla — zkusíme to za dvě sekundy znovu */
+      } finally {
+        running = false;
+      }
+    };
+
+    void tick();
+    const timer = setInterval(tick, 2000);
+    return () => { stopped = true; clearInterval(timer); };
+  }, [job?.id, job?.status]);
+
+  /**
+   * Odhad zbývajícího času z toho, co už proběhlo.
+   *
+   * Žádný model, jen trojčlenka: kolik sekund zabralo `processedCount` firem, tolik ku jedné
+   * zabere i zbytek. Dokud není zpracovaných aspoň deset, neukazuje se nic — první sekundy
+   * zkresluje načítání ze zdrojů a odhad z nich by byl číslo vycucané z prstu.
+   */
+  const remainingLabel = (() => {
+    if (!job || !job.startedAt || job.status !== 'running') return null;
+    if (job.processedCount < 10 || job.foundCount <= job.processedCount) return null;
+    const elapsed = (Date.now() - new Date(job.startedAt).getTime()) / 1000;
+    const perFirm = elapsed / job.processedCount;
+    const seconds = Math.round((job.foundCount - job.processedCount) * perFirm);
+    if (seconds < 5) return null;
+    if (seconds < 90) return `${seconds} s`;
+    return `${Math.round(seconds / 60)} min`;
+  })();
+
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!effectiveRegion || !effectiveIndustry) return;
     setLoading(true);
     setError('');
     setResults([]);
+    resultsRef.current = 0;
+    setJob(null);
     setActive(new Set());
     setHasSearched(true);
     setLoadingMsg(isWholeCzech(effectiveRegion)
@@ -706,12 +829,28 @@ export default function SearchPage() {
         return;
       }
       const data = await res.json();
-      setResults(data.results);
-      setSearchId(data.searchId ?? null);
-      setIsDemo(Boolean(data.demo));
-      // Scénář se promítne až tady, jako předem zapnuté filtry. Uživatel je pak vidí mezi
+
+      // Scénář se promítne hned, jako předem zapnuté filtry. Uživatel je pak vidí mezi
       // ostatními chipy a může je vypnout — nic se před ním neschovává.
       setActive(new Set(scenarioById(scenario).filters));
+
+      // Ukázka pro nepřihlášené doběhne rovnou v odpovědi — pět řádků, není co sledovat.
+      if (data.demo) {
+        setResults(data.results);
+        setSearchId(null);
+        setIsDemo(true);
+        return;
+      }
+
+      // Přihlášené hledání běží na pozadí. Odpověď nese jen id; výsledky si vyzvedáváme sami.
+      setIsDemo(false);
+      setSearchId(data.searchId ?? null);
+      setJob({
+        id: data.jobId, searchId: data.searchId, status: 'queued',
+        foundCount: 0, processedCount: 0, startedAt: null, error: null,
+      });
+      // Adresa je teď odkaz na tenhle běh. Kdo kartu zavře a otevře ji znovu, uvidí totéž.
+      window.history.replaceState({}, '', `${window.location.pathname}?job=${data.jobId}`);
     } catch {
       setError(localized(S.errNetwork, locale));
     } finally {
@@ -907,6 +1046,42 @@ export default function SearchPage() {
 
         {error && (
           <div className="rounded-lg border border-ink px-4 py-3 text-sm font-medium text-ink mb-4">{error}</div>
+        )}
+
+        {job && job.status !== 'done' && (
+          <div className="mb-6 border border-line rounded-xl p-5">
+            <div className="flex items-baseline justify-between flex-wrap gap-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
+                {localized(job.status === 'failed' ? S.jobFailed
+                  : job.status === 'queued' ? S.jobQueued : S.jobRunning, locale)}
+              </p>
+              {job.status !== 'failed' && job.foundCount > 0 && (
+                <p className="tnum text-xs text-ink-muted">
+                  {job.foundCount} {localized(S.jobFound, locale)} · {job.processedCount} {localized(S.jobDone, locale)}
+                  {remainingLabel && ` · ${localized(S.jobLeft, locale).replace('{t}', remainingLabel)}`}
+                </p>
+              )}
+            </div>
+
+            {job.status !== 'failed' && (
+              <>
+                {/* Pruh průběhu. Dokud neznáme počet nalezených firem, nemá co ukazovat —
+                    prázdný pruh je poctivější než animace, která předstírá postup. */}
+                <div className="h-1 bg-line mt-3 overflow-hidden">
+                  <div className="h-1 bg-ink transition-all duration-500"
+                       style={{ width: job.foundCount > 0 ? `${Math.min(100, Math.round(job.processedCount / job.foundCount * 100))}%` : '0%' }} />
+                </div>
+                <p className="text-xs text-ink-faint mt-3">{localized(S.jobCanLeave, locale)}</p>
+              </>
+            )}
+
+            {job.status === 'failed' && (
+              <>
+                <p className="text-sm text-ink-muted mt-2">{job.error}</p>
+                <p className="text-xs text-ink-faint mt-2">{localized(S.jobPartial, locale)}</p>
+              </>
+            )}
+          </div>
         )}
 
         {results.length > 0 && (

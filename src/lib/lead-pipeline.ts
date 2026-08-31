@@ -196,8 +196,25 @@ export interface VerifiedCandidate {
  */
 export async function enrichAndVerify(
   candidates: Candidate[],
-  { probeNetwork, deadlineAt, region = '', industry = '' }:
-    { probeNetwork: boolean; deadlineAt: number; region?: string; industry?: string },
+  { probeNetwork, deadlineAt, region = '', industry = '', onBatch, batchSize = 25 }:
+    {
+      probeNetwork: boolean;
+      deadlineAt: number;
+      region?: string;
+      industry?: string;
+      /**
+       * Zavolá se průběžně, jakmile je hotová další dávka firem.
+       *
+       * Bez tohohle se všechno zapisovalo až po doběhnutí celého poolu — a job, který spadl
+       * v půlce, po sobě nenechal nic. Volání se čeká (await), takže když je databáze pomalá,
+       * pool se sám přibrzdí místo aby se zápisy hromadily.
+       *
+       * Nepovinné: synchronní cesty (ukázka bez přihlášení, import CSV) ho neposílají a chovají
+       * se přesně jako dřív.
+       */
+      onBatch?: (batch: VerifiedCandidate[]) => Promise<void>;
+      batchSize?: number;
+    },
 ): Promise<VerifiedCandidate[]> {
   const robots = createRobotsCache();
   const probe = createProbeCache(robots);
@@ -267,15 +284,27 @@ export async function enrichAndVerify(
     };
   };
 
+  // Nasbírané, ale ještě nezapsané výsledky. Pool je plní z dvanácti pracovníků naráz, takže
+  // se do něj sahá jen tady a jen celým odebráním obsahu.
+  const pending: VerifiedCandidate[] = [];
+  const flush = async (force: boolean) => {
+    if (!onBatch) return;
+    if (!force && pending.length < batchSize) return;
+    const batch = pending.splice(0, pending.length);
+    if (batch.length > 0) await onBatch(batch);
+  };
+
   const [verdicts] = await Promise.all([
     runPool<Candidate, VerifiedCandidate>(
       candidates,
-      async c => ({
-        c,
+      async c => {
         // Když se firma do stropu nevejde, platí verdikt z toho, co řekly zdroje — tedy totéž,
         // co dostane celostátní hledání, které se po síti neptá vůbec.
-        verdict: await withCap(verify(c), () => classify(c.signals), PER_CANDIDATE_MS),
-      }),
+        const result = { c, verdict: await withCap(verify(c), () => classify(c.signals), PER_CANDIDATE_MS) };
+        pending.push(result);
+        await flush(false);
+        return result;
+      },
       CONCURRENCY,
       deadlineAt,
       c => ({ c, verdict: classify(c.signals) }),
@@ -290,6 +319,9 @@ export async function enrichAndVerify(
       () => undefined,
     ),
   ]);
+
+  // Zbytek, který na plnou dávku nedosáhl.
+  await flush(true);
 
   return verdicts;
 }

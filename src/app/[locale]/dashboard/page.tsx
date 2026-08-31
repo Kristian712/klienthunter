@@ -9,6 +9,18 @@ interface Search {
   id: string; query: string; region: string; createdAt: string;
   _count: { results: number };
 }
+/** Stav hledání běžícího na pozadí. Páruje se se `Search` přes `searchId`. */
+interface Job {
+  id: string; searchId: string; status: 'queued' | 'running' | 'done' | 'failed';
+  foundCount: number; processedCount: number; error: string | null;
+}
+
+const JOB_LABEL: Record<Job['status'], { cs: string; en: string }> = {
+  queued:  { cs: 'čeká',    en: 'queued' },
+  running: { cs: 'běží',    en: 'running' },
+  done:    { cs: 'hotovo',  en: 'done' },
+  failed:  { cs: 'spadlo',  en: 'failed' },
+};
 interface User {
   name?: string; email: string; plan: string; isAdmin: boolean; isVip: boolean;
 }
@@ -20,6 +32,7 @@ export default function DashboardPage() {
   const isCs = locale === 'cs' || locale === 'sk';
   const [user, setUser]       = useState<User | null>(null);
   const [searches, setSearches] = useState<Search[]>([]);
+  const [jobs, setJobs] = useState<Record<string, Job>>({});
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
 
@@ -46,6 +59,17 @@ export default function DashboardPage() {
         setSearches(d.searches ?? []);
         setLoading(false);
       });
+  }, []);
+
+  /**
+   * Stavy hledání. Načítají se zvlášť, protože `/api/profile` o jobech nic neví — a hlavně
+   * proto, že tenhle dotaz zároveň uklidí joby, které se zasekly (viz `sweepStaleJobs`).
+   */
+  useEffect(() => {
+    fetch('/api/jobs', { credentials: 'include' })
+      .then(r => (r.ok ? r.json() : { jobs: [] }))
+      .then(d => setJobs(Object.fromEntries((d.jobs ?? []).map((j: Job) => [j.searchId, j]))))
+      .catch(() => {});
   }, []);
 
   if (loading) return (
@@ -113,12 +137,24 @@ export default function DashboardPage() {
           </div>
         ) : (
           <div className="divide-y divide-line">
-            {searches.map(s => (
-              <div key={s.id} className="flex items-center justify-between py-3">
-                <div>
-                  <span className="font-medium">{s.query}</span>
+            {searches.map(s => {
+              const job = jobs[s.id];
+              return (
+              <div key={s.id} className="flex items-center justify-between py-3 gap-3">
+                <div className="min-w-0">
+                  {/* Odkaz otevře hledání znovu — i to, které ještě běží. Průběh se dopočítá
+                      ze serveru, takže se uživatel může vrátit ke kterémukoli běhu. */}
+                  <Link href={`/${locale}/search?job=${job?.id ?? ''}`} className="font-medium hover:text-accent transition-colors">
+                    {s.query}
+                  </Link>
                   <span className="text-ink-faint mx-2">·</span>
                   <span className="text-ink-muted">{s.region}</span>
+                  {job && (
+                    <span className={`badge ml-2 ${job.status === 'failed' ? 'badge-red' : ''}`}>
+                      {isCs ? JOB_LABEL[job.status].cs : JOB_LABEL[job.status].en}
+                      {job.status === 'running' && ` ${job.processedCount}/${job.foundCount}`}
+                    </span>
+                  )}
                 </div>
                 <div className="flex items-center gap-4">
                   <span className="text-sm text-ink-faint tnum">{s._count.results} {isCs ? 'firem' : 'businesses'}</span>
@@ -136,7 +172,8 @@ export default function DashboardPage() {
                   </button>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

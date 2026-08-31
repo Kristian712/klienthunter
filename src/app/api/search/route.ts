@@ -3,14 +3,20 @@ import { z } from 'zod';
 import { getPlanLimits, sessionFrom } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { leadScore } from '@/lib/lead-score';
-import { persistResults } from '@/lib/lead-persist';
 import { enrichAndVerify, mergeLeads, type VerifiedCandidate } from '@/lib/lead-pipeline';
 import {
   ANONYMOUS_RESULTS, ANONYMOUS_SEARCHES, countHits, hashIp, recordHit,
 } from '@/lib/rate-limit';
+import { runSearchJob } from '@/lib/search-job';
 import { discoverAll } from '@/lib/sources';
+import { waitUntil } from '@vercel/functions';
 
-export const maxDuration = 60;
+/**
+ * Strop funkce. Bylo 60 s — což bylo naše číslo, ne limit platformy: Vercel dnes s Fluid Compute
+ * dává 300 s na všech plánech. Práce navíc běží po odeslání odpovědi, takže těch 300 s je celé
+ * k dispozici hledání, ne čekajícímu prohlížeči.
+ */
+export const maxDuration = 300;
 
 const SearchSchema = z.object({
   region: z.string().min(1),
@@ -172,35 +178,42 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Ranking is per-user: the score of a row is the share of *this* user's onboarding criteria
-    // the firm meets. Someone who skipped onboarding has an empty list and gets the neutral
-    // default from `lead-score.ts`.
-    const profile = await prisma.user.findUnique({
-      where: { id: payload.userId },
-      select: { targetFilters: true },
-    });
-
+    // Kritéria uživatele si načítá runner na pozadí — v cestě požadavku by to byl jen další
+    // round trip do databáze mezi uživatelem a odpovědí, kterou čeká.
     const search = await prisma.search.create({
       data: { userId: payload.userId, query: industry, region },
     });
 
-    const deadlineAt = Date.now() + NETWORK_BUDGET_MS;
-    const wholeCz = isWholeCz(region);
-    const city = wholeCz ? '' : region.split(',')[0].trim();
-    const limit = limits.resultsPerSearch;
+    /**
+     * Odsud dál se nečeká.
+     *
+     * Založíme job, vrátíme jeho id — a vlastní hledání běží dál v téže invokaci díky
+     * `waitUntil`, jen už bez prohlížeče na druhém konci. Uživatel může kartu zavřít; výsledky
+     * se plní do databáze po dávkách a on se k nim vrátí, kdy chce.
+     *
+     * `resultsPerSearch` z plánu se nese v `foundCount` jako vstupní strop, ne jako výsledek —
+     * runner ho použije jako limit pro zdroje a přepíše ho skutečným počtem nalezených firem.
+     */
+    const job = await prisma.searchJob.create({
+      data: {
+        userId: payload.userId,
+        searchId: search.id,
+        region,
+        industry,
+        foundCount: limits.resultsPerSearch === Infinity ? 500 : limits.resultsPerSearch,
+      },
+    });
 
-    // Order matters: OpenStreetMap goes first because it is the only source carrying phones,
-    // e-mails and websites, so its records deserve the slots. ARES then confirms them with an
-    // IČO and fills the rest with firms OSM has never heard of.
-    const [aresLeads, osmLeads] = await discoverAll(industry, city, limit);
-    const candidates = mergeLeads([osmLeads, aresLeads], limit);
+    // Lokální `next dev` žádný kontext požadavku nemá a `waitUntil` v něm vyhodí výjimku.
+    // Tam se prostě počká — vývojáře to nezdrží a chování zůstane stejné.
+    const work = runSearchJob(job.id);
+    try {
+      waitUntil(work);
+    } catch {
+      await work;
+    }
 
-    // A nationwide run would need thousands of probes and would never finish, so it skips the
-    // network entirely and yields only HAS / UNKNOWN from what the sources already said.
-    const verified = await enrichAndVerify(candidates, { probeNetwork: !wholeCz, deadlineAt, region, industry });
-    const results = await persistResults(search.id, verified, profile?.targetFilters);
-
-    return NextResponse.json({ searchId: search.id, results });
+    return NextResponse.json({ jobId: job.id, searchId: search.id });
   } catch (err) {
     if (err instanceof z.ZodError) {
       return NextResponse.json({ error: err.errors }, { status: 422 });

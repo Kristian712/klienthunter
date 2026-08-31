@@ -44,6 +44,7 @@ model User {
   updatedAt        DateTime  @updatedAt
 
   searches         Search[]
+  jobs             SearchJob[]
   savedResults     SavedResult[]
   createdCodes     InviteCode[] @relation("CreatedCodes")
   usedCode         InviteCode[] @relation("UsedCode")
@@ -64,6 +65,43 @@ model Search {
 
   user    User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   results BusinessResult[]
+  job     SearchJob?
+}
+
+/// Jedno hledání běžící na pozadí.
+///
+/// Do teď se hledání odbývalo v jednom HTTP požadavku: uživatel čekal 50 sekund s otevřenou
+/// kartou a když ji zavřel, přišel o všechno. Tenhle řádek je to, co po požadavku zůstane —
+/// route ho založí, vrátí jeho id a práce pokračuje mimo odpověď (`waitUntil`).
+///
+/// Počítadla se aktualizují průběžně, po dávkách, ne až na konci. Když job spadne v půlce,
+/// zapsané firmy zůstanou a `error` řekne proč — což je celý smysl toho, že tu ta tabulka je.
+model SearchJob {
+  id             String    @id @default(cuid())
+  userId         String
+  /// Hledání, do kterého se zapisují výsledky. Zakládá se rovnou s jobem, aby export fungoval
+  /// i nad rozpracovaným během.
+  searchId       String    @unique
+  /// `queued` | `running` | `done` | `failed`
+  status         String    @default("queued")
+  region         String
+  industry       String
+  /// Kolik firem vrátily zdroje, než začalo ověřování.
+  foundCount     Int       @default(0)
+  /// Kolik jich je už zapsaných v databázi.
+  processedCount Int       @default(0)
+  startedAt      DateTime?
+  finishedAt     DateTime?
+  /// Proč to spadlo. Ukazuje se uživateli, takže žádné stacktrace.
+  error          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  search Search @relation(fields: [searchId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([status, updatedAt])
 }
 
 model BusinessResult {
