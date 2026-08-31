@@ -51,9 +51,11 @@ export async function persistResults(
         checks !== null ||
         Boolean(social.fb || social.ig || social.li) ||
         Boolean(c.facebookUrl || c.instagramUrl),
-      foundedAt:     c.foundedAt,
-      vatPayer:      c.vatPayer,
-      vatUnreliable: c.vatUnreliable,
+      foundedAt:      c.foundedAt,
+      vatPayer:       c.vatPayer,
+      vatUnreliable:  c.vatUnreliable,
+      legalForm:      c.legalForm,
+      activePremises: c.activePremises,
     };
 
     return prisma.businessResult.create({

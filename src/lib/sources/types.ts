@@ -54,6 +54,23 @@ export interface RawLead {
   vatPayer?: boolean;
   /** Listed by the tax office as an unreliable payer. A genuine red flag. */
   vatUnreliable?: boolean;
+  /**
+   * Kód právní formy z ARESu (`112` s.r.o., `101` živnostník, `121` a.s. …).
+   *
+   * Ukládá se kód, ne přeložený název: číselník patří do zobrazovací vrstvy a data v databázi
+   * mají zůstat tím, co rejstřík skutečně řekl.
+   */
+  legalForm?: string;
+  /**
+   * Počet provozoven s aktivním živnostenským oprávněním (`provozovnyStav.pocetAktivnich`).
+   *
+   * Nejlepší volně dostupný signál, že firma opravdu funguje. ARES do výsledků nikdy nedává
+   * subjekty se zrušenou živností — takže „má živnost, ale nepodniká" nejde poznat ze stavu
+   * živnosti, zato jde poznat odtud: kdo měl provozovny a všechny je zrušil, skoro jistě
+   * skončil. Nula ale neznamená „nefunguje": kadeřnice v pronajatém křesle nebo řemeslník
+   * jezdící ke klientům provozovnu registrovanou mít nemusí.
+   */
+  activePremises?: number;
 }
 
 export interface DiscoverySource {

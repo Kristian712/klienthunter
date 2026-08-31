@@ -32,6 +32,14 @@ interface AresSubject {
   sidlo?: { textovaAdresa?: string; kodAdresnihoMista?: number; kodObce?: number };
   /** `YYYY-MM-DD`, already in the search response — no detail request needed. */
   datumVzniku?: string;
+  /** Kód právní formy. Stejný číselník, jakým se dá i filtrovat (viz `SPLIT_FORMS`). */
+  pravniForma?: string;
+  /**
+   * Stav subjektu v jednotlivých rejstřících. Zajímá nás `stavZdrojeDph`: registr plátců DPH
+   * se dnes obchází zvlášť SOAPem na ADIS, ale ten stíhá jen část firem — kdežto tohle přijde
+   * v odpovědi, kterou stahujeme tak jako tak.
+   */
+  seznamRegistraci?: { stavZdrojeDph?: string };
 }
 
 interface AresFilter {
@@ -91,6 +99,15 @@ function toLead(s: AresSubject): RawLead | null {
     obecCode: s.sidlo?.kodObce,
     category: nace[0],
     foundedAt: parseAresDate(s.datumVzniku),
+    legalForm: s.pravniForma,
+    // Jen když ARES řekne „AKTIVNI". „NEEXISTUJICI" znamená, že subjekt v registru plátců není,
+    // tedy plátce není — a to je odpověď, ne mezera. Cokoli jiného (ZANIKLY…) necháváme
+    // nevyplněné a ať to případně doplní dotaz na ADIS, který umí i nespolehlivého plátce.
+    vatPayer: s.seznamRegistraci?.stavZdrojeDph === 'AKTIVNI'
+      ? true
+      : s.seznamRegistraci?.stavZdrojeDph === 'NEEXISTUJICI'
+        ? false
+        : undefined,
   };
 }
 

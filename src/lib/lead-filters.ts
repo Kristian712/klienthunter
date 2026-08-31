@@ -50,6 +50,10 @@ export interface FilterableLead {
    * never opened mean "we did not look", not "the firm has no profiles".
    */
   socialsChecked?: boolean | null;
+  /** Kód právní formy z ARESu. `112` s.r.o., `101` živnostník, `121` a.s. … */
+  legalForm?: string | null;
+  /** Počet provozoven s aktivním živnostenským oprávněním. NULL = nezeptali jsme se. */
+  activePremises?: number | null;
 }
 
 export type FilterGroup = 'web' | 'contact' | 'company';
@@ -124,6 +128,25 @@ function hasSocial(b: FilterableLead): boolean {
   return Boolean(b.hasFacebook || b.hasInstagram || b.hasLinkedIn);
 }
 
+/**
+ * Právní formy, které nejsou fyzická osoba.
+ *
+ * `100` a `101` jsou podnikající fyzická osoba — všechno ostatní je právnická osoba, tedy někdo,
+ * kdo za založení zaplatil a každý rok podává účetní závěrku. Test je proto „není OSVČ" a ne
+ * výčet forem: číselník ARESu má přes sto položek a nový spolek nebo evropská společnost nemá
+ * propadnout sítem jen proto, že jsme na ni zapomněli.
+ */
+const SOLE_TRADER_FORMS = ['100', '101'];
+
+function isCompany(b: FilterableLead): boolean {
+  return Boolean(b.legalForm) && !SOLE_TRADER_FORMS.includes(b.legalForm!);
+}
+
+/** Provozovna s aktivním živnostenským oprávněním. `null` znamená, že jsme se nezeptali. */
+function hasActivePremises(b: FilterableLead): boolean {
+  return typeof b.activePremises === 'number' && b.activePremises > 0;
+}
+
 function olderThan(years: number) {
   return (b: FilterableLead) => {
     const age = yearsSince(b.foundedAt);
@@ -150,6 +173,56 @@ const ageUnknown = (b: FilterableLead) => yearsSince(b.foundedAt) === null;
 const vatUnknown = (b: FilterableLead) => b.vatPayer === null || b.vatPayer === undefined;
 
 export const LEAD_FILTERS: LeadFilter[] = [
+  {
+    /**
+     * Firmy, které dávají znát, že opravdu fungují.
+     *
+     * Proč zrovna tyhle tři podmínky a proč OR: ARES do výsledků nedává nikoho se zrušenou
+     * živností, takže „má živnost, ale nepodniká" nejde poznat ze stavu živnosti. Nejblíž tomu
+     * je počet aktivních provozoven — kdo je měl a všechny zrušil, skoro jistě skončil.
+     * Změřeno na 100 kadeřnictvích ve Zlíně: 39 z nich nemá aktivní ani jednu.
+     *
+     * Plátcovství DPH a právní forma jsou tam jako druhá a třetí šance, ne jako přitvrzení.
+     * Samotné by filtr posunuly ke korporacím, jenže ideální klient na web je často malá
+     * aktivní živnostnice bez DPH — a ta má obvykle registrovanou provozovnu.
+     *
+     * Čím to lže: kadeřnice v pronajatém křesle nebo řemeslník jezdící ke klientům provozovnu
+     * registrovanou mít nemusí. Proto jde filtr vypnout.
+     */
+    id: 'working',
+    group: 'company',
+    label: { cs: 'Jen fungující podniky', sk: 'Len fungujúce podniky', en: 'Operating businesses only' },
+    where: {
+      OR: [
+        { activePremises: { gt: 0 } },
+        { vatPayer: true },
+        { legalForm: { not: null, notIn: SOLE_TRADER_FORMS } },
+      ],
+    },
+    test: b => hasActivePremises(b) || b.vatPayer === true || isCompany(b),
+    /**
+     * Nezeptali jsme se ani na jedno ze tří. Pro skórování je to mezera, ne odpověď — jinak by
+     * firma bez IČO (tedy z OpenStreetMap, kde nemáme co dotazovat) vyšla jako potvrzeně mrtvá.
+     */
+    unknown: b => b.activePremises == null && b.vatPayer == null && !b.legalForm,
+  },
+  {
+    /**
+     * Přísnější stupeň: k provozovně navíc chce ekonomickou stopu. Krátký seznam na obvolání,
+     * ne výchozí pohled — vyhodí i spoustu živých malých firem.
+     */
+    id: 'verified',
+    group: 'company',
+    label: { cs: 'Jen prověřené', sk: 'Len preverené', en: 'Verified only' },
+    where: {
+      AND: [
+        { activePremises: { gt: 0 } },
+        { OR: [{ vatPayer: true }, { legalForm: { not: null, notIn: SOLE_TRADER_FORMS } }] },
+      ],
+    },
+    test: b => hasActivePremises(b) && (b.vatPayer === true || isCompany(b)),
+    unknown: b => b.activePremises == null && b.vatPayer == null && !b.legalForm,
+  },
   {
     id: 'no_website',
     group: 'web',

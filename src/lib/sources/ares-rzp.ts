@@ -18,6 +18,13 @@ interface RzpTrade {
   predmetPodnikani?: unknown;
 }
 
+interface RzpProvozovnyStav {
+  pocetCelkem?: number;
+  pocetAktivnich?: number;
+  pocetZaniklych?: number;
+  pocetPozastavenych?: number;
+}
+
 function establishments(trades: RzpTrade[]): RzpEstablishment[] {
   return trades.flatMap(t => t.provozovny ?? []);
 }
@@ -37,13 +44,25 @@ export const aresRzpSource: EnrichmentSource = {
       });
       if (res.status !== 200) return {};
 
-      const trades: RzpTrade[] = res.data?.zaznamy?.[0]?.zivnosti ?? [];
+      const zaznam: { zivnosti?: RzpTrade[]; provozovnyStav?: RzpProvozovnyStav } | undefined =
+        res.data?.zaznamy?.[0];
+      const trades: RzpTrade[] = zaznam?.zivnosti ?? [];
       const premises = establishments(trades);
-      if (premises.length === 0) return {};
+
+      /**
+       * Kolik provozoven firmě běží. Bereme hotové počítadlo z odpovědi, ne `premises.length` —
+       * to by lhalo, protože `provozovny` visí pod každou živností zvlášť a jedna provozovna se
+       * tak v seznamu opakuje tolikrát, kolik má firma živností.
+       */
+      const activePremises: number | undefined =
+        typeof zaznam?.provozovnyStav?.pocetAktivnich === 'number'
+          ? zaznam.provozovnyStav.pocetAktivnich
+          // Firma bez jediné provozovny v rejstříku počítadlo nemá; to je nula, ne „nevíme".
+          : zaznam ? 0 : undefined;
 
       // Prefer a real shop or workshop address over the registered seat.
-      const address = premises[0].sidloProvozovny?.textovaAdresa;
-      return address ? { address } : {};
+      const address = premises[0]?.sidloProvozovny?.textovaAdresa;
+      return address ? { address, activePremises } : { activePremises };
     } catch {
       return {};
     }

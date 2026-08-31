@@ -129,6 +129,13 @@ model BusinessResult {
   // From the VAT register. NULL means we never asked, not that the answer was no.
   vatPayer      Boolean?
   vatUnreliable Boolean?
+  /// Kód právní formy z ARESu (112 = s.r.o., 101 = živnostník, 121 = a.s. …). Ukládá se kód,
+  /// ne přeložený název — číselník patří do zobrazovací vrstvy.
+  legalForm     String?
+  /// Počet provozoven s aktivním živnostenským oprávněním. Nejlepší volně dostupný signál, že
+  /// firma opravdu funguje: kdo měl provozovny a všechny zrušil, skoro jistě skončil. NULL
+  /// znamená, že jsme se nezeptali (firma bez IČO nebo nestihnutý dotaz), 0 je odpověď.
+  activePremises Int?
   hasWebsite    Boolean  @default(false)
   // NULL on rows written before three-state classification existed; readers fall back to hasWebsite.
   websiteStatus String?

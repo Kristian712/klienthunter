@@ -91,6 +91,10 @@ export interface Candidate {
   foundedAt?: Date;
   vatPayer?: boolean;
   vatUnreliable?: boolean;
+  /** Kód právní formy z ARESu. `112` s.r.o., `101` živnostník, `121` a.s. … */
+  legalForm?: string;
+  /** Počet provozoven s aktivním živnostenským oprávněním. Viz `RawLead.activePremises`. */
+  activePremises?: number;
   signals: WebsiteSignals;
 }
 
@@ -112,6 +116,8 @@ export function toCandidate(lead: RawLead): Candidate {
     obecCode: lead.obecCode,
     category: lead.category,
     foundedAt: lead.foundedAt,
+    legalForm: lead.legalForm,
+    vatPayer: lead.vatPayer,
     signals: {
       claimedUrl: lead.website,
       osmSaysEmpty: lead.sourceId === 'osm' && !lead.website,
@@ -137,6 +143,9 @@ function absorb(target: Candidate, lead: RawLead): void {
   if (!target.ruianCode) { target.ruianCode = lead.ruianCode; target.obecCode = lead.obecCode; }
   // An OSM record merged with an ARES one inherits the founding date it could never have.
   if (!target.foundedAt) target.foundedAt = lead.foundedAt;
+  // Totéž pro právní formu a stav DPH: nese je jen ARES, ale platí o firmě, ne o záznamu.
+  if (!target.legalForm) target.legalForm = lead.legalForm;
+  if (target.vatPayer === undefined) target.vatPayer = lead.vatPayer;
 
   // Asymmetric on purpose: a website claim from any source counts, silence from one source
   // never cancels a claim from another.
@@ -259,8 +268,10 @@ export async function enrichAndVerify(
       // The trade register knows where the business actually operates; the registered seat of
       // a sole trader is usually their flat, so this address is worth overwriting with.
       if (patch.address) c.address = patch.address;
+      // ADIS umí navíc nespolehlivého plátce, takže jeho odpověď přebíjí tu z ARESu.
       if (patch.vatPayer !== undefined) c.vatPayer = patch.vatPayer;
       if (patch.vatUnreliable !== undefined) c.vatUnreliable = patch.vatUnreliable;
+      if (patch.activePremises !== undefined) c.activePremises = patch.activePremises;
     }
   };
 
