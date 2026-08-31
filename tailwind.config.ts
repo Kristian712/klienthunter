@@ -39,8 +39,15 @@ const config: Config = {
           soft:    '#fff1ec',
           ink:     '#bf2e00',
         },
-        /** The only line colour in the app. Hairlines replace cards and shadows. */
-        line: '#e5e5e5',
+        /**
+         * Jediná barva linek v aplikaci. Hairline nahrazuje karty a stíny.
+         *
+         * Je poloprůhledná, ne plná šedá: na teplém podkladu `#f6f5f2` vypadá plná `#e5e5e5`
+         * studeně a vystupuje víc než text, který ohraničuje.
+         */
+        line: 'rgba(16, 16, 17, 0.10)',
+        /** Silnější varianta pro místa, kde linka nese hierarchii, ne jen oddělení. */
+        'line-strong': 'rgba(16, 16, 17, 0.18)',
         surface: {
           DEFAULT: 'rgb(var(--surface) / <alpha-value>)',
           subtle:  'rgb(var(--surface-subtle) / <alpha-value>)',
@@ -53,8 +60,11 @@ const config: Config = {
         },
       },
       fontFamily: {
-        sans: ['var(--font-inter)', 'Inter', 'system-ui', 'sans-serif'],
-        mono: ['ui-monospace', 'SFMono-Regular', 'monospace'],
+        sans:    ['var(--font-inter)', 'Inter', 'system-ui', 'sans-serif'],
+        /** Nadpisy a displeje. Charakter značky sedí v tomhle písmu, ne v barvě. */
+        display: ['var(--font-display)', 'Bricolage Grotesque', 'var(--font-inter)', 'sans-serif'],
+        /** Čísla a verzálkové mikropopisky. Stejně široké číslice drží sloupce v klidu. */
+        mono:    ['var(--font-mono)', 'JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'monospace'],
       },
       borderRadius: {
         // Nothing rounder than 8px anywhere. `xl`/`2xl` are remapped rather than removed so
@@ -66,8 +76,8 @@ const config: Config = {
       },
       fontSize: {
         // Fluid display sizes. The landing headline is meant to fill a third of the screen.
-        'display':    ['clamp(2.75rem, 9vw, 6.5rem)', { lineHeight: '0.9', letterSpacing: '-0.04em' }],
-        'display-sm': ['clamp(2rem, 5vw, 3.25rem)',   { lineHeight: '0.95', letterSpacing: '-0.03em' }],
+        'display':    ['clamp(2.75rem, 9vw, 6.5rem)', { lineHeight: '0.88', letterSpacing: '-0.045em' }],
+        'display-sm': ['clamp(2rem, 5vw, 3.25rem)',   { lineHeight: '0.92', letterSpacing: '-0.035em' }],
       },
     },
   },

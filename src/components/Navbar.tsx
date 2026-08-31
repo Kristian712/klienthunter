@@ -63,7 +63,7 @@ export function Navbar() {
 
   if (standalone) return null;
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-line">
+    <header className="fixed top-0 left-0 right-0 z-50 bg-surface border-b border-line">
       <nav className="max-w-6xl mx-auto px-5 flex items-center h-14 gap-8">
 
         <Link href={`/${locale}`} className="font-extrabold text-[17px] tracking-tight shrink-0">
@@ -101,7 +101,7 @@ export function Navbar() {
               </button>
 
               {dropdown && (
-                <div className="absolute right-0 top-full mt-2 w-52 bg-white border border-line rounded-lg py-1 animate-fade-in">
+                <div className="absolute right-0 top-full mt-2 w-52 bg-surface-subtle border border-line rounded-lg py-1 animate-fade-in">
                   <Link href={`/${locale}/profile`} onClick={() => setDropdown(false)}
                     className="block px-4 py-2.5 text-sm text-ink hover:bg-surface-subtle transition-colors">
                     {locale === 'cs' ? 'Můj profil' : 'My profile'}
@@ -140,7 +140,7 @@ export function Navbar() {
       </nav>
 
       {mobile && (
-        <div className="md:hidden border-t border-line px-5 py-4 space-y-1 bg-white animate-fade-in">
+        <div className="md:hidden border-t border-line px-5 py-4 space-y-1 bg-surface animate-fade-in">
           {links.map(l => (
             <Link key={l.href} href={l.href}
               className="block py-2.5 text-sm font-medium text-ink"

@@ -26,8 +26,8 @@
   },
   "search": {
     "title": "Vyhľadať firmy",
-    "region_label": "Región / Mesto",
-    "industry_label": "Odbor / Kategória",
+    "region_label": "Región",
+    "industry_label": "Odbor",
     "search_button": "Vyhľadať",
     "searching": "Vyhľadávam…",
     "export_excel": "Exportovať do Excelu",

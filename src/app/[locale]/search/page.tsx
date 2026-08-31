@@ -66,6 +66,10 @@ interface BusinessResult {
   foundedAt?: string | null;
   vatPayer?: boolean;
   vatUnreliable?: boolean;
+  /** Kód právní formy z ARESu. `112` s.r.o., `101` živnostník, `121` a.s. … */
+  legalForm?: string | null;
+  /** Počet provozoven s aktivním živnostenským oprávněním. NULL = nezeptali jsme se. */
+  activePremises?: number | null;
 }
 
 /** Průběh hledání, které běží na pozadí. Odpovídá řádku `SearchJob` v databázi. */
@@ -634,7 +638,14 @@ export default function SearchPage() {
     window.history.replaceState({}, '', window.location.pathname);
   }
 
-  const [active, setActive]               = useState<Set<string>>(new Set());
+  /**
+   * Filtr „Jen fungující podniky" startuje zapnutý.
+   *
+   * Bez něj je v každém výsledku zhruba třetina lidí, kteří mají živnost, ale žádnou aktivní
+   * provozovnu — na mapě se přes ně nedá klikat a v seznamu se v nich nedá číst. Vypnout ho jde
+   * jedním kliknutím na tentýž chip, takže výchozí zapnutí nic neschovává natrvalo.
+   */
+  const [active, setActive]               = useState<Set<string>>(new Set(['working']));
   const [results, setResults]             = useState<BusinessResult[]>([]);
   const [searchId, setSearchId]           = useState<string | null>(null);
   /** Výsledky pocházejí z ukázky pro nepřihlášené: pět řádků, kontakty server vůbec neposlal. */
@@ -925,7 +936,7 @@ export default function SearchPage() {
         <OnboardingModal locale={locale} initial={profile} onDone={closeOnboarding} />
       )}
 
-      <div className="border-b border-line bg-white">
+      <div className="border-b border-line bg-surface">
         <div className="max-w-6xl mx-auto px-4 py-8">
           <h1 className="text-2xl font-bold text-ink mb-1">{t('title')}</h1>
           <p className="text-ink-muted text-sm">
@@ -974,7 +985,6 @@ export default function SearchPage() {
                 key={sc.id}
                 type="button"
                 onClick={() => setScenario(sc.id)}
-                title={localized(sc.hint, locale)}
                 className={scenario === sc.id ? 'chip-active' : 'chip'}
               >
                 {localized(sc.label, locale)}
@@ -990,7 +1000,6 @@ export default function SearchPage() {
             {/* Region select */}
             <div className="md:col-span-2">
               <label className="label">
-                <MapPin size={13} className="inline mr-1" />
                 {t('region_label')}
               </label>
               <div className="relative">
@@ -1031,7 +1040,6 @@ export default function SearchPage() {
                 Psaní zvládne obojí naráz: filtruje seznam a zároveň je to ten volný text. */}
             <div className="md:col-span-2">
               <label className="label">
-                <Search size={13} className="inline mr-1" />
                 {t('industry_label')}
               </label>
 
@@ -1054,10 +1062,8 @@ export default function SearchPage() {
                   aria-autocomplete="list"
                   role="combobox"
                 />
-                <ChevronDown size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none" />
-
                 {industryOpen && (
-                  <ul className="absolute z-20 left-0 right-0 mt-1 max-h-64 overflow-y-auto bg-white border border-ink">
+                  <ul className="absolute z-20 left-0 right-0 mt-1 max-h-64 overflow-y-auto bg-surface-subtle border border-ink">
                     {industryMatches.map(item => (
                       <li key={item.value}>
                         <button
@@ -1104,7 +1110,7 @@ export default function SearchPage() {
                   </svg>
                   {t('searching')}
                 </span>
-              ) : <><Search size={16} />{t('search_button')}</>}
+              ) : t('search_button')}
             </button>
           </div>
 
@@ -1377,7 +1383,7 @@ export default function SearchPage() {
                             value={statusOf(b) ?? 'new'}
                             onChange={e => setLeadStatus(b.id, e.target.value as LeadStatus)}
                             aria-label={localized({ cs: 'Stav', sk: 'Stav', en: 'Status' }, locale)}
-                            className="text-[11px] border border-line rounded-lg px-1.5 py-0.5 bg-white cursor-pointer hover:border-ink transition-colors"
+                            className="text-[11px] border border-line rounded-lg px-1.5 py-0.5 bg-surface-subtle cursor-pointer hover:border-ink transition-colors"
                             style={{ color: statusDef(statusOf(b))?.color ?? undefined }}
                           >
                             {LEAD_STATUSES.map(st => (

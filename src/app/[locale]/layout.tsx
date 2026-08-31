@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+import { Bricolage_Grotesque, Inter, JetBrains_Mono } from 'next/font/google';
 import { NextIntlClientProvider, useMessages } from 'next-intl';
 import { Navbar } from '@/components/Navbar';
 import { Footer } from '@/components/Footer';
@@ -7,14 +7,36 @@ import { localized } from '@/lib/lead-filters';
 import '../globals.css';
 
 /**
- * One font, exposed as a CSS variable so Tailwind's `font-sans` and the raw CSS in
- * `globals.css` resolve to the same family. Weights are declared explicitly because the
- * design leans on 800 for headlines and 400 for everything else.
+ * Tři písma, každé s jednou prací — stejná sada, jakou používá webovkyvanek.cz, aby appka
+ * a web mluvily jedním hlasem.
+ *
+ *  - Bricolage Grotesque 800 na displeje a nadpisy. Nese celý charakter; těsný proklad se
+ *    nastavuje až v `tailwind.config.ts`, ne tady.
+ *  - Inter na běžný text. Nejlépe čitelný grotesk na malé velikosti, co je zadarmo.
+ *  - JetBrains Mono na čísla a malé verzálkové popisky. Číslice mají stejnou šířku, takže
+ *    sloupec počtů v tabulce nepoulá při každé změně.
+ *
+ * Všechna jako CSS proměnné, aby `font-sans`/`font-display`/`font-mono` v Tailwindu a raw CSS
+ * v `globals.css` sahaly na tutéž rodinu.
  */
 const inter = Inter({
   subsets: ['latin', 'latin-ext'],
-  weight: ['400', '500', '600', '700', '800'],
+  weight: ['400', '500', '600', '700'],
   variable: '--font-inter',
+  display: 'swap',
+});
+
+const bricolage = Bricolage_Grotesque({
+  subsets: ['latin', 'latin-ext'],
+  weight: ['600', '700', '800'],
+  variable: '--font-display',
+  display: 'swap',
+});
+
+const mono = JetBrains_Mono({
+  subsets: ['latin', 'latin-ext'],
+  weight: ['400', '500'],
+  variable: '--font-mono',
   display: 'swap',
 });
 
@@ -55,7 +77,7 @@ export default function RootLayout({
   const messages = useMessages();
 
   return (
-    <html lang={locale} className={inter.variable}>
+    <html lang={locale} className={`${inter.variable} ${bricolage.variable} ${mono.variable}`}>
       <body className="font-sans">
         <NextIntlClientProvider locale={locale} messages={messages}>
           <Navbar />

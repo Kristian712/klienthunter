@@ -26,8 +26,8 @@
   },
   "search": {
     "title": "Vyhledat firmy",
-    "region_label": "Region / Město",
-    "industry_label": "Obor / Kategorie",
+    "region_label": "Region",
+    "industry_label": "Obor",
     "search_button": "Vyhledat",
     "searching": "Vyhledávám...",
     "export_excel": "Exportovat do Excelu",

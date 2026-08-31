@@ -19,15 +19,25 @@
     scroll-behavior: smooth;
   }
 
+  /**
+   * Paleta je převzatá z webovkyvanek.cz, aby appka a web nevypadaly jako dvě různé firmy.
+   *
+   * Podklad je teplá špinavě bílá, ne čistá — čistá bílá vedle černého textu svítí a dělá
+   * z rozhraní formulář. Text není absolutní černá ze stejného důvodu.
+   *
+   * Oranžová zůstává jako `--accent`, ale odešla z tlačítek. Nově znamená jedinou věc: data.
+   * Na mapě „web jsme nenašli", v logu tečku za jménem. Když barva neoznačuje nic jiného,
+   * oko ji na mapě mezi pěti sty body najde okamžitě.
+   */
   :root {
-    --surface:        255 255 255;
-    --surface-subtle: 250 250 250;
-    --surface-muted:  244 244 244;
-    --ink:            0 0 0;
-    --ink-muted:      107 107 107;
-    --ink-faint:      154 154 154;
+    --surface:        246 245 242;
+    --surface-subtle: 255 254 252;
+    --surface-muted:  240 239 235;
+    --ink:            16 16 17;
+    --ink-muted:      69 70 74;
+    --ink-faint:      131 132 138;
     --line:           229 229 229;
-    --accent:         230 57 0;
+    --accent:         214 94 0;
   }
 
   body {
@@ -40,7 +50,12 @@
     color: #fff;
   }
 
-  h1, h2, h3 { letter-spacing: -0.02em; }
+  /* Nadpisy nese displejové písmo; těsný proklad je jeho charakter, ne dekorace. */
+  h1, h2, h3 {
+    font-family: var(--font-display), var(--font-inter), sans-serif;
+    font-weight: 800;
+    letter-spacing: -0.035em;
+  }
 }
 
 @layer components {
@@ -48,10 +63,10 @@
   /* ── Type ──────────────────────────────────────────────────────────────────
      The headline is the artwork. Tight tracking, near-zero leading, weight 800. */
   .display {
-    @apply text-display font-extrabold;
+    @apply font-display text-display font-extrabold;
   }
   .display-sm {
-    @apply text-display-sm font-extrabold;
+    @apply font-display text-display-sm font-extrabold;
   }
   /* Numbers that sit in a column must not dance as they change. */
   .tnum { font-variant-numeric: tabular-nums; }
@@ -64,18 +79,22 @@
            disabled:opacity-40 disabled:pointer-events-none whitespace-nowrap;
   }
 
-  /* The one place colour is allowed to shout. */
+  /**
+   * Hlavní akce je černá, ne oranžová. Barva v téhle aplikaci znamená data — oranžový bod na
+   * mapě je „web jsme nenašli". Kdyby stejná oranžová byla i na každém tlačítku, přestala by
+   * na mapě něco znamenat.
+   */
   .btn-primary {
-    @apply btn bg-accent text-white hover:bg-accent-ink px-5 py-2.5 text-sm;
+    @apply btn bg-ink text-surface hover:bg-ink/85 px-5 py-2.5 text-sm;
   }
 
-  /* Secondary action: black on white, the quieter half of every pair of buttons. */
+  /* Alias na primární. Zůstává, aby starší markup dál kompiloval. */
   .btn-dark {
-    @apply btn bg-ink text-white hover:bg-ink/85 px-5 py-2.5 text-sm;
+    @apply btn-primary;
   }
 
   .btn-outline {
-    @apply btn border border-line bg-white text-ink hover:border-ink
+    @apply btn border border-line-strong bg-surface-subtle text-ink hover:border-ink
            text-sm px-5 py-2.5;
   }
 
@@ -88,18 +107,21 @@
 
   /* ── Inputs ── */
   .input {
-    @apply w-full rounded-lg px-4 py-2.5 text-sm bg-white text-ink
-           border border-line
+    @apply w-full rounded-lg px-4 py-2.5 text-sm bg-surface-subtle text-ink
+           border border-line-strong
            focus:outline-none focus:border-ink transition-colors duration-150;
   }
   .input::placeholder { color: rgb(var(--ink-faint)); }
 
-  .label { @apply block text-xs font-semibold uppercase tracking-wider mb-2 text-ink-muted; }
+  /* Popisek pole. Mono s rozpáleným prokladem — stejný hlas jako `[ TVORBA WEBŮ ]` na webu. */
+  .label {
+    @apply block font-mono text-[10px] uppercase tracking-[0.14em] mb-2 text-ink-faint;
+  }
 
   /* ── Surfaces ──────────────────────────────────────────────────────────────
      A card is a hairline outline, never a floating panel. No shadows anywhere. */
   .card {
-    @apply rounded-lg p-6 bg-white border border-line;
+    @apply rounded-lg p-6 bg-surface-subtle border border-line;
   }
   .card-hover {
     @apply card hover:border-ink transition-colors duration-150 cursor-pointer;
@@ -129,7 +151,7 @@
   /* ── Chips (filters) ── */
   .chip {
     @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
-           border border-line text-ink-muted bg-white
+           border border-line text-ink-muted bg-surface-subtle
            hover:border-ink hover:text-ink transition-colors duration-150
            disabled:opacity-40 disabled:pointer-events-none;
   }

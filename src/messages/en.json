@@ -26,8 +26,8 @@
   },
   "search": {
     "title": "Search Businesses",
-    "region_label": "Region / City",
-    "industry_label": "Industry / Category",
+    "region_label": "Region",
+    "industry_label": "Industry",
     "search_button": "Search",
     "searching": "Searching...",
     "export_excel": "Export to Excel",

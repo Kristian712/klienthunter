@@ -60,7 +60,6 @@ const T = {
   hasShort: { cs: 'má web',          sk: 'má web',         en: 'has a site' },
   noneShort:{ cs: 'web neuveden',    sk: 'web neuvedený',  en: 'no site listed' },
   openMaps: { cs: 'Otevřít na Google Maps', sk: 'Otvoriť na Google Maps', en: 'Open in Google Maps' },
-  status:   { cs: 'Stav',            sk: 'Stav',           en: 'Status' },
   legend:   { cs: 'Legenda',         sk: 'Legenda',        en: 'Legend' },
   legWeb:   { cs: 'Web',             sk: 'Web',            en: 'Website' },
   legTags:  { cs: 'Vaše značky',     sk: 'Vaše značky',    en: 'Your tags' },
@@ -79,6 +78,52 @@ const T = {
 export function googleMapsHref(lead: MapLead): string {
   const q = [lead.name, lead.address].filter(Boolean).join(', ');
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;
+}
+
+/**
+ * Přebarví načtený podklad do palety webovkyvanek.cz.
+ *
+ * Positron je nejtišší styl, jaký OpenFreeMap nabízí, ale je studeně šedozelený a maluje plochy
+ * zeleně, které na mapě firem nic neznamenají. Tady dostane teplou špinavě bílou `#f6f5f2` —
+ * tedy přesně pozadí webu — bílé silnice a tlumené popisky. Body jsou pak jediná sytá věc na
+ * obrazovce, což je celý smysl té mapy.
+ *
+ * Mění se hotový styl po načtení, ne jeho JSON před vytvořením mapy: kdyby se čekalo na stažení
+ * a úpravu stylu, neexistovala by mapa, do které se dají sázet body, a první dávka firem by se
+ * ztratila.
+ */
+function tintVanek(m: MapLibreMap) {
+  const style = m.getStyle();
+  if (!style?.layers) return;
+
+  for (const layer of style.layers) {
+    const id = layer.id;
+    // POI a půdorysy budov: na mapě, kde každý bod je firma, jsou to jen další tečky navíc.
+    if (/poi|building/i.test(id)) {
+      if (m.getLayer(id)) m.removeLayer(id);
+      continue;
+    }
+    try {
+      if (layer.type === 'background') m.setPaintProperty(id, 'background-color', '#f6f5f2');
+      if (layer.type === 'fill') {
+        const voda = /water/i.test(id);
+        m.setPaintProperty(id, 'fill-color', voda ? '#e4e3de' : '#f0efeb');
+      }
+      if (layer.type === 'line') {
+        if (/water|river|stream/i.test(id)) m.setPaintProperty(id, 'line-color', '#dcdbd6');
+        else if (/boundary|admin/i.test(id)) m.setPaintProperty(id, 'line-color', 'rgba(16,16,17,.22)');
+        else m.setPaintProperty(id, 'line-color', '#ffffff');
+      }
+      if (layer.type === 'symbol') {
+        m.setPaintProperty(id, 'text-color', '#83848a');
+        m.setPaintProperty(id, 'text-halo-color', '#f6f5f2');
+        m.setPaintProperty(id, 'text-halo-width', 1.4);
+      }
+    } catch {
+      // Vrstva, která tuhle vlastnost nemá. Přeskočit ji je správně — styl se mezi verzemi mění
+      // a jedna neznámá vrstva nesmí shodit celý podklad.
+    }
+  }
 }
 
 /**
@@ -143,7 +188,7 @@ function Swatch({ color, shape, tagged }: { color: string; shape: PointShape; ta
 function Legend({ locale, labelsOn }: { locale: string; labelsOn: boolean }) {
   const tags = LEAD_STATUSES.filter(s => s.id !== 'new');
   return (
-    <aside className="md:w-52 shrink-0 border border-line rounded-xl p-3 bg-white">
+    <aside className="md:w-52 shrink-0 border border-line rounded-xl p-3 bg-surface-subtle">
       <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint mb-2">
         {localized(T.legend, locale)}
       </p>
@@ -219,6 +264,7 @@ export function ResultsMap({ leads, total, locale, onSetStatus }: Props) {
       attributionControl: false,
     });
     m.addControl(new NavigationControl({ showCompass: false }), 'top-right');
+    m.on('style.load', () => tintVanek(m));
     // Když se nepovede načíst styl nebo dlaždice, ať to není tichý prázdný obdélník.
     m.on('error', e => { console.warn('mapa:', e?.error?.message ?? e); setFailed(true); });
     // Popisky se přerovnávají až po dojetí pohybu. Během posouvání jedou s body samy — jsou
@@ -351,14 +397,14 @@ export function ResultsMap({ leads, total, locale, onSetStatus }: Props) {
 
           {placeable.length === 0 && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <p className="bg-white/90 border border-line px-4 py-3 text-sm text-ink-muted max-w-xs text-center">
+              <p className="bg-surface-subtle/95 border border-line px-4 py-3 text-sm text-ink-muted max-w-xs text-center">
                 {localized(T.none, locale)}
               </p>
             </div>
           )}
 
           {selected && (
-            <div className="absolute left-3 bottom-16 md:bottom-20 w-[min(20rem,calc(100%-1.5rem))] bg-white border border-ink p-4 shadow-lg">
+            <div className="absolute left-3 bottom-16 md:bottom-20 w-[min(20rem,calc(100%-1.5rem))] bg-surface-subtle border border-ink rounded-lg p-4">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="font-semibold leading-tight">{selected.name}</p>
@@ -369,11 +415,9 @@ export function ResultsMap({ leads, total, locale, onSetStatus }: Props) {
 
               {selected.address && <p className="text-xs text-ink-muted mt-2">{selected.address}</p>}
 
-              <div className="flex flex-wrap gap-2 mt-2">
-                <span className="badge">
-                  {localized(selected.hasWebsite ? T.webHas : T.webNone, locale)}
-                </span>
-                {selected.ico && <span className="badge">IČO {selected.ico}</span>}
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-[11px] text-ink-faint">
+                {!selected.hasWebsite && <span>{localized(T.webNone, locale)}</span>}
+                {selected.ico && <span className="font-mono">IČO {selected.ico}</span>}
               </div>
 
               <div className="flex flex-col gap-1.5 mt-3 text-xs">
@@ -396,9 +440,6 @@ export function ResultsMap({ leads, total, locale, onSetStatus }: Props) {
               </div>
 
               <div className="border-t border-line mt-3 pt-3">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint mb-2">
-                  {localized(T.status, locale)}
-                </p>
                 <div className="flex flex-wrap gap-1.5">
                   {LEAD_STATUSES.map(s => (
                     <button
