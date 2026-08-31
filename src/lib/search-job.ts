@@ -1,6 +1,7 @@
 import { prisma } from './db';
 import { persistResults } from './lead-persist';
 import { enrichAndVerify, mergeLeads } from './lead-pipeline';
+import { fillCoordinates } from './ruian';
 import { discoverAll } from './sources';
 
 /**
@@ -65,6 +66,15 @@ export async function runSearchJob(jobId: string): Promise<void> {
       where: { id: jobId },
       data: { foundCount: candidates.length },
     });
+
+    /**
+     * Souřadnice z RÚIAN, ještě než se začnou ověřovat weby.
+     *
+     * Musí to být tady: `persistResults` zapisuje `lat`/`lon` z kandidáta, takže kdyby se
+     * doplňovaly až potom, první dávky by na mapě chyběly. Stojí to jedno stažení na obec
+     * (řádově desetiny sekundy) a selhání ČÚZK hledání nepoloží — firmy jen zůstanou bez bodu.
+     */
+    await fillCoordinates(candidates);
 
     let processed = 0;
     await enrichAndVerify(candidates, {

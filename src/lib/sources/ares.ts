@@ -29,7 +29,7 @@ interface AresSubject {
   dic?: string;
   obchodniJmeno?: string;
   czNace?: string[];
-  sidlo?: { textovaAdresa?: string; kodAdresnihoMista?: number };
+  sidlo?: { textovaAdresa?: string; kodAdresnihoMista?: number; kodObce?: number };
   /** `YYYY-MM-DD`, already in the search response — no detail request needed. */
   datumVzniku?: string;
 }
@@ -40,7 +40,7 @@ interface AresFilter {
   czNace?: string[];
   obchodniJmeno?: string;
   pravniForma?: string[];
-  sidlo?: { textovaAdresa?: string; kodAdresnihoMista?: number };
+  sidlo?: { textovaAdresa?: string; kodAdresnihoMista?: number; kodObce?: number };
 }
 
 interface AresPage {
@@ -88,6 +88,7 @@ function toLead(s: AresSubject): RawLead | null {
     address: s.sidlo?.textovaAdresa,
     // Souřadnice ARES nevrací, ale tenhle kód je klíč k nim. Viz `RawLead.ruianCode`.
     ruianCode: s.sidlo?.kodAdresnihoMista,
+    obecCode: s.sidlo?.kodObce,
     category: nace[0],
     foundedAt: parseAresDate(s.datumVzniku),
   };

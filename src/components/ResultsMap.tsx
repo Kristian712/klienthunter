@@ -72,8 +72,11 @@ export function ResultsMap({ leads, total, locale, onSetStatus }: Props) {
   const container = useRef<HTMLDivElement | null>(null);
   const map = useRef<MapLibreMap | null>(null);
   const markers = useRef<Marker[]>([]);
+  /** Na výsledky se doskočí jednou. Další dávky už mapu pod rukama neposouvají. */
+  const fitted = useRef(false);
   const [selected, setSelected] = useState<MapLead | null>(null);
   const [ready, setReady] = useState(false);
+  const [failed, setFailed] = useState(false);
 
   const placeable = leads.filter(l => typeof l.lat === 'number' && typeof l.lon === 'number');
 
@@ -90,6 +93,8 @@ export function ResultsMap({ leads, total, locale, onSetStatus }: Props) {
     });
     m.addControl(new NavigationControl({ showCompass: false }), 'top-right');
     m.on('load', () => setReady(true));
+    // Když se nepovede načíst styl nebo dlaždice, ať to není tichý prázdný obdélník.
+    m.on('error', e => { console.warn('mapa:', e?.error?.message ?? e); setFailed(true); });
     map.current = m;
     return () => { m.remove(); map.current = null; };
   }, []);
@@ -98,7 +103,10 @@ export function ResultsMap({ leads, total, locale, onSetStatus }: Props) {
   // vysázet znovu než držet a párovat diff.
   useEffect(() => {
     const m = map.current;
-    if (!m || !ready) return;
+    // Schválně bez čekání na `load`: body jsou obyčejné HTML prvky ukotvené k souřadnicím,
+    // se stylem mapy nemají nic společného. Vázat je na načtení dlaždic znamenalo prázdnou
+    // mapu pokaždé, když se styl načítal pomalu nebo vůbec.
+    if (!m) return;
 
     markers.current.forEach(mk => mk.remove());
     markers.current = [];
@@ -117,12 +125,13 @@ export function ResultsMap({ leads, total, locale, onSetStatus }: Props) {
 
     // Po prvním naplnění doskoč na výsledky. Později už ne — uživatel si mapu posouvá sám
     // a skákat mu pod rukama při každé dávce by bylo nepoužitelné.
-    if (placeable.length > 0 && !m.getBounds().contains([placeable[0].lon!, placeable[0].lat!])) {
+    if (placeable.length > 0 && !fitted.current) {
+      fitted.current = true;
       const b = new LngLatBounds();
       placeable.forEach(l => b.extend([l.lon!, l.lat!]));
       m.fitBounds(b, { padding: 48, maxZoom: 14, duration: 400 });
     }
-  }, [placeable.map(l => `${l.id}:${l.status ?? ''}`).join(','), ready]);
+  }, [placeable.map(l => `${l.id}:${l.status ?? ''}`).join(',')]);
 
   return (
     <div className="relative">
@@ -138,6 +147,14 @@ export function ResultsMap({ leads, total, locale, onSetStatus }: Props) {
         )}
       </div>
       <p className="text-[11px] text-ink-faint mt-1">{localized(T.attrib, locale)}</p>
+
+      {failed && (
+        <p className="text-[11px] text-ink-faint mt-1">
+          {localized({ cs: 'Podklad mapy se nepodařilo načíst — body jsou na správných místech, jen bez mapy pod nimi.',
+                       sk: 'Podklad mapy sa nepodarilo načítať — body sú na správnych miestach, len bez mapy pod nimi.',
+                       en: 'The basemap failed to load — the points are in the right places, just without a map under them.' }, locale)}
+        </p>
+      )}
 
       {placeable.length === 0 && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">

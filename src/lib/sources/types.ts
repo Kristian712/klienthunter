@@ -41,6 +41,8 @@ export interface RawLead {
    * jinak by se pro ně muselo znovu do rejstříku.
    */
   ruianCode?: number;
+  /** Kód obce z ARESu. Určuje, který soubor adresních míst z RÚIAN je potřeba stáhnout. */
+  obecCode?: number;
   category?: string;
   /**
    * Date the business was entered in the register. Only the registry sources have it, so a
