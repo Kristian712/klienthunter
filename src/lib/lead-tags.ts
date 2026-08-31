@@ -20,12 +20,22 @@ export interface LeadStatusDef {
   color: string;
 }
 
+/**
+ * Barvy značek jsou z palety Okabe–Ito, která je navržená tak, aby byly její odstíny rozlišitelné
+ * i při deuteranopii a protanopii — tedy u zhruba každého dvanáctého muže. Původní sada měla
+ * zelenou #16a34a pro klienta a červenou #dc2626 pro nezájem; to je přesně ta dvojice, která se
+ * barvoslepému slije v jednu hnědožlutou, a zrovna u „klient" versus „nezájem" je záměna nejdražší.
+ *
+ * Barva ale nikdy nenese informaci sama: web se pozná podle TVARU bodu (viz `pointShape`) a
+ * označená firma má navíc tmavý kroužek. I kdyby čtenář dva odstíny zaměnil, pořád ví, jestli
+ * firma má web a jestli ji už řešil.
+ */
 export const LEAD_STATUSES: LeadStatusDef[] = [
-  { id: 'new',       label: { cs: 'Neosloveno', sk: 'Neoslovené', en: 'Not contacted' }, color: '#9ca3af' },
-  { id: 'contacted', label: { cs: 'Osloveno',   sk: 'Oslovené',   en: 'Contacted' },     color: '#2563eb' },
-  { id: 'talking',   label: { cs: 'Jedná se',   sk: 'Rokuje sa',  en: 'In talks' },      color: '#d97706' },
-  { id: 'client',    label: { cs: 'Klient',     sk: 'Klient',     en: 'Client' },        color: '#16a34a' },
-  { id: 'rejected',  label: { cs: 'Nezájem',    sk: 'Nezáujem',   en: 'Not interested' }, color: '#dc2626' },
+  { id: 'new',       label: { cs: 'Neosloveno', sk: 'Neoslovené', en: 'Not contacted' },  color: '#9ca3af' },
+  { id: 'contacted', label: { cs: 'Osloveno',   sk: 'Oslovené',   en: 'Contacted' },      color: '#0072b2' },
+  { id: 'talking',   label: { cs: 'Jedná se',   sk: 'Rokuje sa',  en: 'In talks' },       color: '#e69f00' },
+  { id: 'client',    label: { cs: 'Klient',     sk: 'Klient',     en: 'Client' },         color: '#009e73' },
+  { id: 'rejected',  label: { cs: 'Nezájem',    sk: 'Nezáujem',   en: 'Not interested' }, color: '#cc79a7' },
 ];
 
 const BY_ID = new Map(LEAD_STATUSES.map(s => [s.id, s]));
@@ -52,14 +62,34 @@ export function statusLabel(id: string | null | undefined, locale: string): stri
  * vyhrává jeho vlastní stav: v tu chvíli ho zajímá, koho už řešil, ne kdo má web.
  */
 export const WEB_COLORS = {
-  /** Web jsme ověřili. */
-  has: '#94a3b8',
+  /** Web jsme ověřili. Šedá schválně: je to ta nezajímavá skupina, nemá strhávat pozornost. */
+  has: '#64748b',
   /** Web jsme nenašli — to je ta skupina, kvůli které se aplikace otvírá. */
-  none: '#ea580c',
+  none: '#d55e00',
 };
 
 export function pointColor(hasWebsite: boolean, status: string | null | undefined): string {
   const def = statusDef(status);
   if (def && def.id !== 'new') return def.color;
   return hasWebsite ? WEB_COLORS.has : WEB_COLORS.none;
+}
+
+export type PointShape = 'circle' | 'diamond';
+
+/**
+ * Tvar bodu na mapě.
+ *
+ * Tvar nese jedinou věc: má firma web, nebo jsme ho nenašli. Drží ji i tehdy, když barvu bodu
+ * přebije uživatelská značka — jinak by u označené firmy nešlo z mapy poznat, kvůli čemu se na
+ * ni vlastně kliklo. Zároveň je to ten „nebarevný" klíč navíc, díky kterému mapa funguje i pro
+ * barvoslepé: kruh a kosočtverec se pletou špatně i v odstínech šedi.
+ */
+export function pointShape(hasWebsite: boolean): PointShape {
+  return hasWebsite ? 'circle' : 'diamond';
+}
+
+/** Označil si uživatel firmu vlastní značkou? „Neosloveno" je výchozí stav, ne značka. */
+export function isTagged(status: string | null | undefined): boolean {
+  const def = statusDef(status);
+  return Boolean(def && def.id !== 'new');
 }
