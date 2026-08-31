@@ -440,7 +440,7 @@ export function ResultsMap({ leads, total, locale, onSetStatus }: Props) {
               </div>
 
               {/* Jeden řádek na to, co firmu identifikuje. Dřív to byly tři odstavce a dva badge. */}
-              <p className="text-[11px] text-ink-faint mt-1 leading-snug">
+              <p className="text-[11px] text-ink-faint mt-1 leading-snug line-clamp-1 md:line-clamp-none">
                 {selected.ico && <span className="font-mono">IČO {selected.ico}</span>}
                 {selected.ico && selected.address && ' · '}
                 {selected.address}
@@ -477,7 +477,7 @@ export function ResultsMap({ leads, total, locale, onSetStatus }: Props) {
                * kartě lámala. „Neosloveno" mezi nimi není: je to výchozí stav, ne volba, a dá se
                * do něj vrátit dalším klikem na už zapnutou možnost.
                */}
-              <div className="grid grid-cols-2 gap-1 mt-2.5 pt-2.5 md:mt-3 md:pt-3 border-t border-line">
+              <div className="grid grid-cols-4 md:grid-cols-2 gap-1 mt-2.5 pt-2.5 md:mt-3 md:pt-3 border-t border-line">
                 {LEAD_STATUSES.filter(st => st.id !== 'new').map(st => {
                   const zapnuto = (selected.status ?? 'new') === st.id;
                   return (
@@ -489,14 +489,15 @@ export function ResultsMap({ leads, total, locale, onSetStatus }: Props) {
                         onSetStatus(selected.id, dalsi);
                         setSelected({ ...selected, status: dalsi });
                       }}
-                      className={`flex items-center gap-1.5 text-[11px] px-2 py-1 md:py-1.5 rounded-md border transition-colors ${
+                      className={`flex items-center justify-center md:justify-start gap-1 md:gap-1.5
+                        text-[10px] md:text-[11px] px-1 md:px-2 py-1 md:py-1.5 rounded-md border transition-colors ${
                         zapnuto
                           ? 'border-ink bg-ink text-surface'
                           : 'border-line text-ink-muted hover:border-ink hover:text-ink'
                       }`}
                     >
                       <span
-                        className="w-2 h-2 rounded-full shrink-0"
+                        className="hidden md:block w-2 h-2 rounded-full shrink-0"
                         style={{ background: st.color, outline: zapnuto ? '1px solid rgba(255,255,255,.5)' : undefined }}
                       />
                       {localized(st.label, locale)}
