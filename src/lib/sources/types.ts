@@ -20,6 +20,16 @@ export interface RawLead {
   phone?: string;
   email?: string;
   website?: string;
+  /**
+   * Profil na sociální síti, jak ho uvádí zdroj.
+   *
+   * Ověřit se nedá: Facebook i Instagram mají v robots.txt `User-agent: * / Disallow: /`
+   * a výslovný zákaz automatizovaného sběru dat, takže profil nenačítáme a nikdy načítat
+   * nebudeme. Platí pro něj tedy stejný standard jako pro telefon a e-mail z OpenStreetMap —
+   * je to tvrzení zdroje, které předáváme dál i s tím, odkud pochází.
+   */
+  facebookUrl?: string;
+  instagramUrl?: string;
   address?: string;
   lat?: number;
   lon?: number;

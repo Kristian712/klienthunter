@@ -25,16 +25,6 @@ function vatLabel(value: boolean | null | undefined): string {
 }
 
 /**
- * Social flags are only ever read off the firm's own homepage. On a row where we never found one
- * they are all `false` for the sole reason that nobody looked, so printing "NE" would invent an
- * answer. `socialsChecked` is what tells the two apart.
- */
-export function socialLabel(has: boolean, checked: boolean): string {
-  if (!checked) return '';
-  return has ? 'ANO' : 'NE';
-}
-
-/**
  * Skóre a důvod patří do exportu ze stejného důvodu, z jakého jsou v tabulce: soubor se sype do
  * CRM nebo do sdíleného listu a člověk, který ho tam otevře, u řádku nemá jak zjistit, proč
  * zrovna tahle firma. Věta je počítaná z týchž kritérií jako pořadí, takže export a obrazovka
@@ -54,9 +44,13 @@ export function exportToExcel(
     'Web': b.website || '',
     'Kontaktní stránka': b.contactUrl || '',
     'Má web': WEBSITE_LABEL_CS[resolveStatus(b)],
-    'Má Facebook': socialLabel(b.hasFacebook, b.socialsChecked),
-    'Má Instagram': socialLabel(b.hasInstagram, b.socialsChecked),
-    'Má LinkedIn': socialLabel(b.hasLinkedIn, b.socialsChecked),
+    // Odkaz, ne ANO/NE. Kdo si export otevře, chce na profil kliknout, ne se dozvědět, že
+    // existuje. Prázdná buňka dál znamená „nevíme" i „nenašli jsme" — rozlišit to umí sloupec
+    // „Sítě ověřeny" níž.
+    'Facebook': b.facebookUrl || '',
+    'Instagram': b.instagramUrl || '',
+    'LinkedIn': b.linkedInUrl || '',
+    'Sítě ověřeny': b.socialsChecked ? 'ANO' : '',
     'Plátce DPH': vatLabel(b.vatPayer),
     'Nespolehlivý plátce': vatLabel(b.vatUnreliable),
     // Ratings and review counts came only from Google Places, which had to go for licensing
@@ -73,9 +67,9 @@ export function exportToExcel(
   // One entry per column above, in the same order.
   ws['!cols'] = [
     { wch: 30 }, { wch: 10 }, { wch: 18 }, { wch: 28 }, { wch: 35 },
-    { wch: 30 }, { wch: 34 }, { wch: 10 }, { wch: 12 }, { wch: 14 },
-    { wch: 12 }, { wch: 12 }, { wch: 18 }, { wch: 7 }, { wch: 70 },
-    { wch: 20 }, { wch: 16 },
+    { wch: 30 }, { wch: 34 }, { wch: 10 }, { wch: 38 }, { wch: 38 },
+    { wch: 38 }, { wch: 12 }, { wch: 12 }, { wch: 18 }, { wch: 7 },
+    { wch: 70 }, { wch: 20 }, { wch: 16 },
   ];
 
   const wb = XLSX.utils.book_new();

@@ -60,6 +60,33 @@ ${area}
 out center tags ${limit};`;
 }
 
+/**
+ * Z hodnoty tagu udělá adresu profilu — nebo nic.
+ *
+ * Mapéři to zapisují třemi způsoby: celou adresou, adresou bez protokolu, nebo jen jménem
+ * profilu. Přijímáme všechny tři, ale výsledek musí skončit na doméně té sítě: `contact:facebook`
+ * občas obsahuje odkaz úplně jinam a takový bychom uživateli podstrčili jako profil firmy.
+ */
+function socialUrl(raw: string | undefined, host: 'facebook.com' | 'instagram.com'): string | undefined {
+  const value = raw?.trim();
+  if (!value) return undefined;
+
+  // Holé jméno profilu — žádná tečka, žádné lomítko na začátku.
+  if (/^[A-Za-z0-9._-]{2,60}$/.test(value) && !value.includes('.')) {
+    return `https://www.${host}/${value}`;
+  }
+
+  try {
+    const url = new URL(value.startsWith('http') ? value : `https://${value}`);
+    if (!/^https?:$/.test(url.protocol)) return undefined;
+    const h = url.hostname.replace(/^www\./, '').toLowerCase();
+    if (h !== host && !h.endsWith('.' + host)) return undefined;
+    return url.toString();
+  } catch {
+    return undefined;
+  }
+}
+
 function toLead(el: OverpassElement): RawLead | null {
   const t = el.tags ?? {};
   const name = t.name || t['name:cs'] || t.operator;
@@ -75,6 +102,11 @@ function toLead(el: OverpassElement): RawLead | null {
     phone: t.phone || t['contact:phone'],
     email: t.email || t['contact:email'],
     website: t.website || t['contact:website'] || t.url,
+    // Tagy, které v odpovědi Overpassu už jsou — čtení nic nestojí. Pokrytí je malé (změřeno
+    // přes celou ČR: 38 kadeřnictví, 29 restaurací a 4 autoservisy bez webu, ale s profilem),
+    // jenže je to přesně ta skupina, kterou uživatel oslovuje přes sítě.
+    facebookUrl: socialUrl(t['contact:facebook'] || t.facebook, 'facebook.com'),
+    instagramUrl: socialUrl(t['contact:instagram'] || t.instagram, 'instagram.com'),
     address: address || undefined,
     lat: el.lat ?? el.center?.lat,
     lon: el.lon ?? el.center?.lon,

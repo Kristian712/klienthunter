@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { exportToExcel, socialLabel, WEBSITE_LABEL_CS } from '@/lib/excel-export';
+import { exportToExcel, WEBSITE_LABEL_CS } from '@/lib/excel-export';
 import { leadReason } from '@/lib/lead-reason';
 import { resolveStatus } from '@/lib/website-status';
 
@@ -11,7 +11,7 @@ function toCsv(
 ): string {
   const headers = [
     'Název firmy', 'IČO', 'Telefon', 'Email', 'Adresa', 'Web',
-    'Kontaktní stránka', 'Má web', 'Facebook', 'Instagram', 'LinkedIn',
+    'Kontaktní stránka', 'Má web', 'Facebook', 'Instagram', 'LinkedIn', 'Sítě ověřeny',
     'Plátce DPH', 'Nespolehlivý plátce',
     'Skóre', 'Proč oslovit',
     'Zdroj',
@@ -37,10 +37,12 @@ function toCsv(
     b.website ?? '',
     b.contactUrl ?? '',
     WEBSITE_LABEL_CS[resolveStatus(b)],
-    // Empty, not "NE", on a row where nobody ever looked — see `socialLabel`.
-    socialLabel(b.hasFacebook, b.socialsChecked),
-    socialLabel(b.hasInstagram, b.socialsChecked),
-    socialLabel(b.hasLinkedIn, b.socialsChecked),
+    // Odkaz, ne ANO/NE — export se otvírá proto, aby se na profil dalo kliknout.
+    b.facebookUrl ?? '',
+    b.instagramUrl ?? '',
+    b.linkedInUrl ?? '',
+    // Prázdno u odkazu znamená „nemá" i „nedívali jsme se". Tenhle sloupec ty dva stavy oddělí.
+    b.socialsChecked ? 'ANO' : '',
     vat(b.vatPayer),
     vat(b.vatUnreliable),
     b.leadScore,

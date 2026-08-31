@@ -38,13 +38,19 @@ export async function persistResults(
       email:         c.email ?? contacts.email ?? checks?.email,
       websiteStatus: verdict.status,
       websiteIsOld:  checks?.websiteIsOld ?? false,
-      hasFacebook:   checks?.hasFacebook  ?? Boolean(social.fb),
-      hasInstagram:  checks?.hasInstagram ?? Boolean(social.ig),
+      // Pořadí zdrojů: odkaz z vlastní homepage firmy je její vlastní tvrzení a vyhrává;
+      // tag z OpenStreetMap je tvrzení mapéra a nastupuje, když web nemáme nebo na profil
+      // neodkazoval. Ověřit ani jedno nejde — Meta automatizovaný sběr zakazuje.
+      hasFacebook:   checks?.hasFacebook  || Boolean(c.facebookUrl)  || Boolean(social.fb),
+      hasInstagram:  checks?.hasInstagram || Boolean(c.instagramUrl) || Boolean(social.ig),
       hasLinkedIn:   checks?.hasLinkedIn  ?? Boolean(social.li),
       // The three flags above are only an answer when we had a page to read them off, or when a
       // source handed us a social URL outright. Otherwise they are all false because we never
       // looked, and the UI has to be able to tell the difference.
-      socialsChecked: checks !== null || Boolean(social.fb || social.ig || social.li),
+      socialsChecked:
+        checks !== null ||
+        Boolean(social.fb || social.ig || social.li) ||
+        Boolean(c.facebookUrl || c.instagramUrl),
       foundedAt:     c.foundedAt,
       vatPayer:      c.vatPayer,
       vatUnreliable: c.vatUnreliable,
@@ -62,8 +68,8 @@ export async function persistResults(
         ico:             c.ico,
         hasWebsite:      verdict.status === 'HAS',
         websiteEvidence: verdict.evidence,
-        facebookUrl:     checks?.facebookUrl  ?? social.fb,
-        instagramUrl:    checks?.instagramUrl ?? social.ig,
+        facebookUrl:     checks?.facebookUrl  ?? c.facebookUrl  ?? social.fb,
+        instagramUrl:    checks?.instagramUrl ?? c.instagramUrl ?? social.ig,
         linkedInUrl:     checks?.linkedInUrl  ?? social.li,
         websiteScore:    checks?.websiteScore ?? 50,
         websiteAgeNote:  checks?.websiteAgeNote ?? '',

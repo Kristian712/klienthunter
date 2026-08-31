@@ -146,6 +146,19 @@ function isCzMobile(phone: string): boolean {
  * reader nothing to do at all. It is a search, not a claim: the button says so, and where the
  * user lands is up to what the search engine finds.
  */
+/**
+ * Vyhledávání firmy na Facebooku podle názvu a města.
+ *
+ * Není to dohledaný profil — profil dohledat neumíme a nikdy nebudeme: Facebook i Instagram
+ * mají v robots.txt `User-agent: * / Disallow: /` a výslovně zakazují automatizovaný sběr dat,
+ * takže stránku profilu nesmíme ani načíst, natož ověřit, že patří té firmě. Tlačítko tedy
+ * nic netvrdí, jen ušetří opsání názvu do vyhledávacího pole.
+ */
+function facebookSearchHref(b: BusinessResult): string {
+  const town = (b.address ?? '').split(',').pop()?.replace(/\d/g, '').trim() ?? '';
+  return `https://www.facebook.com/search/top?q=${encodeURIComponent([b.name, town].filter(Boolean).join(' '))}`;
+}
+
 function lookupHref(b: BusinessResult): string {
   // The last part of an ARES address is "70030 Ostrava"; the postcode only narrows a web search
   // by accident, so it goes.
@@ -197,6 +210,10 @@ const CONTACT = {
   webTip:  { cs: 'Web firmy tak, jak jsme ho ověřili. Kontakty bývají v patičce nebo v menu.',
              sk: 'Web firmy tak, ako sme ho overili. Kontakty bývajú v pätičke alebo v menu.',
              en: 'The website as we verified it. Contacts are usually in the footer or the menu.' },
+  fbSearch:{ cs: 'Hledat na Facebooku', sk: 'Hľadať na Facebooku', en: 'Search on Facebook' },
+  fbSearchTip: { cs: 'Profil jsme nedohledali — Facebook to automatizovaně neumožňuje. Tohle otevře jeho vyhledávání podle názvu a města, ať to nemusíte psát ručně.',
+             sk: 'Profil sme nedohľadali — Facebook to automatizovane neumožňuje. Toto otvorí jeho vyhľadávanie podľa názvu a mesta, aby ste to nemuseli písať ručne.',
+             en: 'We could not find the profile — Facebook does not allow that automatically. This opens its search by name and town so you do not have to type it.' },
   lookup:  { cs: 'Najít firmu na webu', sk: 'Nájsť firmu na webe', en: 'Look the firm up' },
   lookupTip: { cs: 'Otevře vyhledávání podle názvu a města. Její web ani profil jsme nedohledali — tohle je nejrychlejší způsob, jak zkusit najít, kde se firma prezentuje.',
              sk: 'Otvorí vyhľadávanie podľa názvu a mesta. Jej web ani profil sme nedohľadali — toto je najrýchlejší spôsob, ako skúsiť nájsť, kde sa firma prezentuje.',
@@ -269,6 +286,15 @@ function ContactStrategy({ b, locale }: { b: BusinessResult; locale: string }) {
                    href: `mailto:${b.email}`, tip: L(CONTACT.emailTip) });
   }
 
+  /**
+   * Firma bez webu, u které profil neznáme — přesně ta skupina, kterou uživatel oslovuje přes
+   * sítě a dosud si ji dohledával ručně. Nabídneme vyhledávání, ne výsledek.
+   */
+  if (webStatus(b) !== 'HAS' && !b.facebookUrl && !b.hasFacebook) {
+    methods.push({ key: 'fbSearch', icon: <FbIcon />, label: L(CONTACT.fbSearch),
+                   href: facebookSearchHref(b), tip: L(CONTACT.fbSearchTip) });
+  }
+
   // Only when nothing else worked. A row from ARES has a name, an address and an IČO and
   // nothing you can call — leaving it with no action at all is what made the whole list feel
   // broken, even though every fact on it was true.
@@ -319,6 +345,12 @@ const S = {
   // I tady mluvíme o tom, co jsme našli my, ne o tom, co firma má: sítě čteme jen z odkazů na
   // jejím webu a firma může mít Facebook, na který ze svých stránek neodkazuje.
   noSocial:    { cs: 'Sítě jsme nenašli', sk: 'Siete sme nenašli', en: 'We found no profiles' },
+  // Provenience se u odkazu musí říct: jedno je tvrzení firmy, druhé tvrzení mapéra, a ani
+  // jedno jsme neověřili — Facebook a Instagram zakazují automatizovaný přístup, takže profil
+  // sami načíst nesmíme.
+  socialSourceTip: { cs: 'odkaz uvádí web firmy nebo OpenStreetMap; profil sami neověřujeme',
+                     sk: 'odkaz uvádza web firmy alebo OpenStreetMap; profil sami neoverujeme',
+                     en: 'the link comes from the firm\u2019s site or OpenStreetMap; we do not verify the profile itself' },
   noSocialTip: { cs: 'Na webu firmy jsme nenašli odkaz na žádnou sociální síť.',
                  sk: 'Na webe firmy sme nenašli odkaz na žiadnu sociálnu sieť.',
                  en: 'We found no link to a social profile on the firm’s website.' },
@@ -408,15 +440,22 @@ function SocialLinks({ b, locale }: { b: BusinessResult; locale: string }) {
       </span>
     );
   }
+  /**
+   * Náhradní odkaz, když víme o profilu, ale neznáme jeho adresu, je vždycky *vyhledávání*,
+   * nikdy uhodnutá adresa profilu. `instagram.com/<název firmy>` tu dřív stálo jako by to byl
+   * její profil — přitom to je adresa, kterou jsme si vymysleli, a klidně patří někomu jinému.
+   */
+  const q = encodeURIComponent(b.name ?? '');
   const links: Array<[boolean, string, React.ReactNode, string]> = [
-    [b.hasFacebook,  b.facebookUrl  ?? `https://www.facebook.com/search/results/?q=${encodeURIComponent(b.name ?? '')}`,        <FbIcon key="f" />, 'Facebook'],
-    [b.hasInstagram, b.instagramUrl ?? `https://www.instagram.com/${encodeURIComponent(b.name ?? '')}`,                        <IgIcon key="i" />, 'Instagram'],
-    [b.hasLinkedIn,  b.linkedInUrl  ?? `https://www.linkedin.com/search/results/all/?keywords=${encodeURIComponent(b.name ?? '')}`, <LiIcon key="l" />, 'LinkedIn'],
+    [b.hasFacebook,  b.facebookUrl  ?? `https://www.facebook.com/search/top?q=${q}`,                       <FbIcon key="f" />, 'Facebook'],
+    [b.hasInstagram, b.instagramUrl ?? `https://www.instagram.com/explore/search/keyword/?q=${q}`,         <IgIcon key="i" />, 'Instagram'],
+    [b.hasLinkedIn,  b.linkedInUrl  ?? `https://www.linkedin.com/search/results/all/?keywords=${q}`,       <LiIcon key="l" />, 'LinkedIn'],
   ];
   return (
     <span className="flex items-center gap-1.5 flex-wrap">
       {links.filter(([on]) => on).map(([, href, icon, label]) => (
-        <a key={label} href={href} target="_blank" rel="noopener noreferrer" title={label}
+        <a key={label} href={href} target="_blank" rel="noopener noreferrer"
+           title={`${label} — ${localized(S.socialSourceTip, locale)}`}
            className="badge hover:border-ink hover:text-ink transition-colors">
           {icon} {label}
         </a>

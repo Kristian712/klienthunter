@@ -278,6 +278,27 @@ export const LEAD_FILTERS: LeadFilter[] = [
     unknown: b => !hasSocial(b) && !b.socialsChecked,
   },
   {
+    id: 'no_web_has_fb',
+    group: 'web',
+    /**
+     * Firmy, které se dají oslovit přes Facebook, protože jinudy to nejde.
+     *
+     * Nálepka nezní „Nemá web, ale má Facebook", i když přesně tak se ta skupina používá:
+     * že firma web nemá, netvrdíme nikde — ARES weby needviduje a my jsme ho jen nenašli.
+     * Druhá polovina je naopak tvrzení doložené, protože odkaz na profil buď stál na vlastním
+     * webu firmy, nebo ho k jejímu záznamu připojil mapér v OpenStreetMap.
+     */
+    label: { cs: 'Web jsme nenašli, Facebook ano', sk: 'Web sme nenašli, Facebook áno', en: 'No website found, but has Facebook' },
+    where: { AND: [STATUS_NOT_HAS, { hasFacebook: true }] },
+    test: b => webStatusOf(b) !== 'HAS' && Boolean(b.hasFacebook),
+    /**
+     * Jako kritérium to znamená „na tuhle firmu se dá dostat, i když web nemá". Když jsme se
+     * po profilech nikdy nedívali, není to ani splněné, ani nesplněné — polovina kreditu,
+     * stejně jako u ostatních otázek, na které nemáme odpověď.
+     */
+    unknown: b => !b.hasFacebook && !b.socialsChecked,
+  },
+  {
     id: 'no_category',
     group: 'company',
     label: { cs: 'Bez uvedeného oboru', sk: 'Bez uvedeného odboru', en: 'No trade listed' },

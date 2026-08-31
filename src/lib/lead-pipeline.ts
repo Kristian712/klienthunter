@@ -76,6 +76,9 @@ export interface Candidate {
   dic?: string;
   phone?: string;
   email?: string;
+  /** Profil na sociální síti, jak ho uvedl zdroj. Neověřený — viz `RawLead`. */
+  facebookUrl?: string;
+  instagramUrl?: string;
   address?: string;
   category?: string;
   foundedAt?: Date;
@@ -93,6 +96,8 @@ export function toCandidate(lead: RawLead): Candidate {
     dic: lead.dic,
     phone: lead.phone,
     email: lead.email,
+    facebookUrl: lead.facebookUrl,
+    instagramUrl: lead.instagramUrl,
     address: lead.address,
     category: lead.category,
     foundedAt: lead.foundedAt,
@@ -109,6 +114,8 @@ function absorb(target: Candidate, lead: RawLead): void {
   if (!target.dic) target.dic = lead.dic;
   if (!target.phone) target.phone = lead.phone;
   if (!target.email) target.email = lead.email;
+  if (!target.facebookUrl) target.facebookUrl = lead.facebookUrl;
+  if (!target.instagramUrl) target.instagramUrl = lead.instagramUrl;
   if (!target.category) target.category = lead.category;
 
   // IČO is the key everything else hangs off, and only the registry has it.

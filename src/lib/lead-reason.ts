@@ -44,6 +44,7 @@ const PHRASE: Record<string, Text> = {
   has_website:      { cs: 'web má', sk: 'web má', en: 'it has a website' },
   insecure_website: { cs: 'její web běží bez HTTPS', sk: 'jej web beží bez HTTPS', en: 'its site runs without HTTPS' },
   old_website:      { cs: 'její web působí zastarale', sk: 'jej web pôsobí zastarano', en: 'its site looks dated' },
+  no_web_has_fb:    { cs: 'web jsme jí nenašli, ale na Facebooku je', sk: 'web sme jej nenašli, ale na Facebooku je', en: 'we found no website, but it is on Facebook' },
   no_social:        { cs: 'sociální sítě jsme jí nenašli', sk: 'sociálne siete sme jej nenašli', en: 'we found no social profiles' },
   has_contact:      { cs: 'je na koho se obrátit', sk: 'je na koho sa obrátiť', en: 'there is someone to contact' },
   no_contact:       { cs: 'telefon ani e-mail jsme nenašli', sk: 'telefón ani e-mail sme nenašli', en: 'we found no phone or e-mail' },
