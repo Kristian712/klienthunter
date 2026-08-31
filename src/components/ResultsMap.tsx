@@ -193,7 +193,7 @@ export function ResultsMap({ leads, total, locale, onSetStatus }: Props) {
   const map = useRef<MapLibreMap | null>(null);
   const markers = useRef<Marker[]>([]);
   /** Popisky u bodů: k čemu patří a který prvek je nese. Přepočítávají se při každém pohybu mapy. */
-  const labels = useRef<Array<{ lead: MapLead; el: HTMLElement }>>([]);
+  const labels = useRef<Array<{ lead: MapLead; el: HTMLElement; root: HTMLElement }>>([]);
   /** Přepočet popisků. V refu, aby ho posluchače mapy mohly volat, i když se mezitím změnila data. */
   const relayout = useRef<() => void>(() => {});
   const measure = useRef(makeMeasurer());
@@ -263,13 +263,13 @@ export function ResultsMap({ leads, total, locale, onSetStatus }: Props) {
       label.style.cssText = [
         'position:absolute;left:14px;top:50%;transform:translateY(-50%)',
         'white-space:nowrap;font:11px system-ui,-apple-system,sans-serif;color:#111',
-        'background:rgba(255,255,255,.9);padding:1px 4px;border-radius:3px',
+        'background:rgba(255,255,255,.95);padding:1px 4px;border-radius:3px',
         'pointer-events:none;display:none',
       ].join(';');
       el.appendChild(label);
 
       el.addEventListener('click', e => { e.stopPropagation(); setSelected(lead); });
-      labels.current.push({ lead, el: label });
+      labels.current.push({ lead, el: label, root: el });
       markers.current.push(
         new Marker({ element: el }).setLngLat([lead.lon!, lead.lat!]).addTo(m),
       );
@@ -285,7 +285,9 @@ export function ResultsMap({ leads, total, locale, onSetStatus }: Props) {
     relayout.current = () => {
       const map0 = map.current;
       if (!map0) return;
-      labels.current.forEach(l => { l.el.style.display = 'none'; });
+      // Markery jsou sourozenci ve stejné vrstvě, takže ty vysázené později kreslí přes popisky
+      // těch dřívějších. Bod s popiskem se proto na dobu, co ho má, zvedne nad ostatní.
+      labels.current.forEach(l => { l.el.style.display = 'none'; l.root.style.zIndex = ''; });
 
       const on = map0.getZoom() >= LABEL_MIN_ZOOM;
       setLabelsOn(on);
@@ -312,6 +314,7 @@ export function ResultsMap({ leads, total, locale, onSetStatus }: Props) {
 
         taken.push(box);
         item.el.style.display = 'block';
+        item.root.style.zIndex = '1';
       }
     };
 
