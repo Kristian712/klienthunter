@@ -80,6 +80,11 @@ export interface Candidate {
   facebookUrl?: string;
   instagramUrl?: string;
   address?: string;
+  /** Souřadnice, když je zdroj uvedl. Dnes je má jen OpenStreetMap. */
+  lat?: number;
+  lon?: number;
+  /** Kód adresního místa RÚIAN z ARESu — klíč k souřadnicím z otevřených dat ČÚZK. */
+  ruianCode?: number;
   category?: string;
   foundedAt?: Date;
   vatPayer?: boolean;
@@ -99,6 +104,9 @@ export function toCandidate(lead: RawLead): Candidate {
     facebookUrl: lead.facebookUrl,
     instagramUrl: lead.instagramUrl,
     address: lead.address,
+    lat: lead.lat,
+    lon: lead.lon,
+    ruianCode: lead.ruianCode,
     category: lead.category,
     foundedAt: lead.foundedAt,
     signals: {
@@ -121,6 +129,9 @@ function absorb(target: Candidate, lead: RawLead): void {
   // IČO is the key everything else hangs off, and only the registry has it.
   if (!target.ico) target.ico = lead.ico;
   if (!target.address) target.address = lead.address;
+  // Souřadnice nese OSM, kód adresního místa ARES — po sloučení má firma obojí.
+  if (target.lat === undefined) { target.lat = lead.lat; target.lon = lead.lon; }
+  if (!target.ruianCode) target.ruianCode = lead.ruianCode;
   // An OSM record merged with an ARES one inherits the founding date it could never have.
   if (!target.foundedAt) target.foundedAt = lead.foundedAt;
 

@@ -15,6 +15,8 @@ import { SCENARIOS, SCENARIO_BY_PROFESSION, scenarioById } from '@/lib/scenarios
 import { EMPTY_PROFILE, type UserProfile } from '@/lib/profile';
 import { REGIONS, INDUSTRIES, POPULAR_CHIPS } from '@/lib/search-options';
 import { LeadScore, GOOD_LEAD } from '@/components/LeadScore';
+import { ResultsMap, type MapLead } from '@/components/ResultsMap';
+import { LEAD_STATUSES, statusDef, type LeadStatus } from '@/lib/lead-tags';
 import { OnboardingModal } from '@/components/OnboardingModal';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -25,6 +27,11 @@ interface BusinessResult {
   phone?: string;
   email?: string;
   address?: string;
+  /** Souřadnice. Dnes je nese jen OpenStreetMap — u řádků z ARESu chybí. */
+  lat?: number | null;
+  lon?: number | null;
+  /** Značky přihlášeného uživatele. Server je posílá už filtrované na něj. */
+  tags?: Array<{ status: string; note?: string | null }>;
   website?: string;
   /** The firm's own "Kontakt" page, read from the link on its site. */
   contactUrl?: string;
@@ -634,6 +641,15 @@ export default function SearchPage() {
   const [isDemo, setIsDemo]               = useState(false);
   /** Běžící hledání na pozadí. `null` = žádné neběží ani nedoběhlo v tomhle okně. */
   const [job, setJob]                     = useState<JobState | null>(null);
+  /** Seznam, nebo mapa. Výchozí je seznam — mapa umí zobrazit jen firmy se souřadnicemi. */
+  const [view, setView]                   = useState<'list' | 'map'>('list');
+  /**
+   * Značky, které uživatel nastavil v tomhle sezení.
+   *
+   * Drží se zvlášť od `results`, aby se změna projevila okamžitě a nečekala na doběhnutí
+   * požadavku ani na další kolo dotazování — a hlavně aby ji další dávka výsledků nepřepsala.
+   */
+  const [tags, setTags]                   = useState<Record<string, LeadStatus>>({});
   /** Kolik řádků už máme. V refu, ne ve stavu — čte to interval, který se kvůli tomu nemá restartovat. */
   const resultsRef = useRef(0);
   const [loading, setLoading]             = useState(false);
@@ -786,6 +802,36 @@ export default function SearchPage() {
     if (seconds < 90) return `${seconds} s`;
     return `${Math.round(seconds / 60)} min`;
   })();
+
+  /**
+   * Uloží, kde je uživatel s danou firmou.
+   *
+   * Nejdřív se to projeví na obrazovce a teprve pak jde požadavek na server. Kdyby to bylo
+   * naopak, každé kliknutí by na půl sekundy nedělalo nic. Když zápis selže, značka se vrátí
+   * zpátky — nechat na mapě barvu, která se neuložila, by bylo horší než chybová hláška.
+   */
+  const setLeadStatus = async (leadId: string, status: LeadStatus) => {
+    const previous = tags[leadId];
+    setTags(t => ({ ...t, [leadId]: status }));
+    try {
+      const res = await fetch(`/api/leads/${leadId}/tag`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      if (!res.ok) throw new Error('save failed');
+    } catch {
+      setTags(t => {
+        const next = { ...t };
+        if (previous) next[leadId] = previous; else delete next[leadId];
+        return next;
+      });
+    }
+  };
+
+  /** Stav firmy: co uživatel právě naklikal, jinak co přišlo ze serveru. */
+  const statusOf = (b: BusinessResult): string | null =>
+    tags[b.id] ?? b.tags?.[0]?.status ?? null;
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1115,6 +1161,21 @@ export default function SearchPage() {
                 </div>
 
                 <div className="flex items-center gap-4 flex-wrap">
+                  {/* Seznam / mapa. Mapa umí zobrazit jen firmy se souřadnicemi, takže je to
+                      druhý pohled na tatáž data, ne náhrada seznamu. */}
+                  <div className="flex gap-1">
+                    {(['list', 'map'] as const).map(v => (
+                      <button
+                        key={v}
+                        onClick={() => setView(v)}
+                        className={view === v ? 'chip-active' : 'chip'}
+                      >
+                        {v === 'list'
+                          ? localized({ cs: 'Seznam', sk: 'Zoznam', en: 'List' }, locale)
+                          : localized({ cs: 'Mapa', sk: 'Mapa', en: 'Map' }, locale)}
+                      </button>
+                    ))}
+                  </div>
                   {active.size > 0 && (
                     <button onClick={() => setActive(new Set())}
                       className="flex items-center gap-1 text-xs text-ink-muted hover:text-ink transition-colors">
@@ -1174,10 +1235,26 @@ export default function SearchPage() {
               </div>
             </div>
 
+            {view === 'map' && (
+              <ResultsMap
+                locale={locale}
+                total={filtered.length}
+                onSetStatus={setLeadStatus}
+                leads={filtered.map((b): MapLead => ({
+                  id: b.id, name: b.name, address: b.address, phone: b.phone, email: b.email,
+                  website: b.website, category: b.category, ico: b.ico,
+                  lat: b.lat, lon: b.lon,
+                  hasWebsite: webStatus(b) === 'HAS',
+                  websiteStatus: b.websiteStatus, leadScore: b.leadScore,
+                  status: statusOf(b),
+                }))}
+              />
+            )}
+
             {/* ── Results ──────────────────────────────────────────────────────────
                 A row, not a card: one hairline between neighbours, the score on the left, and
                 a 3px accent edge on the ones worth calling first. */}
-            <div className="border-t border-line">
+            <div className={`border-t border-line ${view === 'map' ? 'hidden' : ''}`}>
               {filtered.map((b, i) => {
                 const good = b.leadScore >= GOOD_LEAD;
                 const { reason, scoreTitle } = rowSummary(b, profile.targetFilters, locale);
@@ -1261,6 +1338,23 @@ export default function SearchPage() {
                         <SocialLinks b={b} locale={locale} />
                         {b.ico && (
                           <span className="badge" title="IČO z veřejného rejstříku ARES">IČO {b.ico}</span>
+                        )}
+
+                        {/* Kde jsem s touhle firmou. Select, ne pět chipů — pět tlačítek na
+                            každém z pěti set řádků by z výsledků udělalo houštinu, a na mapě,
+                            kde je na výběr místo, chipy zůstávají. */}
+                        {!isDemo && (
+                          <select
+                            value={statusOf(b) ?? 'new'}
+                            onChange={e => setLeadStatus(b.id, e.target.value as LeadStatus)}
+                            aria-label={localized({ cs: 'Stav', sk: 'Stav', en: 'Status' }, locale)}
+                            className="text-[11px] border border-line rounded-lg px-1.5 py-0.5 bg-white cursor-pointer hover:border-ink transition-colors"
+                            style={{ color: statusDef(statusOf(b))?.color ?? undefined }}
+                          >
+                            {LEAD_STATUSES.map(st => (
+                              <option key={st.id} value={st.id}>{localized(st.label, locale)}</option>
+                            ))}
+                          </select>
                         )}
                         {b.vatUnreliable && (
                           <span className="badge-red" title="Finanční správa firmu vede jako nespolehlivého plátce DPH">

@@ -27,6 +27,9 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     where: { searchId: job.searchId },
     orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     skip: from,
+    // Značky patří přihlášenému uživateli, takže se dotahují filtrované na něj. Kdyby se
+    // vybíraly všechny, viděl by, jak si tutéž firmu označil někdo jiný.
+    include: { tags: { where: { userId: session.userId }, select: { status: true, note: true } } },
   });
 
   return NextResponse.json({ job, results });

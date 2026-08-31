@@ -29,6 +29,7 @@
     "clsx": "^2.1.0",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.344.0",
+    "maplibre-gl": "^6.6.0",
     "next": "14.1.0",
     "next-intl": "^3.9.0",
     "papaparse": "^5.5.4",

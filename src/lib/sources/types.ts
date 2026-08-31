@@ -33,6 +33,14 @@ export interface RawLead {
   address?: string;
   lat?: number;
   lon?: number;
+  /**
+   * Kód adresního místa v RÚIAN, jak ho vrací ARES (`sidlo.kodAdresnihoMista`) u 97 % subjektů.
+   *
+   * Sám o sobě nic nezobrazuje, ale je to klíč do otevřených dat ČÚZK, kde ke každému adresnímu
+   * místu v republice existují souřadnice. Ukládáme ho i tehdy, když souřadnice ještě nemáme —
+   * jinak by se pro ně muselo znovu do rejstříku.
+   */
+  ruianCode?: number;
   category?: string;
   /**
    * Date the business was entered in the register. Only the registry sources have it, so a

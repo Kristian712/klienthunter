@@ -45,6 +45,7 @@ model User {
 
   searches         Search[]
   jobs             SearchJob[]
+  leadTags         LeadTag[]
   savedResults     SavedResult[]
   createdCodes     InviteCode[] @relation("CreatedCodes")
   usedCode         InviteCode[] @relation("UsedCode")
@@ -112,6 +113,14 @@ model BusinessResult {
   phone         String?
   email         String?
   address       String?
+  /// Souřadnice firmy, když je zdroj uvedl. Dnes je má jen OpenStreetMap; ARES vrací adresu
+  /// textem, ale spolu s ní i kód adresního místa RÚIAN (viz `ruianCode`), ze kterého se
+  /// souřadnice dají doplnit z otevřených dat ČÚZK — zadarmo a bez geokódování.
+  lat           Float?
+  lon           Float?
+  /// Kód adresního místa v RÚIAN. ARES ho vrací u 97 % subjektů. Ukládáme ho i bez souřadnic,
+  /// aby se daly doplnit později bez opakovaného dotazu do rejstříku.
+  ruianCode     Int?
   website       String?
   // Czech company registration number. Present only for registry-sourced rows.
   ico           String?
@@ -153,6 +162,7 @@ model BusinessResult {
 
   search  Search        @relation(fields: [searchId], references: [id], onDelete: Cascade)
   savedBy SavedResult[]
+  tags    LeadTag[]
 }
 
 model InviteCode {
@@ -201,4 +211,28 @@ model AnonymousHit {
 
   @@index([ipHash, kind, createdAt])
   @@index([createdAt])
+}
+
+/// Kde je uživatel s danou firmou.
+///
+/// Patří uživateli, ne firmě: dva lidé můžou mít tutéž firmu v úplně jiné fázi a ani jeden
+/// z nich nemá co vidět stav toho druhého. Proto to není sloupec v `BusinessResult`.
+///
+/// `status` je volný řetězec kontrolovaný v aplikaci (`LEAD_STATUSES`), ne enum v databázi —
+/// přidání šestého stavu by jinak znamenalo migraci schématu kvůli jednomu slovu.
+model LeadTag {
+  id               String   @id @default(cuid())
+  userId           String
+  businessResultId String
+  /// `new` | `contacted` | `talking` | `client` | `rejected`
+  status           String
+  note             String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user     User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  business BusinessResult @relation(fields: [businessResultId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, businessResultId])
+  @@index([userId, status])
 }
