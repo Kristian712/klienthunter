@@ -25,7 +25,12 @@ import {
  * Everything here runs against a wall clock. The API routes have sixty seconds, and a lead
  * whose website could not be checked in time is still a lead — it is just UNKNOWN.
  */
-export const CONCURRENCY = 12;
+/**
+ * Delší strop na firmu by se do rozpočtu hledání nevešel, kdyby běželo dvanáct firem naráz.
+ * Práce je čekání na síť, ne počítání, a probíhá proti stovkám různých hostů — zvýšení
+ * paralelismu tedy nikoho nezahltí a vrátí čas, který stojí delší timeouty.
+ */
+export const CONCURRENCY = 20;
 const ENRICH_CONCURRENCY = 8;
 
 /**
@@ -50,7 +55,12 @@ const DISCOVERY_HEADROOM_MS = 6_000;
  * nejvýš čtyři HTTP dotazy po dvou sekundách. Firma, která se do toho nevejde, se vrátí bez
  * ověřeného webu — což je stav, se kterým aplikace odjakživa počítá.
  */
-const PER_CANDIDATE_MS = 8_000;
+/**
+ * Strop na jednu firmu. Bylo 8 s, což stačilo právě na jeden probe — takže záložní podoby
+ * adresy (`www.`, `http://`) se v reálném hledání nikdy nestihly, i když je kód uměl.
+ * Tři varianty po 6 s se vejdou sem.
+ */
+const PER_CANDIDATE_MS = 20_000;
 
 /**
  * Vrátí, co stihne práce, jinak náhradní výsledek. Nikdy nevyhodí výjimku.

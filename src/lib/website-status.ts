@@ -53,7 +53,14 @@ export type RobotsCheck = (url: string) => Promise<{ allowed: boolean; reason: s
  * Cena: přijdeme o weby na opravdu líných serverech. U nich ale platí, že pomalý web je přesně
  * ten, kvůli kterému uživatel firmu oslovuje — takže i tak zůstane ve výsledku, jen bez adresy.
  */
-const PROBE_TIMEOUT = 2_000;
+/**
+ * Kolik čekáme na odpověď webu.
+ *
+ * Byly to 2 s, zkrácené kvůli 60s stropu serverové funkce. Hledání dnes běží na pozadí, kde
+ * strop není — a dvě vteřiny stačily jen na rychlé weby: ESTHEA medical odpověděla za 3 s
+ * a vycházela jako firma bez webu.
+ */
+const PROBE_TIMEOUT = 6_000;
 const MAX_HTML = 500_000;
 const BROWSER_UA =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
@@ -364,11 +371,23 @@ export async function probeWebsite(
     }
   }
 
+  /**
+   * Odpověď bez HTML smyčku neukončí.
+   *
+   * Doména, která vrátí 403, je „živá", ale nepřečetli jsme z ní ani slovo — a přesně to dělá
+   * profservis.cz: holá doména blokuje boty, `www.` servíruje web s IČO firmy. Dokud se
+   * `attempt` bral jako konečná odpověď, `www.` se nikdy nezkusilo a firma s živým webem
+   * vycházela jako firma bez webu. Blokovanou odpověď si proto necháme stranou a vrátíme ji,
+   * jen když žádná další podoba adresy nedá stránku ke čtení.
+   */
+  let blokovano: ProbeResult | null = null;
   for (const variant of urlVariants(url, mode)) {
     const result = await attempt(variant);
-    if (result) return result;
+    if (!result) continue;
+    if (result.html) return result;
+    blokovano ??= result;
   }
-  return { alive: false, reason: 'doména neodpověděla' };
+  return blokovano ?? { alive: false, reason: 'doména neodpověděla' };
 }
 
 // ── Classification ────────────────────────────────────────────────────────────

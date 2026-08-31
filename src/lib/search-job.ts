@@ -29,7 +29,7 @@ const BATCH = 25;
  * úlohy — `runPool` kontroluje hodiny jen než úlohu spustí, takže po vypršení rozpočtu ještě
  * doběhne nejvýš `PER_CANDIDATE_MS` z lead-pipeline.
  */
-const NETWORK_BUDGET_MS = 240_000;
+const NETWORK_BUDGET_MS = 270_000;
 
 /** Job, který se takhle dlouho neposunul, už se nevrátí — instance ho vzala s sebou. */
 export const STALE_AFTER_MS = 5 * 60 * 1000;

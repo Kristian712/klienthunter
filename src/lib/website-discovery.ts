@@ -77,10 +77,24 @@ export function buildNameIndex(names: string[]): NameIndex {
 
 /** The firm's name reduced to plain words: no legal form, no titles, no diacritics. */
 export function nameTokens(name: string): string[] {
-  return normalizeName(name.replace(/"[^"]*"/g, ' '))
+  const cely = normalizeName(name.replace(/"[^"]*"/g, ' '))
+    .split(' ')
+    .filter(t => t.length >= 2);
+  const bezTitulu = normalizeName(name.replace(/"[^"]*"/g, ' '))
     .replace(TITLES, ' ')
     .split(' ')
     .filter(t => t.length >= 2);
+
+  /**
+   * Titul se škrtá jen tehdy, když po něm zbude čím firmu pojmenovat.
+   *
+   * „PROF SERVIS s.r.o." není profesor: `TITLES` z něj udělalo jen „servis", což je obecné
+   * slovo, takže firma nedostala jediného kandidáta na doménu a její web (profservis.cz) jsme
+   * nikdy nehledali. U „MUDr. Nováková" naopak škrtnout chceme. Rozhoduje výsledek: když
+   * škrtání nenechá ani jedno slovo, které firmu odlišuje, bereme název, jak přišel.
+   */
+  const zbylo = bezTitulu.filter(t => !GENERIC_WORDS.has(t));
+  return zbylo.length > 0 ? bezTitulu : cely;
 }
 
 /** A word specific enough that a domain made of it alone could plausibly be this firm's. */
@@ -208,6 +222,7 @@ export function verifyPage(
     return `na stránce je IČO ${firm.ico}`;
   }
 
+
   const tokens = nameTokens(firm.name).filter(t => t.length >= 3);
   if (tokens.length === 0 || !tokens.every(t => hasWord(text, t))) return null;
   // At least one word has to name *this* firm rather than its trade — see `domainCandidates`.
@@ -216,8 +231,20 @@ export function verifyPage(
   // The name is on the page — but so is "restaurace" on every restaurant's page. It only counts
   // when the domain was built out of that same name rather than out of the trade.
   const label = domainLabel(url);
-  const wholeNameIsTheDomain = tokens.every(t => label.includes(t));
-  const distinctiveOnPage = tokens.some(t => isDistinctive(t, index) && label.includes(t));
+  // Proti VŠEM slovům názvu, ne jen těm delším než dva znaky: `tokens` má krátká slova odfiltrovaná,
+  // takže „HP TRONIC" se testovalo jen na „tronic" a `tronic.cz` prošlo jako celý název.
+  const wholeNameIsTheDomain = nameTokens(firm.name).every(t => label.includes(t));
+  /**
+   * Zkratka přes jedno výrazné slovo platí jen u jednoslovných názvů.
+   *
+   * „HP TRONIC, s.r.o." má dvě slova, ale `tronic.cz` nese jen to druhé — a patří někomu jinému.
+   * U víceslovného názvu musí doména nést celý název, jinak je to shoda s cizí firmou, která
+   * má náhodou stejné jedno slovo.
+   */
+  const vsechnaSlova = nameTokens(firm.name);
+  const jednoslovny = vsechnaSlova.length === 1;
+  const distinctiveOnPage =
+    jednoslovny && tokens.some(t => isDistinctive(t, index) && label.includes(t));
   if (!wholeNameIsTheDomain && !distinctiveOnPage) return null;
 
   /**
@@ -231,6 +258,34 @@ export function verifyPage(
   if (tradeWords.length > 0 && !tradeWords.some(w => text.includes(w))) return null;
 
   return 'doména nese název firmy, celý název i obor sedí na stránce';
+}
+
+/** Stránky, kde firmy nejčastěji uvádějí IČO, když ho nemají v patičce homepage. */
+const KONTAKTNI_CESTY = ['/kontakt', '/kontakty', '/contact'];
+
+function obsahujeIco(html: string, ico: string): boolean {
+  return pageText(html).replace(/[^0-9]/g, '').includes(ico.replace(/^0+/, ''));
+}
+
+/** Je na webu IČO té firmy? Homepage, a když ne, tak kontaktní stránka. */
+async function icoOnSite(
+  homepage: string,
+  url: string,
+  ico: string,
+  probe: (url: string, mode?: 'all' | 'first-only') => Promise<ProbeResult>,
+): Promise<boolean> {
+  if (obsahujeIco(homepage, ico)) return true;
+  for (const cesta of KONTAKTNI_CESTY) {
+    let cil: string;
+    try {
+      cil = new URL(cesta, url).toString();
+    } catch {
+      continue;
+    }
+    const r = await probe(cil, 'first-only');
+    if (r.html && obsahujeIco(r.html, ico)) return true;
+  }
+  return false;
 }
 
 /**
@@ -282,16 +337,36 @@ export async function discoverWebsite(
      * nám unikne. Odpovídá to pravidlu, které tenhle modul dodržuje jinde — radši ticho než
      * dohady — jen posunuté o kus dřív.
      */
-    const result = await opts.probe(`https://${domain}`, 'first-only');
+    // Dřív jen jedna podoba adresy, kvůli 60s stropu funkce. Hledání dnes běží na pozadí, takže
+    // se zkouší i `www.` a `http://` — profservis.cz servíruje web výhradně na www a holá doména
+    // vrací 403, takže firma s živým webem vycházela jako „web neuveden".
+    const result = await opts.probe(`https://${domain}`, 'all');
     // Blocked by robots.txt means a site exists but we may not read it — and without reading it
     // we cannot show it belongs to this firm, so it stays unsaid.
     if (!result.alive || !result.html) continue;
 
     const url = result.finalUrl ?? `https://${domain}`;
     const why = verifyPage(result.html, firm, url, index, opts.tradeWords ?? []);
-    if (why) {
-      return { url, html: result.html, evidence: `web dohledán podle názvu firmy: ${why}` };
+    if (!why) continue;
+
+    /**
+     * Shoda jména sama nestačí — musí sedět IČO.
+     *
+     * Doménu jsme si vymysleli z názvu, takže shoda názvu na stránce je kruh: `nisapark.cz`
+     * i `squasharena.cz` projdou testem na jméno a přitom patří jiným subjektům, což se pozná
+     * až podle IČO v patičce. Změřeno na deseti firmách: bez tohohle kroku byly tři z šesti
+     * nálezů cizí web. Falešný web je horší než žádný — uživatel pak nevěří ani zbytku.
+     *
+     * IČO bývá v patičce kontaktní stránky častěji než na homepage, takže se u nadějné domény
+     * podívá i tam. Je to jeden požadavek navíc, a jen u domény, která už prošla jménem.
+     */
+    if (firm.ico) {
+      const potvrzeno = await icoOnSite(result.html, url, firm.ico, opts.probe);
+      if (!potvrzeno) continue;
+      return { url, html: result.html, evidence: `web dohledán podle názvu a potvrzen IČO ${firm.ico}` };
     }
+    // Firma bez IČO (typicky jen z OpenStreetMap) potvrdit nejde, a hádat nebudeme.
+    continue;
   }
 
   return null;
