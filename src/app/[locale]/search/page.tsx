@@ -1045,7 +1045,7 @@ export default function SearchPage() {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-5 gap-4 items-end">
+          <div className="grid md:grid-cols-5 gap-4 items-start">
 
             {/* Region select */}
             <div className="md:col-span-2">
@@ -1145,13 +1145,12 @@ export default function SearchPage() {
                 )}
               </div>
 
-              {yieldNote && (
-                <p className="text-[11px] text-ink-faint mt-1.5 leading-snug">{yieldNote}</p>
-              )}
             </div>
 
+            {/* Odsazení o výšku popisku: sloupec s tlačítkem žádný nemá, a bez toho by tlačítko
+                v mřížce zarovnané nahoru sedělo nad poli místo vedle nich. */}
             <button type="submit" disabled={loading || !effectiveRegion || !effectiveIndustry}
-              className="btn-primary h-[42px]">
+              className="btn-primary h-[42px] md:mt-[23px]">
               {loading ? (
                 <span className="flex items-center gap-2">
                   <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
@@ -1164,14 +1163,14 @@ export default function SearchPage() {
             </button>
           </div>
 
+          {/* Pod mřížkou, ne v ní: uvnitř sloupce tahle věta rozhodila zarovnání polí. */}
+          {yieldNote && (
+            <p className="text-[11px] text-ink-faint mt-2 leading-snug max-w-2xl">{yieldNote}</p>
+          )}
+
+          {/* Kolečko se točí jen v tlačítku. Dvě identická pár centimetrů od sebe byla jen hluk. */}
           {loading && loadingMsg && (
-            <div className="mt-4 flex items-center gap-2 text-sm text-ink-muted border-t border-line pt-4">
-              <svg className="animate-spin h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-              </svg>
-              {loadingMsg}
-            </div>
+            <p className="mt-4 text-sm text-ink-muted border-t border-line pt-4">{loadingMsg}</p>
           )}
         </form>
 

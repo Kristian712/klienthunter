@@ -314,6 +314,9 @@ export default function ProfilePage() {
               {isCs ? 'Zatím žádná vyhledávání.' : 'No searches yet.'}
             </div>
           ) : (
+            <div className="overflow-x-auto">
+              {/* Na 375 px tabulka přetékala o 20 px a rozhoupala celou stránku do stran.
+                  Vodorovné rolování patří tabulce, ne dokumentu. */}
             <table className="w-full text-sm results-table">
               <thead><tr>
                 <th>{isCs ? 'Obor' : 'Industry'}</th>
@@ -340,6 +343,7 @@ export default function ProfilePage() {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </div>
 
