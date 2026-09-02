@@ -9,6 +9,13 @@ import { loadUser, clearUser, type StoredUser } from '@/lib/client-auth';
 
 type UserType = StoredUser;
 
+/** Jazyky psané tak, jak si je čte jejich vlastní mluvčí — ne přeložené do jazyka stránky. */
+const LANGUAGES = [
+  { code: 'cs', label: 'Čeština' },
+  { code: 'sk', label: 'Slovenčina' },
+  { code: 'en', label: 'English' },
+];
+
 /**
  * White bar, one hairline underneath, black type. The only colour is the accent on the
  * register button and under the active link — everything else earns attention through weight.
@@ -24,7 +31,9 @@ export function Navbar() {
   const [user, setUser]     = useState<UserType | null>(null);
   const [mobile, setMobile] = useState(false);
   const [dropdown, setDropdown] = useState(false);
+  const [langOpen, setLangOpen] = useState(false);
   const dropRef = useRef<HTMLDivElement>(null);
+  const langRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setUser(loadUser());
@@ -33,6 +42,7 @@ export function Navbar() {
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (dropRef.current && !dropRef.current.contains(e.target as Node)) setDropdown(false);
+      if (langRef.current && !langRef.current.contains(e.target as Node)) setLangOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -44,9 +54,19 @@ export function Navbar() {
     window.location.href = `/${locale}`;
   };
 
-  const switchLocale = () => {
-    const order = ['cs', 'en', 'sk'];
-    const next = order[(order.indexOf(locale) + 1) % order.length];
+  /**
+   * Přepnutí jazyka.
+   *
+   * Dřív to bylo tlačítko s jedním popiskem, které cyklilo cs → en → sk. Kdo si chtěl přečíst
+   * anglicky a klikl o jednou navíc, skončil ve slovenštině — a protože se volba ukládala do
+   * cookie na rok, zůstal v ní i po návratu na holou doménu. Odsud ta stížnost, že se aplikace
+   * sama přepíná. Teď je to seznam tří jazyků: uživatel vybere, co chce, a cookie se zapíše
+   * jedině tímhle kliknutím (middleware ji už nepíše sám).
+   */
+  const chooseLocale = (next: string) => {
+    document.cookie = `NEXT_LOCALE=${next}; Path=/; Max-Age=31536000; SameSite=Lax`;
+    setLangOpen(false);
+    setMobile(false);
     window.location.href = pathname.replace(`/${locale}`, `/${next}`);
   };
 
@@ -87,10 +107,27 @@ export function Navbar() {
         </div>
 
         <div className="hidden md:flex items-center gap-4 ml-auto">
-          <button onClick={switchLocale}
-            className="text-xs font-semibold tracking-wide text-ink-muted hover:text-ink transition-colors">
-            {locale.toUpperCase()}
-          </button>
+          <div className="relative" ref={langRef}>
+            <button onClick={() => setLangOpen(v => !v)}
+              aria-haspopup="listbox" aria-expanded={langOpen}
+              className="text-xs font-semibold tracking-wide text-ink-muted hover:text-ink transition-colors">
+              {locale.toUpperCase()}
+            </button>
+            {langOpen && (
+              <div role="listbox"
+                className="absolute right-0 top-full mt-2 w-36 bg-surface-subtle border border-line rounded-lg py-1 animate-fade-in">
+                {LANGUAGES.map(l => (
+                  <button key={l.code} role="option" aria-selected={l.code === locale}
+                    onClick={() => chooseLocale(l.code)}
+                    className={`block w-full text-left px-4 py-2 text-sm transition-colors hover:bg-surface ${
+                      l.code === locale ? 'text-ink font-semibold' : 'text-ink-muted hover:text-ink'
+                    }`}>
+                    {l.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           {user ? (
             <div className="relative" ref={dropRef}>
@@ -155,9 +192,18 @@ export function Navbar() {
             </Link>
           )}
           <div className="pt-3 border-t border-line flex flex-col gap-2">
-            <button onClick={switchLocale} className="btn-outline text-sm">
-              {locale === 'cs' ? 'English' : 'Čeština'}
-            </button>
+            <div className="flex gap-2">
+              {LANGUAGES.map(l => (
+                <button key={l.code} onClick={() => chooseLocale(l.code)}
+                  className={`flex-1 text-sm py-2 border rounded-lg transition-colors ${
+                    l.code === locale
+                      ? 'border-ink text-ink font-semibold'
+                      : 'border-line text-ink-muted hover:text-ink'
+                  }`}>
+                  {l.label}
+                </button>
+              ))}
+            </div>
             {user ? (
               <button onClick={handleLogout} className="btn-outline text-sm">{t('logout')}</button>
             ) : (

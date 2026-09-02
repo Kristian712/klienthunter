@@ -1,11 +1,37 @@
 import createMiddleware from 'next-intl/middleware';
 import { NextRequest, NextResponse } from 'next/server';
 
+const LOCALES = ['cs', 'en', 'sk'] as const;
+type Locale = (typeof LOCALES)[number];
+
+const DEFAULT_LOCALE: Locale = 'cs';
+
+/** Kde si pamatujeme volbu jazyka. Zapisuje ji jedině přepínač v liště, viz `Navbar.tsx`. */
+const LOCALE_COOKIE = 'NEXT_LOCALE';
+
+/**
+ * Jazyk určuje adresa, a když ta ho neuvádí, volba uživatele. Nikdy prohlížeč.
+ *
+ * `localeDetection` je u next-intl ve výchozím stavu zapnuté a bylo to zapnuté i tady, protože
+ * se ta volba nikdy nevyplnila. Znamenalo to dvě věci: holá doména poslala každého, kdo má
+ * v prohlížeči slovenštinu, na `/sk` — a `NEXT_LOCALE` se zapisovala při každé návštěvě
+ * jakékoli stránky, takže jediné omylem otevřené `/sk` přepnulo jazyk na rok dopředu.
+ * Uživatel pak psal `klienthunter.vercel.app`, dostal slovenštinu a neměl jak se jí zbavit.
+ *
+ * Teď je detekce vypnutá a přesměrování z holé domény si obsluhujeme sami: cookie, kterou
+ * zapsal přepínač, jinak čeština.
+ */
 const intlMiddleware = createMiddleware({
-  locales: ['cs', 'en', 'sk'],
-  defaultLocale: 'cs',
+  locales: [...LOCALES],
+  defaultLocale: DEFAULT_LOCALE,
   localePrefix: 'always',
+  localeDetection: false,
 });
+
+function chosenLocale(request: NextRequest): Locale {
+  const saved = request.cookies.get(LOCALE_COOKIE)?.value;
+  return LOCALES.includes(saved as Locale) ? (saved as Locale) : DEFAULT_LOCALE;
+}
 
 // Only admin pages need strict middleware protection.
 // Dashboard/search/profile are client components that call the API,
@@ -31,8 +57,20 @@ function decodeJWT(token: string): { userId?: string; isAdmin?: boolean; accessE
 
 export default async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
-  const pathnameWithoutLocale = pathname.replace(/^\/(cs|en)/, '');
-  const locale = pathname.split('/')[1] || 'cs';
+
+  // Adresa bez jazyka (typicky holá doména z adresního řádku nebo záložka). Rozhoduje volba
+  // uživatele, ne hlavička `Accept-Language`.
+  const firstSegment = pathname.split('/')[1];
+  if (!LOCALES.includes(firstSegment as Locale)) {
+    const target = new URL(`/${chosenLocale(request)}${pathname === '/' ? '' : pathname}`, request.url);
+    target.search = request.nextUrl.search;
+    return NextResponse.redirect(target);
+  }
+
+  // Dřív tenhle výraz neuměl `sk`, takže pod `/sk/admin` zůstala cesta „bez locale" i s prefixem,
+  // podmínka níž nesedla a admin sekce se v slovenštině nechránila vůbec.
+  const pathnameWithoutLocale = pathname.replace(/^\/(cs|en|sk)/, '');
+  const locale = firstSegment;
 
   const isAdmin = adminPaths.some(p => pathnameWithoutLocale.startsWith(p));
 
