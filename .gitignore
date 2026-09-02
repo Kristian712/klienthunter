@@ -30,3 +30,6 @@ npm-debug.log*
 .vscode/
 .claude/
 .vercel
+
+# Build artifact – mění se každým buildem, do gitu nepatří
+tsconfig.tsbuildinfo
