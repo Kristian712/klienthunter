@@ -8,6 +8,7 @@ import {
   ANONYMOUS_RESULTS, ANONYMOUS_SEARCHES, countHits, hashIp, recordHit,
 } from '@/lib/rate-limit';
 import { runSearchJob } from '@/lib/search-job';
+import { CZ_STAGES } from '@/lib/search-options';
 import { discoverAll } from '@/lib/sources';
 import { waitUntil } from '@vercel/functions';
 
@@ -138,12 +139,21 @@ export async function POST(req: NextRequest) {
 
       const deadlineAt = Date.now() + NETWORK_BUDGET_MS;
       const wholeCz = isWholeCz(region);
-      const city = wholeCz ? '' : region.split(',')[0].trim();
+      /**
+       * Ukázka „celé ČR" je pět řádků z první fáze skutečného hledání, tedy z Prahy.
+       *
+       * Bez města šel do ARESu dotaz na celou republiku. Ten se odmítne dřív, než něco vrátí,
+       * a v ukázce pak zbyly konglomeráty, které mají v rejstříku desítky oborů — Grandhotel
+       * Pupp jako výsledek hledání kadeřnictví. Pět opravdových pražských firem řekne
+       * o aplikaci pravdu, tohle o ní lhalo.
+       */
+      const city = wholeCz ? CZ_STAGES[0].label : region.split(',')[0].trim();
 
       const [aresLeads, osmLeads] = await discoverAll(industry, city, ANONYMOUS_RESULTS);
       const candidates = mergeLeads([osmLeads, aresLeads], ANONYMOUS_RESULTS);
       const verified = await enrichAndVerify(candidates, {
-        probeNetwork: !wholeCz, deadlineAt, region, industry,
+        // Pět řádků se ověří i u „celé ČR" — je to jedno město a pět sond, ne tisíce.
+        probeNetwork: true, deadlineAt, region, industry,
       });
 
       return NextResponse.json({ demo: true, results: verified.map(toDemoRow) });
