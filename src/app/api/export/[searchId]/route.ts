@@ -88,12 +88,25 @@ export async function GET(
 
     const slug = `${search.region}-${search.query}`.replace(/[^a-z0-9áčďéěíňóřšťúůýžÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ\-]/gi, '-').slice(0, 60);
 
+    /**
+     * Název souboru s diakritikou.
+     *
+     * Hlavička HTTP unese jen znaky do 255, takže `filename="...ČR..."` shodilo celý export
+     * výjimkou z Node — a export "Celá ČR" byl tedy vždycky pád, ne soubor. RFC 5987 na to
+     * má dvojici: `filename` bez diakritiky pro staré klienty a `filename*` v UTF-8 pro
+     * všechny dnešní prohlížeče.
+     */
+    const asciiSlug = slug.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\w\-]/g, '-');
+    const disposition = (ext: string) =>
+      `attachment; filename="klienthunter-${asciiSlug}.${ext}"; ` +
+      `filename*=UTF-8''${encodeURIComponent(`klienthunter-${slug}.${ext}`)}`;
+
     if (format === 'csv') {
       const csv = toCsv(search.results, profile?.targetFilters);
       return new NextResponse(csv, {
         headers: {
           'Content-Type': 'text/csv; charset=utf-8',
-          'Content-Disposition': `attachment; filename="klienthunter-${slug}.csv"`,
+          'Content-Disposition': disposition('csv'),
         },
       });
     }
@@ -102,7 +115,7 @@ export async function GET(
     return new NextResponse(buffer as unknown as BodyInit, {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'Content-Disposition': `attachment; filename="klienthunter-${slug}.xlsx"`,
+        'Content-Disposition': disposition('xlsx'),
       },
     });
   } catch (err) {
