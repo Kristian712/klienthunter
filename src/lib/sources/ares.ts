@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { resolveNiche, USELESS_NACE } from '../nace-map';
+import { subAreasFor } from './ares-areas';
 import type { DiscoverySource, RawLead } from './types';
 
 const BASE = 'https://ares.gov.cz/ekonomicke-subjekty-v-be/rest';
@@ -48,7 +49,13 @@ interface AresFilter {
   czNace?: string[];
   obchodniJmeno?: string;
   pravniForma?: string[];
-  sidlo?: { textovaAdresa?: string; kodAdresnihoMista?: number; kodObce?: number };
+  sidlo?: {
+    textovaAdresa?: string;
+    kodAdresnihoMista?: number;
+    kodObce?: number;
+    /** Kód městské části nebo obvodu (MOMC v RÚIAN). Viz `ares-areas.ts`. */
+    kodMestskeCastiObvodu?: number;
+  };
 }
 
 interface AresPage {
@@ -111,8 +118,27 @@ function toLead(s: AresSubject): RawLead | null {
   };
 }
 
-/** Pages through one filter until `limit` is reached, splitting by legal form if ARES balks. */
-async function collect(base: AresFilter, limit: number, until: number): Promise<AresSubject[]> {
+/**
+ * Vytáhne z ARESu jeden filtr, a když ho ARES odmítne pro velikost, zkusí ho postupně zúžit.
+ *
+ * Tři úrovně, každá užší než předchozí:
+ *   1. filtr, jak přišel,
+ *   2. rozpad podle právní formy (`SPLIT_FORMS`),
+ *   3. rozpad podle městských částí (`subAreas`), a uvnitř každé části zase podle formy.
+ *
+ * Třetí úroveň je tu proto, že u velkých měst druhá nestačí: v Praze je samotných živnostníků
+ * s NACE 96210 přes osmdesát tisíc, takže rozpad podle formy skončí zase odmítnutím a hledání
+ * do teď vracelo prázdno — mlčky, jako by v Praze žádná kadeřnictví nebyla.
+ *
+ * Když ani třetí úroveň nestačí (jedna městská část přes tisíc firem), vrátí se, co se stihlo
+ * jinde. Vždycky je to víc než nula, kterou tenhle kód vracel předtím.
+ */
+async function collect(
+  base: AresFilter,
+  limit: number,
+  until: number,
+  subAreas: number[] = [],
+): Promise<AresSubject[]> {
   const out: AresSubject[] = [];
 
   const drain = async (filter: AresFilter) => {
@@ -130,9 +156,31 @@ async function collect(base: AresFilter, limit: number, until: number): Promise<
   const first = await drain(base);
   if (!first.tooMany) return out;
 
+  let stillTooMany = false;
   for (const forms of SPLIT_FORMS) {
     if (out.length >= limit || Date.now() >= until) break;
-    await drain({ ...base, pravniForma: forms });
+    const split = await drain({ ...base, pravniForma: forms });
+    if (split.tooMany) stillTooMany = true;
+  }
+
+  // Rozpad podle formy stačil, nebo aspoň něco přinesl a čas došel. Dál se nezkouší.
+  if (!stillTooMany || subAreas.length === 0) return out;
+
+  /**
+   * Poslední úroveň. Části, ve kterých už něco máme, se neopakují — a protože se `out` sdílí,
+   * limit i hodiny hlídá `drain` sám. Sídlo se přepisuje celé: `kodMestskeCastiObvodu` a
+   * `textovaAdresa` vedle sebe by znamenaly „část X, jejíž adresa obsahuje jméno celého města",
+   * což je zbytečně užší podmínka.
+   */
+  for (const area of subAreas) {
+    if (out.length >= limit || Date.now() >= until) break;
+    const areaFilter: AresFilter = { ...base, sidlo: { kodMestskeCastiObvodu: area } };
+    const area1 = await drain(areaFilter);
+    if (!area1.tooMany) continue;
+    for (const forms of SPLIT_FORMS) {
+      if (out.length >= limit || Date.now() >= until) break;
+      await drain({ ...areaFilter, pravniForma: forms });
+    }
   }
   return out;
 }
@@ -153,11 +201,14 @@ export const aresSource: DiscoverySource = {
     const { nace, keywords } = resolveNiche(niche);
     const sidlo = city ? { textovaAdresa: city } : undefined;
     const until = Date.now() + SEARCH_BUDGET_MS;
+    // Kam se dá ustoupit, když ARES řekne, že by výsledek byl přes tisíc řádků. U menších měst
+    // je to prázdné pole — tam se to nestává.
+    const subAreas = city ? subAreasFor(city) : [];
 
     const strands: Promise<AresSubject[]>[] = [];
-    if (nace.length) strands.push(collect({ czNace: nace, sidlo }, limit, until));
+    if (nace.length) strands.push(collect({ czNace: nace, sidlo }, limit, until, subAreas));
     for (const kw of keywords.slice(0, 2)) {
-      strands.push(collect({ obchodniJmeno: kw, sidlo }, Math.ceil(limit / 2), until));
+      strands.push(collect({ obchodniJmeno: kw, sidlo }, Math.ceil(limit / 2), until, subAreas));
     }
 
     const batches = await Promise.all(strands);

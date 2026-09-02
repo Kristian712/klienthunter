@@ -14,8 +14,22 @@
 export interface NicheQuery {
   /** CZ-NACE codes as ARES actually stores them. */
   nace: string[];
-  /** Words that appear in the business name. Used as a second, independent ARES query. */
+  /**
+   * Slova, která firmy toho řemesla mívají v názvu. Jdou do ARESu jako druhý, nezávislý dotaz.
+   *
+   * ARES hledá v názvu **celá slova** a hvězdičku neumí: `kadeřnic` vrátí nulu, `kadeřnictví`
+   * dvacet šest (změřeno 2. 9. 2026 na všech devadesáti slovech téhle mapy — osm z nich
+   * nevracelo nic a byla to polovina druhého dotazu, tedy tiše mrtvá větev hledání). Sem tedy
+   * patří jen tvary, o kterých je ověřené, že v ARESu něco najdou.
+   */
   keywords: string[];
+  /**
+   * Slova, podle kterých se pozná obor v tom, co napsal uživatel — do ARESu se neposílají.
+   *
+   * Jsou to kmeny a spojení, která ARES nenajde (`kadeřnic`, `osobní trenér`), ale pro
+   * porozumění dotazu jsou cenná: kdo napíše „kadeřnice", musí skončit u kadeřnictví.
+   */
+  aliases?: string[];
   /** OpenStreetMap tag filters, as `key=value`. */
   osm: string[];
   /** Jak často u tohohle oboru najdeme web. Viz `YIELD` níž. */
@@ -49,23 +63,23 @@ export type YieldBand = 'measured-high' | 'measured-low' | 'high' | 'mid' | 'low
 export const USELESS_NACE = new Set(['46900', '4690', '00', '74', '741', '68200', 'G']);
 
 export const NICHE_MAP: Record<string, NicheQuery> = {
-  'plumber':              { nace: ['4322'],            keywords: ['instalatér', 'vodoinstalatér', 'topenář'], osm: ['craft=plumber'], yield: 'low' },
+  'plumber':              { nace: ['4322'],            keywords: ['instalatérství', 'instalatér', 'topenář'], aliases: ['vodoinstalatér', 'vodoinstalace'], osm: ['craft=plumber'], yield: 'low' },
   'electrician':          { nace: ['43210'],           keywords: ['elektro', 'elektroinstalace', 'elektrikář'], osm: ['craft=electrician'], yield: 'unknown' },
   'carpenter':            { nace: ['43320', '16230'],  keywords: ['truhlářství', 'tesařství'], osm: ['craft=carpenter', 'craft=joiner'], yield: 'low' },
   'painter':              { nace: ['43340'],           keywords: ['malířství', 'malby', 'nátěry'], osm: ['craft=painter'], yield: 'low' },
   // 43910 samo vrací tři firmy v celé ČR — kód se prakticky nedeklaruje. Doplněné 43990
   // (ostatní specializované stavební práce) rozšíří záběr; obor stejně stojí hlavně na názvu.
-  'roofer':               { nace: ['43910', '43990'],  keywords: ['pokrývačství', 'střechy', 'pokrývač'], osm: ['craft=roofer'], yield: 'unknown' },
+  'roofer':               { nace: ['43910', '43990'],  keywords: ['pokrývačství', 'střechy'], aliases: ['pokrývač'], osm: ['craft=roofer'], yield: 'unknown' },
   'landscaper':           { nace: ['81300'],           keywords: ['zahradnictví', 'zahradní'], osm: ['craft=gardener', 'shop=garden_centre'], yield: 'high' },
   'restaurant':           { nace: ['56300'],           keywords: ['restaurace', 'hostinec'], osm: ['amenity=restaurant'], yield: 'high' },
   'cafe':                 { nace: ['56300'],           keywords: ['kavárna', 'café'], osm: ['amenity=cafe'], yield: 'high' },
   'bakery':               { nace: ['10710', '47240'],  keywords: ['pekárna', 'pekařství'], osm: ['shop=bakery'], yield: 'mid' },
   'butcher shop':         { nace: ['47220', '10110'],  keywords: ['řeznictví', 'masna'], osm: ['shop=butcher'], yield: 'mid' },
-  'hair salon':           { nace: ['96210'],           keywords: ['kadeřnictví', 'kadeřnic'], osm: ['shop=hairdresser'], yield: 'measured-low' },
+  'hair salon':           { nace: ['96210'],           keywords: ['kadeřnictví', 'kadeřník'], aliases: ['kadeřnic'], osm: ['shop=hairdresser'], yield: 'measured-low' },
   'beauty salon':         { nace: ['96210', '96230'],  keywords: ['kosmetika', 'kosmetický'], osm: ['shop=beauty'], yield: 'low' },
-  'nail studio':          { nace: ['96210'],           keywords: ['nehtové studio', 'nehtová'], osm: ['shop=beauty'], yield: 'low' },
-  'massage':              { nace: ['96230'],           keywords: ['masáže', 'masážní'], osm: ['shop=massage'], yield: 'low' },
-  'car repair':           { nace: ['95310'],           keywords: ['autoservis', 'automobilový servis'], osm: ['shop=car_repair'], yield: 'mid' },
+  'nail studio':          { nace: ['96210'],           keywords: ['nehty', 'nehtová', 'manikúra'], aliases: ['nehtové studio'], osm: ['shop=beauty'], yield: 'low' },
+  'massage':              { nace: ['96230'],           keywords: ['masáže', 'masér'], aliases: ['masážní'], osm: ['shop=massage'], yield: 'low' },
+  'car repair':           { nace: ['95310'],           keywords: ['autoservis', 'autodílna'], aliases: ['automobilový servis'], osm: ['shop=car_repair'], yield: 'mid' },
   'tire shop':            { nace: ['95310'],           keywords: ['pneuservis', 'pneu'], osm: ['shop=tyres'], yield: 'mid' },
   'accountant':           { nace: ['69200'],           keywords: ['účetnictví', 'účetní'], osm: ['office=accountant'], yield: 'low' },
   'photographer':         { nace: ['74200'],           keywords: ['fotograf', 'fotoateliér'], osm: ['craft=photographer'], yield: 'low' },
@@ -81,11 +95,11 @@ export const NICHE_MAP: Record<string, NicheQuery> = {
   'driving school':       { nace: ['85530'],           keywords: ['autoškola'], osm: ['amenity=driving_school'], yield: 'mid' },
   'language school':      { nace: ['8559'],            keywords: ['jazyková škola', 'jazykov'], osm: ['amenity=language_school'], yield: 'mid' },
   'gym':                  { nace: ['93130'],           keywords: ['fitness', 'posilovna'], osm: ['leisure=fitness_centre'], yield: 'high' },
-  'personal trainer':     { nace: ['85510'],           keywords: ['osobní trenér', 'trenér'], osm: ['leisure=fitness_centre'], yield: 'mid' },
+  'personal trainer':     { nace: ['85510'],           keywords: ['trenér'], aliases: ['osobní trenér'], osm: ['leisure=fitness_centre'], yield: 'mid' },
   'yoga studio':          { nace: ['93130'],           keywords: ['jóga', 'yoga'], osm: ['leisure=fitness_centre'], yield: 'high' },
   'florist':              { nace: ['47760'],           keywords: ['květinářství', 'květiny'], osm: ['shop=florist'], yield: 'mid' },
   'tailor':               { nace: ['95230'],           keywords: ['krejčovství', 'krejčí', 'šití'], osm: ['craft=tailor', 'shop=tailor'], yield: 'low' },
-  'locksmith':            { nace: ['25620', '25110'],  keywords: ['zámečnictví', 'zámečnic'], osm: ['craft=locksmith'], yield: 'mid' },
+  'locksmith':            { nace: ['25620', '25110'],  keywords: ['zámečnictví', 'zámečník'], aliases: ['zámečnic'], osm: ['craft=locksmith'], yield: 'mid' },
   'glazier':              { nace: ['23120', '43340'],  keywords: ['sklenářství', 'sklenář'], osm: ['craft=glaziery'], yield: 'low' },
   'chimney sweep':        { nace: ['81220', '43990'],  keywords: ['kominictví', 'kominík'], osm: ['craft=chimney_sweeper'], yield: 'mid' },
   // ── Doplněno ve vlně 5. Každý kód ověřen proti živému ARESu, že vrací řádky: obecné
@@ -114,7 +128,8 @@ function normalize(text: string): string {
  * Index se staví jednou při načtení modulu; mapa je konstantní.
  */
 const BY_KEYWORD: Array<{ key: string; word: string }> = Object.entries(NICHE_MAP)
-  .flatMap(([key, q]) => q.keywords.map(word => ({ key, word: normalize(word) })))
+  // Aliasy sem patří taky: jsou k ničemu v ARESu, ale právě kvůli téhle tabulce existují.
+  .flatMap(([key, q]) => [...q.keywords, ...(q.aliases ?? [])].map(word => ({ key, word: normalize(word) })))
   // Delší slovo vyhrává: „svatební fotograf" má padnout na `fotograf`, ne na `foto` z jiného
   // oboru, a „nehtové studio" na nehtové studio, ne na obecné „studio".
   .sort((a, b) => b.word.length - a.word.length);
