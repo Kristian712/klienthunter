@@ -9,23 +9,61 @@
  * OpenStreetMap, not something a user reads. `label` is what a user reads.
  */
 
+/**
+ * The fourteen regional capitals, in the order the region list shows them.
+ *
+ * Two jobs at once. It is the batch list behind "Celá ČR" — a whole-country query is rejected
+ * by ARES outright (HTTP 400 the moment the result would pass a thousand rows), so the only
+ * way to cover the country is to walk it city by city and merge. And it is the single place
+ * where the mapping "region → the town we actually search" is written down, so the labels
+ * below cannot drift away from what the search really does.
+ *
+ * Why a town and not the region: measured on 2 September 2026, ARES honours only `kodObce`,
+ * `kodCastiObce`, `kodUlice`, `kodMestskeCastiObvodu` and `textovaAdresa`. There is no key for
+ * a region, and the region's name does not appear in any address — `textovaAdresa` of
+ * "Zlínský kraj" returns zero rows, while "Zlín" returns 723.
+ *
+ * Středočeský kraj is the one region with no capital of its own (it is administered from
+ * Prague, which is a region in itself), so it gets Kladno — the largest town inside it,
+ * measured at 532 rows.
+ */
+export const CZ_STAGES: { value: string; label: string }[] = [
+  { value: 'Praha, Czech Republic',                label: 'Praha' },
+  { value: 'Kladno, Středočeský kraj',             label: 'Kladno' },
+  { value: 'České Budějovice, Jihočeský kraj',     label: 'České Budějovice' },
+  { value: 'Plzeň, Plzeňský kraj',                 label: 'Plzeň' },
+  { value: 'Karlovy Vary, Karlovarský kraj',       label: 'Karlovy Vary' },
+  { value: 'Ústí nad Labem, Ústecký kraj',         label: 'Ústí nad Labem' },
+  { value: 'Liberec, Liberecký kraj',              label: 'Liberec' },
+  { value: 'Hradec Králové, Královéhradecký kraj', label: 'Hradec Králové' },
+  { value: 'Pardubice, Pardubický kraj',           label: 'Pardubice' },
+  { value: 'Jihlava, Kraj Vysočina',               label: 'Jihlava' },
+  { value: 'Brno, Jihomoravský kraj',              label: 'Brno' },
+  { value: 'Olomouc, Olomoucký kraj',              label: 'Olomouc' },
+  { value: 'Zlín, Zlínský kraj',                   label: 'Zlín' },
+  { value: 'Ostrava, Moravskoslezský kraj',        label: 'Ostrava' },
+];
+
 export const REGIONS = [
+  // Popisky říkají město, ne kraj, protože se hledá město. Do teď stálo v nabídce „Zlínský
+  // kraj" a hledal se Zlín — uživatel se to dozvěděl až z výsledků, ve kterých chybělo
+  // Uherské Hradiště. Radši to říct předem.
   { group: 'Česká republika — kraje', items: [
-    { value: 'Celá ČR',                                    label: 'Celá ČR (všechny kraje)' },
+    { value: 'Celá ČR',                                    label: 'Celá ČR (14 krajských měst)' },
     { value: 'Praha, Czech Republic',                      label: 'Praha (Hlavní město Praha)' },
-    { value: 'Středočeský kraj, Czech Republic',           label: 'Středočeský kraj' },
-    { value: 'České Budějovice, Jihočeský kraj',           label: 'Jihočeský kraj' },
-    { value: 'Plzeň, Plzeňský kraj',                       label: 'Plzeňský kraj' },
-    { value: 'Karlovy Vary, Karlovarský kraj',             label: 'Karlovarský kraj' },
-    { value: 'Ústí nad Labem, Ústecký kraj',               label: 'Ústecký kraj' },
-    { value: 'Liberec, Liberecký kraj',                    label: 'Liberecký kraj' },
-    { value: 'Hradec Králové, Královéhradecký kraj',       label: 'Královéhradecký kraj' },
-    { value: 'Pardubice, Pardubický kraj',                 label: 'Pardubický kraj' },
-    { value: 'Jihlava, Kraj Vysočina',                     label: 'Kraj Vysočina' },
-    { value: 'Brno, Jihomoravský kraj',                    label: 'Jihomoravský kraj' },
-    { value: 'Olomouc, Olomoucký kraj',                    label: 'Olomoucký kraj' },
-    { value: 'Zlín, Zlínský kraj',                         label: 'Zlínský kraj' },
-    { value: 'Ostrava, Moravskoslezský kraj',              label: 'Moravskoslezský kraj' },
+    { value: 'Kladno, Středočeský kraj',                   label: 'Středočeský kraj (Kladno a okolí)' },
+    { value: 'České Budějovice, Jihočeský kraj',           label: 'Jihočeský kraj (České Budějovice a okolí)' },
+    { value: 'Plzeň, Plzeňský kraj',                       label: 'Plzeňský kraj (Plzeň a okolí)' },
+    { value: 'Karlovy Vary, Karlovarský kraj',             label: 'Karlovarský kraj (Karlovy Vary a okolí)' },
+    { value: 'Ústí nad Labem, Ústecký kraj',               label: 'Ústecký kraj (Ústí nad Labem a okolí)' },
+    { value: 'Liberec, Liberecký kraj',                    label: 'Liberecký kraj (Liberec a okolí)' },
+    { value: 'Hradec Králové, Královéhradecký kraj',       label: 'Královéhradecký kraj (Hradec Králové a okolí)' },
+    { value: 'Pardubice, Pardubický kraj',                 label: 'Pardubický kraj (Pardubice a okolí)' },
+    { value: 'Jihlava, Kraj Vysočina',                     label: 'Kraj Vysočina (Jihlava a okolí)' },
+    { value: 'Brno, Jihomoravský kraj',                    label: 'Jihomoravský kraj (Brno a okolí)' },
+    { value: 'Olomouc, Olomoucký kraj',                    label: 'Olomoucký kraj (Olomouc a okolí)' },
+    { value: 'Zlín, Zlínský kraj',                         label: 'Zlínský kraj (Zlín a okolí)' },
+    { value: 'Ostrava, Moravskoslezský kraj',              label: 'Moravskoslezský kraj (Ostrava a okolí)' },
   ]},
   { group: 'Slovensko — kraje', items: [
     { value: 'Bratislava, Slovakia',                       label: 'Bratislavský kraj' },
@@ -243,6 +281,26 @@ export const INDUSTRIES: Record<string, { group: string; items: { value: string;
     ]},
   ],
 };
+
+/**
+ * The readable name of a trade, for places that show a past search back to the user.
+ *
+ * What gets stored with a search is `value` — an English OpenStreetMap query string. That is
+ * right for the search itself and wrong for the history list, where a Czech user was reading
+ * "hair salon" for a search they started by clicking "Kadeřnictví". The stored value is not
+ * always in the list either (the field also takes free text), so anything unknown comes back
+ * unchanged rather than disappearing.
+ */
+export function industryLabel(value: string, locale: string): string {
+  const lists = [INDUSTRIES[locale], INDUSTRIES.cs, INDUSTRIES.en].filter(Boolean);
+  for (const groups of lists) {
+    for (const group of groups) {
+      const hit = group.items.find(i => i.value === value);
+      if (hit) return hit.label;
+    }
+  }
+  return value;
+}
 
 // Popular categories shown as quick chips (localized)
 export const POPULAR_CHIPS: Record<string, { value: string; label: string }[]> = {

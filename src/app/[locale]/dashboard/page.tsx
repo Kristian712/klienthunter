@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
 import Link from 'next/link';
 import { Search, ArrowRight, Crown, Clock, BarChart3, Upload, Trash2 } from 'lucide-react';
+import { industryLabel } from '@/lib/search-options';
 
 interface Search {
   id: string; query: string; region: string; createdAt: string;
@@ -11,13 +12,16 @@ interface Search {
 }
 /** Stav hledání běžícího na pozadí. Páruje se se `Search` přes `searchId`. */
 interface Job {
-  id: string; searchId: string; status: 'queued' | 'running' | 'done' | 'failed';
+  id: string; searchId: string; status: 'queued' | 'running' | 'paused' | 'done' | 'failed';
   foundCount: number; processedCount: number; error: string | null;
 }
 
 const JOB_LABEL: Record<Job['status'], { cs: string; en: string }> = {
   queued:  { cs: 'čeká',    en: 'queued' },
   running: { cs: 'běží',    en: 'running' },
+  // Hledání po městech, které vyčerpalo čas jedné invokace. Naváže samo, jakmile uživatel
+  // otevře jeho výsledky — proto „pokračuje", ne „stojí".
+  paused:  { cs: 'pokračuje', en: 'continues' },
   done:    { cs: 'hotovo',  en: 'done' },
   failed:  { cs: 'spadlo',  en: 'failed' },
 };
@@ -145,13 +149,15 @@ export default function DashboardPage() {
                   {/* Odkaz otevře hledání znovu — i to, které ještě běží. Průběh se dopočítá
                       ze serveru, takže se uživatel může vrátit ke kterémukoli běhu. */}
                   <Link href={`/${locale}/search?job=${job?.id ?? ''}`} className="font-medium hover:text-accent transition-colors">
-                    {s.query}
+                    {industryLabel(s.query, locale)}
                   </Link>
                   <span className="text-ink-faint mx-2">·</span>
                   <span className="text-ink-muted">{s.region}</span>
                   {job && (
                     <span className={`badge ml-2 ${job.status === 'failed' ? 'badge-red' : ''}`}>
-                      {isCs ? JOB_LABEL[job.status].cs : JOB_LABEL[job.status].en}
+                      {/* Přes `?.`, protože stav přichází ze serveru jako řetězec: nový stav
+                          přidaný v budoucnu má zůstat neznámým štítkem, ne pádem stránky. */}
+                      {isCs ? JOB_LABEL[job.status]?.cs ?? job.status : JOB_LABEL[job.status]?.en ?? job.status}
                       {job.status === 'running' && ` ${job.processedCount}/${job.foundCount}`}
                     </span>
                   )}

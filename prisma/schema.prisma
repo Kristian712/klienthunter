@@ -83,12 +83,24 @@ model SearchJob {
   /// Hledání, do kterého se zapisují výsledky. Zakládá se rovnou s jobem, aby export fungoval
   /// i nad rozpracovaným během.
   searchId       String    @unique
-  /// `queued` | `running` | `done` | `failed`
+  /// `queued` | `running` | `paused` | `done` | `failed`
+  ///
+  /// `paused` znamená „došel čas jedné invokace, ale zbývají další fáze". Není to chyba:
+  /// běh naváže tam, kde skončil, jakmile se klient znovu zeptá na stav.
   status         String    @default("queued")
   region         String
   industry       String
-  /// Kolik firem vrátily zdroje, než začalo ověřování.
+  /// Kolik firem vrátily zdroje, než začalo ověřování. U hledání po fázích se přičítá.
   foundCount     Int       @default(0)
+  /// Strop z plánu uživatele — kolik firem má hledání dohromady přinést. Musí být oddělený
+  /// od `foundCount`, jinak by navazující běh četl jako limit počet dosud nalezených firem.
+  targetCount    Int       @default(500)
+  /// Kolik fází je hotových; zároveň index té, která je na řadě. Jedna fáze = jedno město.
+  stageIndex     Int       @default(0)
+  /// Kolik fází má hledání celkem. 1 u běžného hledání, 14 u „Celá ČR".
+  stageCount     Int       @default(1)
+  /// Jméno města, ve kterém se právě hledá. Jen pro průběh v UI.
+  stageLabel     String?
   /// Kolik jich je už zapsaných v databázi.
   processedCount Int       @default(0)
   startedAt      DateTime?

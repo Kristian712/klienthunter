@@ -9,6 +9,7 @@ import {
   CriteriaField, IndustryField, ProfessionField, RegionField,
   EMPTY_DRAFT, draftToPayload, toDraft, type ProfileDraft,
 } from '@/components/ProfileFields';
+import { industryLabel } from '@/lib/search-options';
 
 interface ProfileData {
   user: UserProfile & {
@@ -327,7 +328,7 @@ export default function ProfilePage() {
               <tbody>
                 {searches.map(s => (
                   <tr key={s.id}>
-                    <td className="font-medium text-ink">{s.query}</td>
+                    <td className="font-medium text-ink">{industryLabel(s.query, locale)}</td>
                     <td className="text-ink-muted">{s.region}</td>
                     <td>
                       <span className="badge-green text-xs">{s._count.results}</span>

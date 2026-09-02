@@ -16,7 +16,7 @@ import { EMPTY_PROFILE, type UserProfile } from '@/lib/profile';
 import { REGIONS, INDUSTRIES, POPULAR_CHIPS } from '@/lib/search-options';
 import { LeadScore, GOOD_LEAD } from '@/components/LeadScore';
 import { ResultsMap, type MapLead } from '@/components/ResultsMap';
-import { LEAD_STATUSES, statusDef, type LeadStatus } from '@/lib/lead-tags';
+import { LEAD_STATUSES, isDone, statusDef, type LeadStatus } from '@/lib/lead-tags';
 import { OnboardingModal } from '@/components/OnboardingModal';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -76,12 +76,20 @@ interface BusinessResult {
 interface JobState {
   id: string;
   searchId: string;
-  status: 'queued' | 'running' | 'done' | 'failed';
+  /** `paused` = došel čas jedné invokace, další fáze naváže při příštím dotazu na průběh. */
+  status: 'queued' | 'running' | 'paused' | 'done' | 'failed';
   foundCount: number;
   processedCount: number;
   startedAt: string | null;
   error: string | null;
+  /** Kolikátá fáze (město) je na řadě, kolik jich je celkem a jak se ta právě běžící jmenuje. */
+  stageIndex: number;
+  stageCount: number;
+  stageLabel: string | null;
 }
+
+/** Kde si pamatujeme, jestli má mapa skrývat vyřízené firmy. */
+const HIDE_DONE_KEY = 'kh-hide-done';
 
 type WebStatus = 'HAS' | 'NONE' | 'UNKNOWN';
 
@@ -427,6 +435,14 @@ const S = {
     sk: 'Firiem sme našli {n}, ale zvolenému filtru nevyhovela ani jedna. To je platný výsledok, nie chyba — skúste filter vypnúť alebo zvoliť iný scenár.',
     en: 'We found {n} firms, but not one matches the filter you picked. That is a valid result, not a fault — try turning the filter off or picking another scenario.',
   },
+  loadingCity:    { cs: 'Hledám v ARESu a OpenStreetMap…',
+                    sk: 'Hľadám v ARESe a OpenStreetMap…',
+                    en: 'Searching ARES and OpenStreetMap…' },
+  // Dřív tu stálo „může trvat 1–2 minuty", což po rozpadu na města neplatí. Slíbený čas,
+  // který se nedodrží, je horší než žádný.
+  loadingWholeCz: { cs: 'Procházím krajská města jedno po druhém. Výsledky přibývají průběžně.',
+                    sk: 'Prechádzam krajské mestá jedno po druhom. Výsledky pribúdajú priebežne.',
+                    en: 'Going through the regional capitals one by one. Results come in as they are found.' },
   jobRunning:  { cs: 'Hledám na pozadí',  sk: 'Hľadám na pozadí',  en: 'Searching in the background' },
   jobQueued:   { cs: 'Spouštím hledání…',  sk: 'Spúšťam hľadanie…',  en: 'Starting the search…' },
   jobFound:    { cs: 'nalezeno firem',     sk: 'nájdených firiem',   en: 'firms found' },
@@ -435,6 +451,15 @@ const S = {
   jobCanLeave: { cs: 'Kartu můžete zavřít — hledání běží dál a výsledky tu na vás počkají.',
                  sk: 'Kartu môžete zavrieť — hľadanie beží ďalej a výsledky tu na vás počkajú.',
                  en: 'You can close the tab — the search keeps running and the results will wait for you.' },
+  // Bez skloňování schválně: „Hledám v Brně" by znamenalo vyskloňovat čtrnáct jmen měst ve
+  // třech jazycích. Pomlčka řekne totéž a nezalže ani u Ústí nad Labem.
+  jobStage:    { cs: '{city} — {i}. ze {n} měst',  sk: '{city} — {i}. zo {n} miest',
+                 en: '{city} — city {i} of {n}' },
+  // Nahrazuje `jobCanLeave` u hledání po městech. Tam kartu zavřít nelze: navazující fázi
+  // spouští právě dotaz na průběh, takže zavřenou kartou se hledání zastaví.
+  jobStaged:   { cs: 'Hledání pokračuje město po městě, dokud máte tuhle stránku otevřenou.',
+                 sk: 'Hľadanie pokračuje mesto po meste, kým máte túto stránku otvorenú.',
+                 en: 'The search continues city by city for as long as this page stays open.' },
   jobFailed:   { cs: 'Hledání se zastavilo',  sk: 'Hľadanie sa zastavilo',  en: 'The search stopped' },
   jobPartial:  { cs: 'Co se stihlo najít, zůstalo uložené a dá se exportovat.',
                  sk: 'Čo sa stihlo nájsť, zostalo uložené a dá sa exportovať.',
@@ -687,6 +712,15 @@ export default function SearchPage() {
   /** Seznam, nebo mapa. Výchozí je seznam — mapa umí zobrazit jen firmy se souřadnicemi. */
   const [view, setView]                   = useState<'list' | 'map'>('list');
   /**
+   * Skrývat na mapě firmy, se kterými už uživatel skončil (osloveno / klient / nezájem).
+   *
+   * Výchozí zapnuto: po pár týdnech práce je většina bodů na mapě hotová věc a nová
+   * příležitost se v nich hledá hůř než první den. Platí to jen pro mapu — v seznamu zůstanou
+   * všechny řádky, protože zmizet uživateli řádek, který si sám označil, je ta nejhorší
+   * možná odměna za označování.
+   */
+  const [hideDone, setHideDone]           = useState(true);
+  /**
    * Značky, které uživatel nastavil v tomhle sezení.
    *
    * Drží se zvlášť od `results`, aby se změna projevila okamžitě a nečekala na doběhnutí
@@ -788,6 +822,27 @@ export default function SearchPage() {
    * `job` je stav komponenty a reload ho smaže. `?job=<id>` v adrese je to, co uživateli dovolí
    * kartu zavřít a vrátit se — a je to zároveň cíl odkazů z přehledu hledání.
    */
+  /**
+   * Volba „skrýt vyřízené" přežije obnovení stránky.
+   *
+   * Čte se až po připojení komponenty, ne při inicializaci stavu: `localStorage` na serveru
+   * neexistuje a odlišný první render by Reactu rozhodil hydrataci.
+   */
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(HIDE_DONE_KEY);
+      if (saved !== null) setHideDone(saved === '1');
+    } catch { /* soukromé okno */ }
+  }, []);
+
+  const toggleHideDone = () => {
+    setHideDone(prev => {
+      const next = !prev;
+      try { localStorage.setItem(HIDE_DONE_KEY, next ? '1' : '0'); } catch { /* soukromé okno */ }
+      return next;
+    });
+  };
+
   useEffect(() => {
     const id = new URLSearchParams(window.location.search).get('job');
     if (!id) return;
@@ -866,6 +921,9 @@ export default function SearchPage() {
    */
   const remainingLabel = (() => {
     if (!job || !job.startedAt || job.status !== 'running') return null;
+    // U hledání po městech by to bylo číslo bez významu: `startedAt` je začátek posledního
+    // běhu, kdežto `processedCount` je součet přes všechny. Radši nic než vymyšlený odhad.
+    if (job.stageCount > 1) return null;
     if (job.processedCount < 10 || job.foundCount <= job.processedCount) return null;
     const elapsed = (Date.now() - new Date(job.startedAt).getTime()) / 1000;
     const perFirm = elapsed / job.processedCount;
@@ -905,6 +963,13 @@ export default function SearchPage() {
   const statusOf = (b: BusinessResult): string | null =>
     tags[b.id] ?? b.tags?.[0]?.status ?? null;
 
+  /**
+   * Co uvidí mapa. Vyřízené firmy se z ní vyndají tady, ne uvnitř mapy — ta má kreslit, ne
+   * rozhodovat, co je vidět. Seznam níž pracuje pořád s `filtered`, tedy se vším.
+   */
+  const mapLeads   = hideDone ? filtered.filter(b => !isDone(statusOf(b))) : filtered;
+  const hiddenDone = filtered.length - mapLeads.length;
+
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!effectiveRegion || !effectiveIndustry) return;
@@ -915,9 +980,10 @@ export default function SearchPage() {
     setJob(null);
     setActive(new Set());
     setHasSearched(true);
-    setLoadingMsg(isWholeCzech(effectiveRegion)
-      ? (isCs ? 'Prohledávám všech 14 krajů… může trvat 1–2 minuty.' : 'Searching all 14 regions… may take 1–2 min.')
-      : isCs ? 'Hledám v ARESu a OpenStreetMap…' : 'Searching ARES and OpenStreetMap…');
+    setLoadingMsg(localized(
+      isWholeCzech(effectiveRegion) ? S.loadingWholeCz : S.loadingCity,
+      locale,
+    ));
     try {
       const res = await fetch('/api/search', {
         method: 'POST',
@@ -966,6 +1032,9 @@ export default function SearchPage() {
       setJob({
         id: data.jobId, searchId: data.searchId, status: 'queued',
         foundCount: 0, processedCount: 0, startedAt: null, error: null,
+        // Kolik fází hledání má, ví server. Než odpoví poprvé, tvrdíme jednu — jinak by
+        // se na vteřinu ukázalo „1. ze 0 měst".
+        stageIndex: 0, stageCount: 1, stageLabel: null,
       });
       // Adresa je teď odkaz na tenhle běh. Kdo kartu zavře a otevře ji znovu, uvidí totéž.
       window.history.replaceState({}, '', `${window.location.pathname}?job=${data.jobId}`);
@@ -1195,13 +1264,32 @@ export default function SearchPage() {
 
             {job.status !== 'failed' && (
               <>
+                {/* Které město je na řadě. U jednofázového hledání se neukazuje — „Zlín —
+                    1. z 1 měst" by byl jen hluk. */}
+                {job.stageCount > 1 && job.stageLabel && (
+                  <p className="tnum text-xs text-ink-muted mt-2">
+                    {localized(S.jobStage, locale)
+                      .replace('{city}', job.stageLabel)
+                      .replace('{i}', String(Math.min(job.stageIndex + 1, job.stageCount)))
+                      .replace('{n}', String(job.stageCount))}
+                  </p>
+                )}
+
                 {/* Pruh průběhu. Dokud neznáme počet nalezených firem, nemá co ukazovat —
-                    prázdný pruh je poctivější než animace, která předstírá postup. */}
+                    prázdný pruh je poctivější než animace, která předstírá postup. U hledání
+                    po městech se počítá z fází: `foundCount` je jen to, co zdroje vrátily
+                    dosud, takže by pruh po každé fázi skákal zpátky. */}
                 <div className="h-1 bg-line mt-3 overflow-hidden">
                   <div className="h-1 bg-ink transition-all duration-500"
-                       style={{ width: job.foundCount > 0 ? `${Math.min(100, Math.round(job.processedCount / job.foundCount * 100))}%` : '0%' }} />
+                       style={{ width: job.stageCount > 1
+                         ? `${Math.round(job.stageIndex / job.stageCount * 100)}%`
+                         : job.foundCount > 0
+                           ? `${Math.min(100, Math.round(job.processedCount / job.foundCount * 100))}%`
+                           : '0%' }} />
                 </div>
-                <p className="text-xs text-ink-faint mt-3">{localized(S.jobCanLeave, locale)}</p>
+                <p className="text-xs text-ink-faint mt-3">
+                  {localized(job.stageCount > 1 ? S.jobStaged : S.jobCanLeave, locale)}
+                </p>
               </>
             )}
 
@@ -1322,9 +1410,12 @@ export default function SearchPage() {
             {view === 'map' && (
               <ResultsMap
                 locale={locale}
-                total={filtered.length}
+                total={mapLeads.length}
                 onSetStatus={setLeadStatus}
-                leads={filtered.map((b): MapLead => ({
+                hideDone={hideDone}
+                hiddenDone={hiddenDone}
+                onToggleHideDone={toggleHideDone}
+                leads={mapLeads.map((b): MapLead => ({
                   id: b.id, name: b.name, address: b.address, phone: b.phone, email: b.email,
                   website: b.website, category: b.category, ico: b.ico,
                   lat: b.lat, lon: b.lon,

@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { waitUntil } from '@vercel/functions';
 import { sessionFrom } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { sweepStaleJobs } from '@/lib/search-job';
+import { runSearchJob, sweepStaleJobs } from '@/lib/search-job';
+
+/**
+ * Stejný strop jako u `/api/search`: tahle route hledání nejen hlásí, ale i navazuje, takže
+ * v ní běží úplně stejná práce. Bez toho by navazující fáze umřely na výchozím stropu funkce.
+ */
+export const maxDuration = 300;
 
 /**
  * Stav jednoho hledání a řádky, které k němu zatím přibyly.
@@ -21,6 +28,36 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     where: { id: params.id, userId: session.userId },
   });
   if (!job) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+  /**
+   * Navázání pozastaveného hledání.
+   *
+   * Hledání přes celou ČR se do jedné invokace nevejde, takže se po vyčerpání rozpočtu uloží
+   * jako `paused`. Rozjede ho zpátky právě tenhle dotaz — ten, kterým se prohlížeč stejně ptá
+   * na průběh. Cena je jasně daná: hledání běží, jen dokud má uživatel stránku otevřenou.
+   * UI to říká nahlas, protože tiché zastavení na půl cesty by bylo horší než čekání.
+   *
+   * Podmínka `status: 'paused'` uvnitř `updateMany` je pojistka proti souběhu: dva dotazy,
+   * které dorazí ve stejnou chvíli, přepnou stav oba, ale uspěje jen jeden — druhý dostane
+   * `count === 0` a hledání nespustí podruhé.
+   */
+  if (job.status === 'paused') {
+    const claimed = await prisma.searchJob.updateMany({
+      where: { id: job.id, status: 'paused' },
+      data: { status: 'queued' },
+    });
+    if (claimed.count === 1) {
+      job.status = 'queued';
+      const work = runSearchJob(job.id);
+      // Lokální `next dev` kontext požadavku nemá a `waitUntil` v něm vyhodí výjimku. Tam se
+      // na hledání počká — vývojáře to nezdrží a chování zůstane stejné.
+      try {
+        waitUntil(work);
+      } catch {
+        await work;
+      }
+    }
+  }
 
   const from = Math.max(0, Number(req.nextUrl.searchParams.get('from') ?? 0) || 0);
   const results = await prisma.businessResult.findMany({

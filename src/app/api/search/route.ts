@@ -191,8 +191,9 @@ export async function POST(req: NextRequest) {
      * `waitUntil`, jen už bez prohlížeče na druhém konci. Uživatel může kartu zavřít; výsledky
      * se plní do databáze po dávkách a on se k nim vrátí, kdy chce.
      *
-     * `resultsPerSearch` z plánu se nese v `foundCount` jako vstupní strop, ne jako výsledek —
-     * runner ho použije jako limit pro zdroje a přepíše ho skutečným počtem nalezených firem.
+     * `resultsPerSearch` z plánu jde do `targetCount` — je to vstupní strop, ne výsledek.
+     * `foundCount` zůstává nulový a runner ho plní tím, co zdroje opravdu vrátily; u hledání
+     * po fázích ho přičítá po každém městě.
      */
     const job = await prisma.searchJob.create({
       data: {
@@ -200,7 +201,7 @@ export async function POST(req: NextRequest) {
         searchId: search.id,
         region,
         industry,
-        foundCount: limits.resultsPerSearch === Infinity ? 500 : limits.resultsPerSearch,
+        targetCount: limits.resultsPerSearch === Infinity ? 500 : limits.resultsPerSearch,
       },
     });
 

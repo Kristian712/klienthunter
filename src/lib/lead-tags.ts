@@ -93,3 +93,19 @@ export function isTagged(status: string | null | undefined): boolean {
   const def = statusDef(status);
   return Boolean(def && def.id !== 'new');
 }
+
+/**
+ * Firmy, se kterými už uživatel nemá co dělat.
+ *
+ * „Jedná se" tu schválně není. Rozjednaná firma je pořád práce — nejcennější ze všech —, takže
+ * zmizet z mapy nesmí. Vyřízené je to, co má konec: oslovil jsem (čekám), stal se klientem,
+ * odmítl. Právě tyhle body dělají z mapy po pár týdnech nepřehlednou změť, ve které se nová
+ * příležitost hledá hůř než na začátku.
+ */
+export const DONE_STATUSES: LeadStatus[] = ['contacted', 'client', 'rejected'];
+
+const DONE = new Set<string>(DONE_STATUSES);
+
+export function isDone(status: string | null | undefined): boolean {
+  return Boolean(status && DONE.has(status));
+}

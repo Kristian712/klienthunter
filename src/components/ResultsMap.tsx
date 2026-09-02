@@ -73,7 +73,25 @@ const T = {
   attrib:   { cs: 'Mapa © OpenFreeMap, data © přispěvatelé OpenStreetMap',
               sk: 'Mapa © OpenFreeMap, dáta © prispievatelia OpenStreetMap',
               en: 'Map © OpenFreeMap, data © OpenStreetMap contributors' },
+  hideDone: { cs: 'Skrýt vyřízené', sk: 'Skryť vybavené', en: 'Hide handled' },
+  hiddenNote: { cs: 'Skryto {n}',   sk: 'Skryté {n}',     en: '{n} hidden' },
 };
+
+/**
+ * „Skryto 24 vyřízených".
+ *
+ * Čeština i slovenština mají u čísel tři tvary a jazyk, který napíše „24 vyřízená", zní jako
+ * strojový překlad — v aplikaci, která jinak mluví normálně, to bije do očí víc, než by se
+ * čekalo. Angličtina má tvary dva.
+ */
+function doneCountLabel(n: number, locale: string): string {
+  if (locale === 'en') return `${n} handled ${n === 1 ? 'firm' : 'firms'}`;
+  const forms = locale === 'sk'
+    ? ['vybavená', 'vybavené', 'vybavených']
+    : ['vyřízená', 'vyřízené', 'vyřízených'];
+  const form = n === 1 ? forms[0] : n >= 2 && n <= 4 ? forms[1] : forms[2];
+  return `${n} ${form}`;
+}
 
 /** Odkaz na Google Maps. Jen adresa, žádné API a žádný klíč — vyhledání podle názvu a adresy. */
 export function googleMapsHref(lead: MapLead): string {
@@ -240,9 +258,14 @@ interface Props {
   total: number;
   locale: string;
   onSetStatus: (leadId: string, status: LeadStatus) => void;
+  /** Skrývají se firmy, se kterými už uživatel skončil? Rozhoduje stránka, mapa jen kreslí. */
+  hideDone: boolean;
+  /** Kolik firem přepínač právě schoval. Nula znamená, že se o něm nemá co říkat. */
+  hiddenDone: number;
+  onToggleHideDone: () => void;
 }
 
-export function ResultsMap({ leads, total, locale, onSetStatus }: Props) {
+export function ResultsMap({ leads, total, locale, onSetStatus, hideDone, hiddenDone, onToggleHideDone }: Props) {
   const container = useRef<HTMLDivElement | null>(null);
   const map = useRef<MapLibreMap | null>(null);
   const markers = useRef<Marker[]>([]);
@@ -401,6 +424,29 @@ export function ResultsMap({ leads, total, locale, onSetStatus }: Props) {
         <p className="text-xs text-ink-muted">{localized(T.withWeb, locale).replace('{n}', String(withWeb))}</p>
         <span className="text-ink-faint text-xs">·</span>
         <p className="text-xs text-ink-muted">{localized(T.noWeb, locale).replace('{n}', String(withoutWeb))}</p>
+
+        {/*
+          Přepínač i počet stojí v jedné řadě s počítadlem, ne nad mapou zvlášť: kdo čte, kolik
+          firem mapa ukazuje, má hned vedle napsáno, kolik jich neukazuje a proč. Kolik je
+          schovaných, se říká jen když se opravdu něco schovalo — nula by byla jen šum.
+        */}
+        <span className="text-ink-faint text-xs ml-auto">
+          {hideDone && hiddenDone > 0 && (
+            <span className="text-xs text-ink-muted mr-2">
+              {localized(T.hiddenNote, locale).replace('{n}', doneCountLabel(hiddenDone, locale))}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={onToggleHideDone}
+            aria-pressed={hideDone}
+            className={`text-xs px-2 py-1 border rounded-lg transition-colors ${
+              hideDone ? 'border-ink text-ink font-semibold' : 'border-line text-ink-muted hover:text-ink'
+            }`}
+          >
+            {localized(T.hideDone, locale)}
+          </button>
+        </span>
       </div>
 
       <div className="flex flex-col md:flex-row gap-3">
