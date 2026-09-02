@@ -30,7 +30,8 @@ export async function DELETE(
     await prisma.search.delete({ where: { id: search.id } });
 
     return NextResponse.json({ ok: true });
-  } catch {
+  } catch (err) {
+    console.error('/api/searches/[id]:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

@@ -19,7 +19,8 @@ export async function DELETE(
 
     await prisma.inviteCode.delete({ where: { id: params.id } });
     return NextResponse.json({ success: true });
-  } catch {
+  } catch (err) {
+    console.error('/api/admin/invite-codes/[id]:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

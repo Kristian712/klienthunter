@@ -25,7 +25,8 @@ export async function GET(req: NextRequest) {
     });
 
     return NextResponse.json({ codes });
-  } catch {
+  } catch (err) {
+    console.error('/api/admin/invite-codes:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -53,7 +54,8 @@ export async function POST(req: NextRequest) {
     );
 
     return NextResponse.json({ codes: created });
-  } catch {
+  } catch (err) {
+    console.error('/api/admin/invite-codes:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

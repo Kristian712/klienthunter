@@ -55,7 +55,8 @@ export async function GET(
 
     const results = city ? rows.filter(r => cityOf(r.address) === city).slice(skip, skip + take) : rows;
     return NextResponse.json({ results, total: results.length });
-  } catch {
+  } catch (err) {
+    console.error('/api/searches/[id]/results:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

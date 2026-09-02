@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 
+/** Čte cookie, takže staticky se vykreslit nedá — viz `/api/searches`. */
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: NextRequest) {
   try {
     const token = req.cookies.get('auth-token')?.value;
@@ -21,7 +24,8 @@ export async function GET(req: NextRequest) {
     });
 
     return NextResponse.json({ users });
-  } catch {
+  } catch (err) {
+    console.error('/api/admin/users:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

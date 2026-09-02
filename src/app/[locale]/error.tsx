@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 
+import { reportError } from '@/lib/report-error';
+
 /**
  * Co uvidí uživatel, když klientská komponenta spadne.
  *
@@ -36,6 +38,7 @@ const T = {
     body: 'Stránku se nepodařilo zobrazit. Zkuste to prosím znovu — pokud to bude opakovat, napište mi a pošlete kód chyby níž.',
     retry: 'Zkusit znovu',
     home: 'Zpět na hledání',
+    detail: 'Co se stalo',
   },
   sk: {
     reloading: 'Načítavam novú verziu aplikácie…',
@@ -43,6 +46,7 @@ const T = {
     body: 'Stránku sa nepodarilo zobraziť. Skúste to prosím znova — ak sa to bude opakovať, napíšte mi a pošlite kód chyby nižšie.',
     retry: 'Skúsiť znova',
     home: 'Späť na hľadanie',
+    detail: 'Čo sa stalo',
   },
   en: {
     reloading: 'Loading the new version…',
@@ -50,6 +54,7 @@ const T = {
     body: 'The page could not be displayed. Please try again — if it keeps happening, tell me and include the error code below.',
     retry: 'Try again',
     home: 'Back to search',
+    detail: 'What happened',
   },
 };
 
@@ -69,6 +74,14 @@ export default function LocaleError({ error, reset }: { error: Error & { digest?
   // Jazyk z adresy, ne z kontextu — ten v tuhle chvíli nemusí existovat.
   const seg = typeof window !== 'undefined' ? window.location.pathname.split('/')[1] : 'cs';
   const t = T[seg as keyof typeof T] ?? T.cs;
+
+  // Hlášení jde ven vždycky, i u zastaralého buildu — právě podle počtu těch hlášení se pozná,
+  // jestli je automatické načtení nové verze potřeba, nebo jestli se za tím schovává něco jiného.
+  useEffect(() => {
+    reportError(error, seg);
+    // `seg` se odvozuje z adresy a mezi dvěma pády na téže stránce se nemění.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [error]);
 
   useEffect(() => {
     if (!isStaleBuild(error)) return;
@@ -94,8 +107,21 @@ export default function LocaleError({ error, reset }: { error: Error & { digest?
       <div className="w-full max-w-md border border-line p-6">
         <h1 className="text-xl font-extrabold tracking-tight">{t.title}</h1>
         <p className="text-sm text-ink-muted mt-2">{t.body}</p>
-        {error.digest && (
-          <p className="text-[11px] text-ink-faint mt-3 font-mono">kód: {error.digest}</p>
+        {/*
+          Hláška, pokud nějaká přežila produkční build. Next ji z klientských chyb vymazává,
+          takže tady většinou bude jen `digest` — ale když je hláška k dispozici, je pro
+          uživatele i pro mě o řád užitečnější než osmnáct náhodných znaků.
+        */}
+        {(error.message || error.digest) && (
+          <div className="mt-4 border-t border-line pt-3">
+            <p className="text-[11px] uppercase tracking-wide text-ink-faint">{t.detail}</p>
+            {error.message && (
+              <p className="text-xs text-ink-muted mt-1 font-mono break-words">{error.message}</p>
+            )}
+            {error.digest && (
+              <p className="text-[11px] text-ink-faint mt-1 font-mono">kód: {error.digest}</p>
+            )}
+          </div>
         )}
         <div className="flex items-center gap-2 mt-5">
           <button onClick={reset} className="btn-primary">{t.retry}</button>

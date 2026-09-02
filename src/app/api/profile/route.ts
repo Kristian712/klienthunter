@@ -79,7 +79,8 @@ export async function GET(req: NextRequest) {
     });
 
     return NextResponse.json({ user, searches, totalResults });
-  } catch {
+  } catch (err) {
+    console.error('/api/profile:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

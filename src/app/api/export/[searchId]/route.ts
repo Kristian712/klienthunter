@@ -105,7 +105,8 @@ export async function GET(
         'Content-Disposition': `attachment; filename="klienthunter-${slug}.xlsx"`,
       },
     });
-  } catch {
+  } catch (err) {
+    console.error('/api/export/[searchId]:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

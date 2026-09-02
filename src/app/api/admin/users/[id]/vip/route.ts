@@ -22,7 +22,8 @@ export async function PATCH(
     });
 
     return NextResponse.json({ user });
-  } catch {
+  } catch (err) {
+    console.error('/api/admin/users/[id]/vip:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
