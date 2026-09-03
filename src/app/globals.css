@@ -210,3 +210,117 @@
   color: rgb(var(--ink));
 }
 .results-table tbody tr { border-bottom: 1px solid rgb(var(--line)); }
+
+/* ── Mapa výsledků ──────────────────────────────────────────────────────────
+   Bod na mapě nese tři věci naráz a každou jiným kanálem: tvar říká, jestli firma má web,
+   barva uživatelovu značku a velikost skóre. Pohyb je čtvrtý kanál a je vyhrazený jediné
+   skupině — firmám bez webu, které uživatel ještě neřešil. Kdyby pulzovalo všechno, nepulzuje
+   nic. Animace se skládají jen z `transform` a `opacity`, takže je počítá grafická karta
+   a pět set bodů nedělá rozdíl. `prefers-reduced-motion` je vypíná globálně výš. */
+
+.kh-pin {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  line-height: 0;
+}
+.kh-pin__hit {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: var(--kh-size);
+  height: var(--kh-size);
+  transition: transform .16s cubic-bezier(.2, .9, .3, 1.4);
+}
+.kh-pin:hover .kh-pin__hit,
+.kh-pin:focus-visible .kh-pin__hit { transform: scale(1.45); }
+.kh-pin[data-selected='true'] .kh-pin__hit { transform: scale(1.5); }
+
+/* Samotný puntík. Bílý lem ho drží čitelný nad tmavou i světlou plochou, měkká záře pod ním
+   dělá hloubku, kterou plochá tečka nemá. */
+.kh-pin__core {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: var(--kh-color);
+  box-shadow:
+    0 0 0 2px #fff,
+    0 2px 5px rgba(16, 16, 17, .35),
+    0 0 14px var(--kh-glow);
+}
+.kh-pin[data-shape='diamond'] .kh-pin__core { border-radius: 3px; transform: rotate(45deg); }
+/* Značka uživatele: tmavý prstenec navíc, aby „už jsem ji řešil" šlo přečíst i bez barvy. */
+.kh-pin[data-tagged='true'] .kh-pin__core { box-shadow: 0 0 0 2px #fff, 0 0 0 3.5px rgba(16, 16, 17, .6), 0 2px 5px rgba(16, 16, 17, .35); }
+
+/* Vlna. Jen u příležitostí: firma bez nalezeného webu, kterou uživatel ještě neoznačil. */
+.kh-pin__ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1.5px solid var(--kh-color);
+  opacity: 0;
+  pointer-events: none;
+}
+.kh-pin[data-pulse='true'] .kh-pin__ring { animation: kh-ping 2.8s cubic-bezier(.15, .6, .3, 1) infinite; }
+.kh-pin[data-pulse='true'] .kh-pin__ring:nth-child(2) { animation-delay: 1.4s; }
+
+@keyframes kh-ping {
+  0%   { transform: scale(.7); opacity: .65; }
+  70%  { transform: scale(2.6); opacity: 0; }
+  100% { transform: scale(2.6); opacity: 0; }
+}
+
+/* Příchod bodu. Dostanou ho jen nově dorazivší firmy, ne celá mapa při každém překreslení —
+   jinak by mapa poskočila pokaždé, když uživatel někoho označí. */
+.kh-pin--enter { animation: kh-pop .45s cubic-bezier(.2, 1.25, .35, 1) backwards; animation-delay: var(--kh-delay, 0ms); }
+@keyframes kh-pop {
+  0%   { transform: scale(0); opacity: 0; }
+  60%  { transform: scale(1.18); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* Vybraná firma má prstenec, který nezmizí — karta a bod na mapě tak patří viditelně k sobě. */
+.kh-pin__halo {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 1.5px solid rgb(var(--ink));
+  opacity: 0;
+  transform: scale(.8);
+  transition: opacity .18s ease-out, transform .18s cubic-bezier(.2, .9, .3, 1.4);
+  pointer-events: none;
+}
+.kh-pin[data-selected='true'] .kh-pin__halo { opacity: .85; transform: scale(1); }
+
+/* Popisek u bodu. Ukazuje ho rozvrh v komponentě, ne hover. */
+.kh-pin__label {
+  position: absolute;
+  left: calc(var(--kh-size) - 1px);
+  top: 50%;
+  transform: translateY(-50%);
+  white-space: nowrap;
+  font: 500 11px var(--font-inter), system-ui, sans-serif;
+  color: rgb(var(--ink));
+  background: rgba(255, 254, 252, .92);
+  backdrop-filter: blur(6px);
+  padding: 2px 6px;
+  border-radius: 6px;
+  border: 1px solid rgba(16, 16, 17, .08);
+  box-shadow: 0 2px 8px rgba(16, 16, 17, .1);
+  pointer-events: none;
+  display: none;
+}
+
+/* Rám mapy. Vinětace uvnitř drží pozornost ve středu a odděluje podklad od stránky, která má
+   stejné pozadí — bez ní mapa splývá s okolím. */
+.kh-map-frame { position: relative; }
+.kh-map-frame::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 1px rgba(16, 16, 17, .1), inset 0 22px 60px -30px rgba(16, 16, 17, .28);
+}

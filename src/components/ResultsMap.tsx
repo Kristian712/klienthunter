@@ -64,9 +64,14 @@ const T = {
   legend:   { cs: 'Legenda',         sk: 'Legenda',        en: 'Legend' },
   legWeb:   { cs: 'Web',             sk: 'Web',            en: 'Website' },
   legTags:  { cs: 'Vaše značky',     sk: 'Vaše značky',    en: 'Your tags' },
-  legHint:  { cs: 'Tvar říká web, barva vaši značku.',
-              sk: 'Tvar hovorí web, farba vašu značku.',
-              en: 'Shape shows the website, colour shows your tag.' },
+  legHint:  { cs: 'Tvar říká web, barva vaši značku, velikost skóre.',
+              sk: 'Tvar hovorí web, farba vašu značku, veľkosť skóre.',
+              en: 'Shape shows the website, colour your tag, size the score.' },
+  legPulse: { cs: 'Pulzují nejlepší firmy bez webu — ty, kvůli kterým se sem chodí.',
+              sk: 'Pulzujú najlepšie firmy bez webu — tie, kvôli ktorým sa sem chodí.',
+              en: 'The pulsing points are the best firms with no website — the reason to look.' },
+  tilt:     { cs: 'Sklopit mapu do 3D', sk: 'Sklopiť mapu do 3D', en: 'Tilt the map to 3D' },
+  tiltOff:  { cs: 'Zpět na plochou mapu', sk: 'Späť na plochú mapu', en: 'Back to the flat map' },
   zoomHint: { cs: 'Názvy firem se ukážou po přiblížení.',
               sk: 'Názvy firiem sa ukážu po priblížení.',
               en: 'Firm names appear as you zoom in.' },
@@ -117,8 +122,8 @@ function tintVanek(m: MapLibreMap) {
 
   for (const layer of style.layers) {
     const id = layer.id;
-    // POI a půdorysy budov: na mapě, kde každý bod je firma, jsou to jen další tečky navíc.
-    if (/poi|building/i.test(id)) {
+    // POI: na mapě, kde každý bod je firma, jsou cizí ikony jen další tečky navíc.
+    if (/poi/i.test(id)) {
       if (m.getLayer(id)) m.removeLayer(id);
       continue;
     }
@@ -126,10 +131,15 @@ function tintVanek(m: MapLibreMap) {
       if (layer.type === 'background') m.setPaintProperty(id, 'background-color', '#f6f5f2');
       if (layer.type === 'fill') {
         const voda = /water/i.test(id);
-        m.setPaintProperty(id, 'fill-color', voda ? '#e4e3de' : '#f0efeb');
+        // Domy zůstávají, jen skoro splynou s podkladem. Dávají městu strukturu, ve které bod
+        // sedí v ulici a ne v prázdnu — a ve 3D režimu z nich vyrostou skutečné bloky.
+        const dum = /building/i.test(id);
+        const park = /park|wood|landcover|grass/i.test(id);
+        m.setPaintProperty(id, 'fill-color', voda ? '#dfe1e4' : dum ? '#edece7' : park ? '#f1f1ec' : '#f0efeb');
+        if (dum) m.setPaintProperty(id, 'fill-outline-color', '#e6e5df');
       }
       if (layer.type === 'line') {
-        if (/water|river|stream/i.test(id)) m.setPaintProperty(id, 'line-color', '#dcdbd6');
+        if (/water|river|stream/i.test(id)) m.setPaintProperty(id, 'line-color', '#d3d7db');
         else if (/boundary|admin/i.test(id)) m.setPaintProperty(id, 'line-color', 'rgba(16,16,17,.22)');
         else m.setPaintProperty(id, 'line-color', '#ffffff');
       }
@@ -165,7 +175,33 @@ const LABEL_GAP = 6;
 
 // ── Body ──────────────────────────────────────────────────────────────────────
 
-/** Styl puntíku. Sdílí ho marker na mapě i vzorek v legendě, aby se nemohly rozejít. */
+/**
+ * Kolik bodů smí zároveň pulzovat.
+ *
+ * Vlna je čtvrtý kanál informace, ne dekorace: má říct „tady je příležitost". Kdyby ji dostalo
+ * všech pět set bodů, neřekne nic a mapa bude vibrovat. Dostanou ji nejlepší leady bez webu,
+ * které uživatel ještě neoznačil — přesně ty, kvůli kterým se mapa otvírá.
+ */
+const MAX_PULSING = 60;
+
+/** Nejmenší a největší průměr bodu. Velikost nese skóre, takže silný lead je vidět dřív. */
+const DOT_MIN = 11;
+const DOT_MAX = 19;
+
+function dotSize(score: number): number {
+  const t = Math.max(0, Math.min(100, score)) / 100;
+  return Math.round(DOT_MIN + (DOT_MAX - DOT_MIN) * t);
+}
+
+/** Barva záře pod bodem. Ze stejného odstínu jako bod, jen průhledná — jinak by to byl druhý bod. */
+function glow(hex: string, alpha: number): string {
+  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  if (!m) return `rgba(16,16,17,${alpha})`;
+  const [r, g, b] = [m[1], m[2], m[3]].map(v => parseInt(v, 16));
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+/** Styl puntíku v legendě. Marker na mapě má vlastní třídy v globals.css. */
 function dotStyle(color: string, shape: PointShape, tagged: boolean, size: number): CSSProperties {
   return {
     display: 'block',
@@ -180,14 +216,6 @@ function dotStyle(color: string, shape: PointShape, tagged: boolean, size: numbe
     // se pozná i bez rozeznání odstínu.
     outline: tagged ? '1.5px solid rgba(0,0,0,.55)' : undefined,
   };
-}
-
-/** Marker si MapLibre bere jako hotový DOM prvek, ne jako JSX — styl mu musíme podat textem. */
-function toCssText(style: CSSProperties): string {
-  return Object.entries(style)
-    .filter(([, v]) => v !== undefined)
-    .map(([k, v]) => `${k.replace(/[A-Z]/g, c => `-${c.toLowerCase()}`)}:${typeof v === 'number' ? `${v}px` : v}`)
-    .join(';');
 }
 
 /** Šířka popisku v pixelech. Měří se doopravdy, odhad podle počtu znaků by u „ě" a „i" lhal. */
@@ -243,6 +271,7 @@ function Legend({ locale, labelsOn }: { locale: string; labelsOn: boolean }) {
       </ul>
 
       <p className="text-[10px] text-ink-faint mt-3 leading-snug">{localized(T.legHint, locale)}</p>
+      <p className="text-[10px] text-ink-faint mt-1 leading-snug">{localized(T.legPulse, locale)}</p>
       {!labelsOn && (
         <p className="text-[10px] text-ink-faint mt-1 leading-snug">{localized(T.zoomHint, locale)}</p>
       )}
@@ -276,6 +305,11 @@ export function ResultsMap({ leads, total, locale, onSetStatus, hideDone, hidden
   const measure = useRef(makeMeasurer());
   /** Na výsledky se doskočí jednou. Další dávky už mapu pod rukama neposouvají. */
   const fitted = useRef(false);
+  /** Firmy, které už na mapě jednou byly. Rozhoduje o tom, jestli bod přiletí, nebo se objeví. */
+  const seen = useRef(new Set<string>());
+  const [tilted, setTilted] = useState(false);
+  /** Styl mapy je načtený a dají se do něj přidávat vrstvy. */
+  const [styleReady, setStyleReady] = useState(false);
   const [selected, setSelected] = useState<MapLead | null>(null);
   const [failed, setFailed] = useState(false);
   const [labelsOn, setLabelsOn] = useState(false);
@@ -294,9 +328,14 @@ export function ResultsMap({ leads, total, locale, onSetStatus, hideDone, hidden
       center: [15.47, 49.82], // střed ČR, než dorazí první firmy
       zoom: 6.5,
       attributionControl: false,
+      // Otáčení a sklápění se ovládá pravým tlačítkem nebo dvěma prsty; ve 3D režimu je to
+      // to hlavní, čím se mapa prohlíží, takže nesmí zůstat zamčené.
+      pitchWithRotate: true,
+      dragRotate: true,
+      maxPitch: 60,
     });
-    m.addControl(new NavigationControl({ showCompass: false }), 'top-right');
-    m.on('style.load', () => tintVanek(m));
+    m.addControl(new NavigationControl({ visualizePitch: true }), 'top-right');
+    m.on('style.load', () => { tintVanek(m); setStyleReady(true); });
     // Když se nepovede načíst styl nebo dlaždice, ať to není tichý prázdný obdélník.
     m.on('error', e => { console.warn('mapa:', e?.error?.message ?? e); setFailed(true); });
     // Popisky se přerovnávají až po dojetí pohybu. Během posouvání jedou s body samy — jsou
@@ -320,33 +359,80 @@ export function ResultsMap({ leads, total, locale, onSetStatus, hideDone, hidden
     markers.current = [];
     labels.current = [];
 
+    /**
+     * Které body dostanou vlnu. Nejlepší příležitosti: firma bez nalezeného webu, kterou
+     * uživatel ještě neoznačil. Množina se počítá dopředu, aby se u každého bodu jen hledalo.
+     */
+    const pulsing = new Set(
+      placeable
+        .filter(l => !l.hasWebsite && !isTagged(l.status))
+        .sort((a, b) => b.leadScore - a.leadScore)
+        .slice(0, MAX_PULSING)
+        .map(l => l.id),
+    );
+
+    let entering = 0;
     for (const lead of placeable) {
       const shape = pointShape(lead.hasWebsite);
       const webShort = localized(lead.hasWebsite ? T.hasShort : T.noneShort, locale);
+      const color = pointColor(lead.hasWebsite, lead.status);
+      const size = dotSize(lead.leadScore);
 
       const el = document.createElement('button');
       el.type = 'button';
+      el.className = 'kh-pin';
       el.setAttribute('aria-label', `${lead.name} — ${webShort}`);
-      // Bez `position`: MapLibre dává markeru `position:absolute` vlastní třídou a přebít mu ji
-      // znamená body poslepovat do rohu mapy. Absolutně umístěný popisek se stejně kotví k němu.
-      el.style.cssText = 'display:block;padding:0;border:0;background:none;cursor:pointer';
+      el.dataset.shape = shape;
+      el.dataset.tagged = String(isTagged(lead.status));
+      el.dataset.pulse = String(pulsing.has(lead.id));
+      el.dataset.leadId = lead.id;
+      el.style.setProperty('--kh-color', color);
+      el.style.setProperty('--kh-glow', glow(color, 0.45));
+      el.style.setProperty('--kh-size', `${size}px`);
 
-      const dot = document.createElement('span');
-      dot.style.cssText = toCssText(dotStyle(pointColor(lead.hasWebsite, lead.status), shape, isTagged(lead.status), 13));
-      el.appendChild(dot);
+      /**
+       * Bod se vysype na mapu jen poprvé.
+       *
+       * Překreslení kvůli nové značce nebo další dávce nesmí rozpohybovat celou mapu — jinak
+       * každé kliknutí na stav vypadá jako by se hledalo znovu. Zpoždění roste po bodech
+       * a je zastropované, takže poslední firma z pěti set nečeká čtyři sekundy.
+       */
+      const isNew = !seen.current.has(lead.id);
+      if (isNew) {
+        seen.current.add(lead.id);
+        el.classList.add('kh-pin--enter');
+        el.style.setProperty('--kh-delay', `${Math.min(entering * 6, 520)}ms`);
+        entering++;
+      }
+
+      // Vlastní obal kvůli transformacím: zvětšení při najetí sedí na něm, otočení kosočtverce
+      // na jádru uvnitř. Na jednom prvku by se ty dvě transformace přepsaly.
+      const hit = document.createElement('span');
+      hit.className = 'kh-pin__hit';
+
+      const halo = document.createElement('span');
+      halo.className = 'kh-pin__halo';
+      const ring1 = document.createElement('span');
+      ring1.className = 'kh-pin__ring';
+      const ring2 = document.createElement('span');
+      ring2.className = 'kh-pin__ring';
+      const core = document.createElement('span');
+      core.className = 'kh-pin__core';
+      hit.append(ring1, ring2, core, halo);
+      el.appendChild(hit);
 
       // Popisek visí mimo tok, takže neposouvá kotvu bodu. Ukazuje se až podle `relayout`.
       const label = document.createElement('span');
+      label.className = 'kh-pin__label';
       label.textContent = `${lead.name} · ${webShort}`;
-      label.style.cssText = [
-        'position:absolute;left:14px;top:50%;transform:translateY(-50%)',
-        'white-space:nowrap;font:11px system-ui,-apple-system,sans-serif;color:#111',
-        'background:rgba(255,255,255,.95);padding:1px 4px;border-radius:3px',
-        'pointer-events:none;display:none',
-      ].join(';');
-      el.appendChild(label);
+      hit.appendChild(label);
 
-      el.addEventListener('click', e => { e.stopPropagation(); setSelected(lead); });
+      el.addEventListener('click', e => {
+        e.stopPropagation();
+        setSelected(lead);
+        // Jemné dorovnání kamery. Bod zůstane na obrazovce i poté, co ho karta zespodu zakryje.
+        map.current?.easeTo({ center: [lead.lon!, lead.lat!], duration: 420 });
+      });
       labels.current.push({ lead, el: label, root: el });
       markers.current.push(
         new Marker({ element: el }).setLngLat([lead.lon!, lead.lat!]).addTo(m),
@@ -382,10 +468,12 @@ export function ResultsMap({ leads, total, locale, onSetStatus, hideDone, hidden
         const p = map0.project([item.lead.lon!, item.lead.lat!]);
         if (p.x < 0 || p.y < 0 || p.x > w || p.y > h) continue;
 
-        const width = measure.current(item.el.textContent ?? '') + 10;
+        const width = measure.current(item.el.textContent ?? '') + 14;
+        // Odsazení popisku roste s bodem — velikost bodu nese skóre, takže není konstantní.
+        const offset = dotSize(item.lead.leadScore);
         const box: [number, number, number, number] = [
-          p.x + 14 - LABEL_GAP, p.y - 9 - LABEL_GAP,
-          p.x + 14 + width + LABEL_GAP, p.y + 9 + LABEL_GAP,
+          p.x + offset - LABEL_GAP, p.y - 10 - LABEL_GAP,
+          p.x + offset + width + LABEL_GAP, p.y + 10 + LABEL_GAP,
         ];
         // Popisek, který by přetekl přes okraj mapy, se ořízne v půlce slova a vypadá to jako
         // chyba. Radši ho nedat — bod je pořád vidět a po posunutí mapy se popisek objeví.
@@ -412,6 +500,63 @@ export function ResultsMap({ leads, total, locale, onSetStatus, hideDone, hidden
 
     relayout.current();
   }, [placeable.map(l => `${l.id}:${l.status ?? ''}`).join(','), locale]);
+
+  /**
+   * Prstenec u vybrané firmy.
+   *
+   * Vlastní efekt, ne přestavba bodů: překreslit kvůli jednomu kliknutí pět set markerů by
+   * mapu na okamžik zastavilo a všechny body by přišly o rozdělané animace.
+   */
+  useEffect(() => {
+    for (const item of labels.current) {
+      item.root.dataset.selected = String(item.lead.id === selected?.id);
+    }
+  }, [selected?.id]);
+
+  /**
+   * Sklopení mapy a domy do prostoru.
+   *
+   * Ve 3D je z bodů vidět, ve které ulici firma sedí, ne jen ve které čtvrti — a mapa přestane
+   * vypadat jako obrázek. Domy se kreslí až od zoomu 15, kde je jich ve výřezu rozumný počet;
+   * pod ním by to byla jen šedá kaše, která stojí výkon.
+   */
+  useEffect(() => {
+    const m = map.current;
+    if (!m || !styleReady) return;
+
+    const apply = () => {
+      const has = Boolean(m.getLayer('kh-buildings'));
+      if (tilted && !has && m.getSource('openmaptiles')) {
+        m.addLayer({
+          id: 'kh-buildings',
+          type: 'fill-extrusion',
+          source: 'openmaptiles',
+          'source-layer': 'building',
+          minzoom: 15,
+          paint: {
+            'fill-extrusion-color': '#e7e6e1',
+            'fill-extrusion-height': ['coalesce', ['get', 'render_height'], 8],
+            'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], 0],
+            'fill-extrusion-opacity': 0.85,
+            // Náběh výšky, aby domy při přiblížení vyrostly, ne vyskočily.
+            'fill-extrusion-vertical-gradient': true,
+          },
+        });
+      }
+      if (!tilted && has) m.removeLayer('kh-buildings');
+      m.easeTo({ pitch: tilted ? 52 : 0, bearing: tilted ? -14 : 0, duration: 600 });
+    };
+
+    apply();
+    /**
+     * Čeká se na `styleReady`, ne na `isStyleLoaded()`.
+     *
+     * `isStyleLoaded()` hlásí false, dokud doběhne poslední zdroj dlaždic — a u mapy, po které
+     * se posouvá, to není nikdy spolehlivě. Efekt se proto pouští až podle příznaku, který
+     * nastaví událost `style.load`; ta přijde právě jednou a znamená přesně to, co potřebujeme:
+     * vrstvy stylu existují a dá se do nich přidávat.
+     */
+  }, [tilted, styleReady]);
 
   return (
     <div>
@@ -451,7 +596,26 @@ export function ResultsMap({ leads, total, locale, onSetStatus, hideDone, hidden
 
       <div className="flex flex-col md:flex-row gap-3">
         <div className="relative flex-1 min-w-0">
-          <div ref={container} className="w-full h-[26rem] md:h-[34rem] rounded-xl overflow-hidden border border-line" />
+          <div
+            ref={container}
+            className="kh-map-frame w-full h-[26rem] md:h-[34rem] rounded-xl overflow-hidden border border-line"
+          />
+
+          {/* Přepínač pohledu. Vlevo nahoře, aby si nelezl do cesty s ovládáním přiblížení. */}
+          <button
+            type="button"
+            onClick={() => setTilted(v => !v)}
+            aria-pressed={tilted}
+            title={localized(tilted ? T.tiltOff : T.tilt, locale)}
+            aria-label={localized(tilted ? T.tiltOff : T.tilt, locale)}
+            className={`absolute z-20 left-3 top-3 text-[11px] font-mono tracking-wider px-2.5 py-1.5 rounded-lg border transition-colors ${
+              tilted
+                ? 'border-ink bg-ink text-surface'
+                : 'border-line bg-surface-subtle/90 text-ink-muted hover:text-ink hover:border-ink'
+            }`}
+          >
+            {tilted ? '2D' : '3D'}
+          </button>
 
           {placeable.length === 0 && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
