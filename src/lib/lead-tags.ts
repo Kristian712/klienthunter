@@ -61,31 +61,42 @@ export function statusLabel(id: string | null | undefined, locale: string): stri
  * Bez značky rozhoduje web — to je celý smysl té mapy. Jakmile ale uživatel firmu označí,
  * vyhrává jeho vlastní stav: v tu chvíli ho zajímá, koho už řešil, ne kdo má web.
  */
+export type WebState = 'HAS' | 'NONE' | 'UNKNOWN';
+
 export const WEB_COLORS = {
   /** Web jsme ověřili. Šedá schválně: je to ta nezajímavá skupina, nemá strhávat pozornost. */
   has: '#64748b',
-  /** Web jsme nenašli — to je ta skupina, kvůli které se aplikace otvírá. */
+  /** Web jsme prověřili a firma ho nemá — to je ta skupina, kvůli které se aplikace otvírá. */
   none: '#d55e00',
+  /** Nevíme. Bledá a tichá: nic netvrdí, jen přiznává, že odpověď chybí. */
+  unknown: '#b8b4ae',
 };
 
-export function pointColor(hasWebsite: boolean, status: string | null | undefined): string {
+export function pointColor(web: WebState, status: string | null | undefined): string {
   const def = statusDef(status);
   if (def && def.id !== 'new') return def.color;
-  return hasWebsite ? WEB_COLORS.has : WEB_COLORS.none;
+  if (web === 'HAS') return WEB_COLORS.has;
+  return web === 'NONE' ? WEB_COLORS.none : WEB_COLORS.unknown;
 }
 
-export type PointShape = 'circle' | 'diamond';
+export type PointShape = 'circle' | 'diamond' | 'ring';
 
 /**
  * Tvar bodu na mapě.
  *
- * Tvar nese jedinou věc: má firma web, nebo jsme ho nenašli. Drží ji i tehdy, když barvu bodu
- * přebije uživatelská značka — jinak by u označené firmy nešlo z mapy poznat, kvůli čemu se na
- * ni vlastně kliklo. Zároveň je to ten „nebarevný" klíč navíc, díky kterému mapa funguje i pro
- * barvoslepé: kruh a kosočtverec se pletou špatně i v odstínech šedi.
+ * Nese jedinou věc, zato tu nejdůležitější: kruh = web ověřen, kosočtverec = prověřili jsme to
+ * a firma web nemá, kroužek = nevíme. Drží ji i tehdy, když barvu bodu přebije uživatelská
+ * značka — jinak by u označené firmy nešlo z mapy poznat, kvůli čemu se na ni vlastně kliklo.
+ * Zároveň je to ten „nebarevný" klíč navíc, díky kterému mapa funguje i pro barvoslepé: tyhle
+ * tři tvary se pletou špatně i v odstínech šedi.
+ *
+ * Třetí tvar přibyl s tím, jak přestalo platit „co není potvrzené, je bez webu": dokud se
+ * neověřené firmy kreslily jako kosočtverce, mapa tvrdila o stovkách firem něco, co nikdo
+ * nezjišťoval.
  */
-export function pointShape(hasWebsite: boolean): PointShape {
-  return hasWebsite ? 'circle' : 'diamond';
+export function pointShape(web: WebState): PointShape {
+  if (web === 'HAS') return 'circle';
+  return web === 'NONE' ? 'diamond' : 'ring';
 }
 
 /** Označil si uživatel firmu vlastní značkou? „Neosloveno" je výchozí stav, ne značka. */

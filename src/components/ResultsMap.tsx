@@ -6,7 +6,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import { localized } from '@/lib/lead-filters';
 import {
   LEAD_STATUSES, WEB_COLORS, isTagged, pointColor, pointShape,
-  type LeadStatus, type PointShape,
+  type LeadStatus, type PointShape, type WebState,
 } from '@/lib/lead-tags';
 
 /**
@@ -47,7 +47,8 @@ export interface MapLead {
 const T = {
   onMap:    { cs: 'Na mapě {n} z {total} firem', sk: 'Na mape {n} z {total} firiem', en: '{n} of {total} firms on the map' },
   withWeb:  { cs: '{n} s webem', sk: '{n} s webom', en: '{n} with a website' },
-  noWeb:    { cs: '{n} bez nalezeného webu', sk: '{n} bez nájdeného webu', en: '{n} with no website found' },
+  noWeb:    { cs: '{n} bez webu',    sk: '{n} bez webu',   en: '{n} with no website' },
+  unver:    { cs: '{n} neověřeno',   sk: '{n} neoverené',  en: '{n} unverified' },
   noCoords: { cs: 'U zbylých neznáme souřadnice — ARES je nevrací, jen adresu textem.',
               sk: 'Pri zvyšných nepoznáme súradnice — ARES ich nevracia, len adresu textom.',
               en: 'We have no coordinates for the rest — ARES returns only a postal address.' },
@@ -55,10 +56,12 @@ const T = {
               sk: 'Žiadnu z nájdených firiem nevieme umiestniť na mapu. Skúste zoznam.',
               en: 'None of the firms found can be placed on the map. Try the list.' },
   webHas:   { cs: 'Web ověřen',      sk: 'Web overený',    en: 'Website verified' },
-  webNone:  { cs: 'Web neuveden',    sk: 'Web neuvedený',  en: 'No website listed' },
+  webNone:  { cs: 'Web nemá',        sk: 'Web nemá',       en: 'No website' },
+  webUnk:   { cs: 'Web neověřen',    sk: 'Web neoverený',  en: 'Website unverified' },
   // Krátká varianta do popisku u bodu — vedle názvu firmy musí být co nejúspornější.
   hasShort: { cs: 'má web',          sk: 'má web',         en: 'has a site' },
-  noneShort:{ cs: 'web neuveden',    sk: 'web neuvedený',  en: 'no site listed' },
+  noneShort:{ cs: 'web nemá',        sk: 'web nemá',       en: 'no site' },
+  unknownShort: { cs: 'web neověřen', sk: 'web neoverený', en: 'site unverified' },
   openMaps: { cs: 'Otevřít na Google Maps', sk: 'Otvoriť na Google Maps', en: 'Open in Google Maps' },
   close:    { cs: 'Zavřít',          sk: 'Zavrieť',        en: 'Close' },
   legend:   { cs: 'Legenda',         sk: 'Legenda',        en: 'Legend' },
@@ -96,6 +99,17 @@ function doneCountLabel(n: number, locale: string): string {
     : ['vyřízená', 'vyřízené', 'vyřízených'];
   const form = n === 1 ? forms[0] : n >= 2 && n <= 4 ? forms[1] : forms[2];
   return `${n} ${form}`;
+}
+
+/**
+ * Stav webu jedné firmy. Starší řádky `websiteStatus` nemají — u nich platí, že potvrzený web
+ * je HAS a všechno ostatní je „nevíme", nikdy „nemá".
+ */
+function webStateOf(l: { websiteStatus?: string | null; hasWebsite: boolean }): WebState {
+  if (l.websiteStatus === 'HAS' || l.websiteStatus === 'NONE' || l.websiteStatus === 'UNKNOWN') {
+    return l.websiteStatus;
+  }
+  return l.hasWebsite ? 'HAS' : 'UNKNOWN';
 }
 
 /** Odkaz na Google Maps. Jen adresa, žádné API a žádný klíč — vyhledání podle názvu a adresy. */
@@ -212,6 +226,8 @@ function dotStyle(color: string, shape: PointShape, tagged: boolean, size: numbe
     boxShadow: '0 1px 3px rgba(0,0,0,.4)',
     borderRadius: shape === 'diamond' ? 2 : '50%',
     transform: shape === 'diamond' ? 'rotate(45deg)' : undefined,
+    // Kroužek: prázdný uvnitř, protože nic netvrdí. Barva je jen v obrysu.
+    ...(shape === 'ring' ? { background: 'transparent', border: `2px solid ${color}`, boxShadow: 'none' } : null),
     // Označená firma dostane tmavý kroužek. Je to nebarevný klíč navíc: „už jsem ji řešil"
     // se pozná i bez rozeznání odstínu.
     outline: tagged ? '1.5px solid rgba(0,0,0,.55)' : undefined,
@@ -257,6 +273,10 @@ function Legend({ locale, labelsOn }: { locale: string; labelsOn: boolean }) {
         <li className="flex items-center gap-2 text-xs text-ink-muted">
           <Swatch color={WEB_COLORS.none} shape="diamond" tagged={false} />
           {localized(T.webNone, locale)}
+        </li>
+        <li className="flex items-center gap-2 text-xs text-ink-muted">
+          <Swatch color={WEB_COLORS.unknown} shape="ring" tagged={false} />
+          {localized(T.webUnk, locale)}
         </li>
       </ul>
 
@@ -315,8 +335,11 @@ export function ResultsMap({ leads, total, locale, onSetStatus, hideDone, hidden
   const [labelsOn, setLabelsOn] = useState(false);
 
   const placeable = leads.filter(l => typeof l.lat === 'number' && typeof l.lon === 'number');
-  const withWeb = placeable.filter(l => l.hasWebsite).length;
-  const withoutWeb = placeable.length - withWeb;
+  // Tři čísla, ne dvě: „bez webu" a „neověřeno" jsou dvě různá tvrzení a slévat je do jednoho
+  // je přesně ta věc, kvůli které mapa lhala.
+  const withWeb = placeable.filter(l => webStateOf(l) === 'HAS').length;
+  const withoutWeb = placeable.filter(l => webStateOf(l) === 'NONE').length;
+  const unverified = placeable.length - withWeb - withoutWeb;
 
   // Mapa se vytváří jednou. Kdyby se přetvářela při každé změně výsledků, ztratil by uživatel
   // pozici i přiblížení pokaždé, když doběhne další dávka firem.
@@ -373,9 +396,10 @@ export function ResultsMap({ leads, total, locale, onSetStatus, hideDone, hidden
 
     let entering = 0;
     for (const lead of placeable) {
-      const shape = pointShape(lead.hasWebsite);
-      const webShort = localized(lead.hasWebsite ? T.hasShort : T.noneShort, locale);
-      const color = pointColor(lead.hasWebsite, lead.status);
+      const web = webStateOf(lead);
+      const shape = pointShape(web);
+      const webShort = localized(web === 'HAS' ? T.hasShort : web === 'NONE' ? T.noneShort : T.unknownShort, locale);
+      const color = pointColor(web, lead.status);
       const size = dotSize(lead.leadScore);
 
       const el = document.createElement('button');
@@ -569,6 +593,12 @@ export function ResultsMap({ leads, total, locale, onSetStatus, hideDone, hidden
         <p className="text-xs text-ink-muted">{localized(T.withWeb, locale).replace('{n}', String(withWeb))}</p>
         <span className="text-ink-faint text-xs">·</span>
         <p className="text-xs text-ink-muted">{localized(T.noWeb, locale).replace('{n}', String(withoutWeb))}</p>
+        {unverified > 0 && (
+          <>
+            <span className="text-ink-faint text-xs">·</span>
+            <p className="text-xs text-ink-faint">{localized(T.unver, locale).replace('{n}', String(unverified))}</p>
+          </>
+        )}
 
         {/*
           Přepínač i počet stojí v jedné řadě s počítadlem, ne nad mapou zvlášť: kdo čte, kolik

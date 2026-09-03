@@ -251,6 +251,12 @@
     0 0 14px var(--kh-glow);
 }
 .kh-pin[data-shape='diamond'] .kh-pin__core { border-radius: 3px; transform: rotate(45deg); }
+/* Kroužek = „nevíme". Prázdný střed schválně: bod nic netvrdí, jen říká, že odpověď chybí. */
+.kh-pin[data-shape='ring'] .kh-pin__core {
+  background: transparent;
+  border: 2.5px solid var(--kh-color);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, .9), 0 1px 3px rgba(16, 16, 17, .25);
+}
 /* Značka uživatele: tmavý prstenec navíc, aby „už jsem ji řešil" šlo přečíst i bez barvy. */
 .kh-pin[data-tagged='true'] .kh-pin__core { box-shadow: 0 0 0 2px #fff, 0 0 0 3.5px rgba(16, 16, 17, .6), 0 2px 5px rgba(16, 16, 17, .35); }
 

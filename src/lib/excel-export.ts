@@ -12,10 +12,14 @@ import { resolveStatus, type WebsiteStatus } from './website-status';
  * only means nobody could confirm a page. The empty cell says exactly that much and no more —
  * the same convention `vatLabel()` below already uses for a register we never asked.
  */
+/**
+ * Tři stavy, tři různé buňky. Prázdno u UNKNOWN by se v Excelu četlo jako „ne" — a to je přesně
+ * ta záměna, kvůli které aplikace o firmách s webem tvrdila, že ho nemají.
+ */
 export const WEBSITE_LABEL_CS: Record<WebsiteStatus, string> = {
   HAS: 'ANO',
   NONE: 'NE',
-  UNKNOWN: '',
+  UNKNOWN: 'NEOVĚŘENO',
 };
 
 /** NULL means the VAT register was never asked, which is not the same as "not registered". */

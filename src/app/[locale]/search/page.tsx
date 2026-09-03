@@ -425,7 +425,10 @@ const S = {
   noSocialTip: { cs: 'Na webu firmy jsme nenašli odkaz na žádnou sociální síť.',
                  sk: 'Na webe firmy sme nenašli odkaz na žiadnu sociálnu sieť.',
                  en: 'We found no link to a social profile on the firm’s website.' },
-  webNone:     { cs: 'Web nenalezen',   sk: 'Web nenájdený',    en: 'No website found' },
+  // „Web nemá" je doložené tvrzení: prošly se domény z názvu i doména z e-mailu. Co doložené
+  // není, má vlastní štítek — viz `webUnknown`.
+  webNone:     { cs: 'Web nemá',        sk: 'Web nemá',         en: 'No website' },
+  webUnknown:  { cs: 'Web neověřen',    sk: 'Web neoverený',    en: 'Website unverified' },
   webUnverifiedTip: { cs: 'Tuhle adresu uvedl zdroj, ale při našem ověření neodpověděla. Web může být dočasně mimo provoz, nebo už nefunguje.',
                       sk: 'Túto adresu uviedol zdroj, ale pri našom overení neodpovedala. Web môže byť dočasne mimo prevádzky, alebo už nefunguje.',
                       en: 'A source gave this address, but it did not answer when we checked. The site may be temporarily down, or gone.' },
@@ -577,10 +580,22 @@ function SocialLinks({ b, locale }: { b: BusinessResult; locale: string }) {
  */
 function WebsiteStatusBadge({ b, locale }: { b: BusinessResult; locale: string }) {
   const status = webStatus(b);
-  if (status === 'UNKNOWN') return null;
+  /**
+   * Tři stavy, tři různé věty — a žádná mlčky.
+   *
+   * Dřív se UNKNOWN nevykresloval vůbec, protože se za ním schovávalo „nedívali jsme se" a psát
+   * o tom cokoli by byla lež. Od chvíle, kdy dohledávání umí říct „prošel jsem všechny domény
+   * z názvu a nic tam není", je NONE doložené tvrzení — a zbytek se má přiznat nahlas, ne
+   * splynout s ním. Důvod je v obou případech v bublině (`websiteEvidence`).
+   */
+  if (status === 'UNKNOWN') {
+    return (
+      <span className="badge text-ink-faint" title={b.websiteEvidence || undefined}>
+        <Globe size={10} />{localized(S.webUnknown, locale)}
+      </span>
+    );
+  }
   if (status === 'NONE') {
-    // Reachable only from a source that can carry real negative evidence. None does today, so
-    // this stays unentered — but it is the one case where saying "no website" would be earned.
     return (
       <span className="badge-red" title={b.websiteEvidence || undefined}>
         <Globe size={10} />{localized(S.webNone, locale)}

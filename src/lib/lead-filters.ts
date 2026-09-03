@@ -260,21 +260,33 @@ export const LEAD_FILTERS: LeadFilter[] = [
     id: 'no_website',
     group: 'web',
     /**
-     * The wording is the whole point. "Web neuveden" was read as a statement about the firm, and
-     * for most rows it was false — ARES has no website column and OpenStreetMap tags one on a
-     * minority of what it maps, so the app was calling firms websiteless on the strength of
-     * having never looked. This label says who did the not-finding.
+     * „Web nemá" je od téhle vlny tvrzení, které se dá obhájit: znamená, že se prošly všechny
+     * domény, které z názvu firmy plynou, e-mailová doména i to, co uvedly zdroje — a nic
+     * z toho web firmy nebyl. Neznamená to „nedívali jsme se"; na to je `web_unknown` níž.
+     *
+     * Dřív sem padalo všechno neověřené, takže filtr sliboval seznam firem bez webu a vracel
+     * seznam firem, o kterých se nic neví. Změřeno na šedesáti firmách, o kterých víme, že web
+     * mají: staré dohledávání jich našlo 15, nové 48 — těch zbylých 33 aplikace do té doby
+     * ukazovala právě pod tímhle filtrem.
      */
-    label: { cs: 'Web jsme nenašli', sk: 'Web sme nenašli', en: 'We found no website' },
-    where: STATUS_NOT_HAS,
-    test: b => webStatusOf(b) !== 'HAS',
-    /**
-     * And this is what keeps the score honest. As a chip the filter is a work queue and may
-     * hand back everything unconfirmed; as a *criterion* it is the claim "this firm has no
-     * website", which today no source can support. Half credit, never a confirmed match, never
-     * printed in the "Proč" column as a reason the firm ranked where it did.
-     */
+    label: { cs: 'Web nemá', sk: 'Web nemá', en: 'Has no website' },
+    where: { websiteStatus: 'NONE' },
+    test: b => webStatusOf(b) === 'NONE',
+    // Neověřená firma není firma bez webu — do skóre se počítá jako „nevíme", ne jako shoda.
     unknown: b => webStatusOf(b) === 'UNKNOWN',
+  },
+  {
+    id: 'web_unknown',
+    group: 'web',
+    /**
+     * Zbytek, u kterého odpověď neznáme: hledání došlo čas, zdroj web uváděl a ten neodpověděl,
+     * nebo se z názvu firmy nedá odvodit doména („G A Dent s.r.o."). Je to malá skupina a patří
+     * na světlo — tichým smícháním s „web nemá" vznikla přesně ta nedůvěra, kvůli které se to
+     * celé předělávalo.
+     */
+    label: { cs: 'Web se nepodařilo ověřit', sk: 'Web sa nepodarilo overiť', en: 'Could not verify' },
+    where: { websiteStatus: 'UNKNOWN' },
+    test: b => webStatusOf(b) === 'UNKNOWN',
   },
   {
     id: 'has_website',
