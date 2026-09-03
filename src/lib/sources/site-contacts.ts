@@ -41,13 +41,27 @@ function scoreEmail(email: string, siteHost: string): number {
   return 0;
 }
 
-function normalizeCzPhone(raw: string): string | null {
-  const digits = raw.replace(/\D/g, '');
-  const nine = digits.length > 9 ? digits.slice(-9) : digits;
-  if (nine.length !== 9) return null;
-  // Czech numbers start 2-9; anything else is a date, a price or a postcode.
-  if (!/^[2-9]/.test(nine)) return null;
-  return `+420 ${nine.slice(0, 3)} ${nine.slice(3, 6)} ${nine.slice(6)}`;
+/**
+ * Telefon v jednom tvaru: `+420 123 456 789`.
+ *
+ * Používá se na dvě věci naráz — na čísla vyzobaná z webu a na tagy z OpenStreetMap, které
+ * chodí v jakémkoli tvaru (`+420577599786`, `777717998`, `+42020777157655`). Když jsou v jednom
+ * poli čísla dvě (`723 634 984, 724 563 687`), bere se první: spojit je dohromady by dalo číslo,
+ * které nepatří nikomu.
+ */
+export function normalizeCzPhone(raw: string): string | null {
+  for (const part of raw.split(/[,;/]|\bnebo\b|\balebo\b/i)) {
+    const digits = part.replace(/\D/g, '');
+    if (!digits) continue;
+    // Předvolba se odstraní zepředu, ne ořezáním zezadu: „+42020777157655" je překlep mapéra
+    // a devět číslic zezadu by z něj udělalo číslo, které v něm vůbec není.
+    const local = digits.replace(/^(?:00)?420/, '');
+    if (local.length !== 9) continue;
+    // Czech numbers start 2-9; anything else is a date, a price or a postcode.
+    if (!/^[2-9]/.test(local)) continue;
+    return `+420 ${local.slice(0, 3)} ${local.slice(3, 6)} ${local.slice(6)}`;
+  }
+  return null;
 }
 
 export function extractContacts(html: string, siteUrl?: string): Pick<RawLead, 'email' | 'phone'> {

@@ -1,7 +1,7 @@
 import { createRobotsCache } from './robots';
-import { ENRICHMENT_SOURCES, type RawLead } from './sources';
+import { ENRICHMENT_SOURCES, contactPageUrl, extractContacts, type RawLead } from './sources';
 import { resolveNiche } from './nace-map';
-import { buildNameIndex, discoverWebsite, tldForRegion } from './website-discovery';
+import { buildNameIndex, discoverWebsite, probeOnce, tldForRegion } from './website-discovery';
 import {
   classify,
   createProbeCache,
@@ -319,6 +319,38 @@ export async function enrichAndVerify(
     };
   };
 
+  /**
+   * Kontakt ze stránky „Kontakt".
+   *
+   * Titulní strana firmy telefon a e-mail často nemá — jsou o klik dál. Změřeno na restauracích
+   * ve Zlíně: z 19 stažených kontaktních stránek přibylo šest e-mailů, které jinde na webu
+   * nebyly. Proto se ta jedna stránka stáhne, ale jen když na titulní chybí: u firmy, která
+   * kontakt vypsala hned, by to byl request navíc za nic.
+   *
+   * Odkaz se čte z HTML, které už máme, a stahuje se `probeOnce` — ne přes `probe`, ta si
+   * pamatuje odpovědi podle hostitele a vrátila by znovu titulní stranu. robots.txt platí
+   * i tady, kontrola je uvnitř sondy.
+   */
+  const contactsFromContactPage = async (c: Candidate, verdict: WebsiteVerdict): Promise<void> => {
+    if (!probeNetwork || verdict.status !== 'HAS' || !verdict.html || !verdict.url) return;
+    if (Date.now() > deadlineAt) return;
+
+    const home = extractContacts(verdict.html, verdict.url);
+    const missingPhone = !c.phone && !home.phone;
+    const missingEmail = !c.email && !home.email;
+    if (!missingPhone && !missingEmail) return;
+
+    const link = contactPageUrl(verdict.html, verdict.url);
+    if (!link) return;
+
+    const page = await probeOnce(link, robots);
+    if (!page.alive || !page.html) return;
+
+    const extra = extractContacts(page.html, verdict.url);
+    if (missingPhone && extra.phone) c.phone = extra.phone;
+    if (missingEmail && extra.email) c.email = extra.email;
+  };
+
   // Nasbírané, ale ještě nezapsané výsledky. Pool je plní z dvanácti pracovníků naráz, takže
   // se do něj sahá jen tady a jen celým odebráním obsahu.
   const pending: VerifiedCandidate[] = [];
@@ -335,7 +367,11 @@ export async function enrichAndVerify(
       async c => {
         // Když se firma do stropu nevejde, platí verdikt z toho, co řekly zdroje — tedy totéž,
         // co dostane celostátní hledání, které se po síti neptá vůbec.
-        const result = { c, verdict: await withCap(verify(c), () => classify(c.signals), PER_CANDIDATE_MS) };
+        const verdict = await withCap(verify(c), () => classify(c.signals), PER_CANDIDATE_MS);
+        // Kontaktní stránka až po verdiktu: bez ověřeného webu není co číst, a strop na firmu
+        // platí zvlášť, aby jedna pomalá stránka nesnědla rozpočet celého hledání.
+        await withCap(contactsFromContactPage(c, verdict), () => undefined, PER_CANDIDATE_MS);
+        const result = { c, verdict };
         pending.push(result);
         await flush(false);
         return result;

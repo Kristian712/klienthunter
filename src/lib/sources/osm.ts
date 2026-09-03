@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { resolveNiche } from '../nace-map';
 import { CRAWLER_UA } from '../robots';
+import { normalizeCzPhone } from './site-contacts';
 import type { DiscoverySource, RawLead } from './types';
 
 /**
@@ -87,6 +88,9 @@ function socialUrl(raw: string | undefined, host: 'facebook.com' | 'instagram.co
   }
 }
 
+const czPhone = (raw: string | undefined): string | undefined =>
+  raw ? normalizeCzPhone(raw) ?? undefined : undefined;
+
 function toLead(el: OverpassElement): RawLead | null {
   const t = el.tags ?? {};
   const name = t.name || t['name:cs'] || t.operator;
@@ -99,7 +103,15 @@ function toLead(el: OverpassElement): RawLead | null {
     sourceId: 'osm',
     externalId: `osm:${el.type}/${el.id}`,
     name,
-    phone: t.phone || t['contact:phone'],
+    /**
+     * Telefon se srovnává do jednoho tvaru hned tady.
+     *
+     * Tagy v OSM píše každý jinak — změřeno na restauracích ve Zlíně: z 31 čísel jich deset
+     * přišlo jako `+420577599786`, `777717998` nebo rovnou dvě čísla v jednom poli. Export
+     * do CSV pak nese řádky, které se nedají použít k ničemu. Co se srovnat nedá (cizí
+     * předvolba, překlep), radši zahodíme — vymyšlené číslo je horší než prázdné pole.
+     */
+    phone: czPhone(t.phone || t['contact:phone']),
     email: t.email || t['contact:email'],
     website: t.website || t['contact:website'] || t.url,
     // Tagy, které v odpovědi Overpassu už jsou — čtení nic nestojí. Pokrytí je malé (změřeno
