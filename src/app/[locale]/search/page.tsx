@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { LEAD_FILTERS, GROUP_LABELS, GROUP_ORDER, matchesAll, localized } from '@/lib/lead-filters';
 import { leadReason } from '@/lib/lead-reason';
+import { reachHint, reachScore } from '@/lib/reach-score';
 import { scoreBreakdown } from '@/lib/lead-score';
 import { YIELD_NOTE, yieldFor } from '@/lib/nace-map';
 import { SCENARIOS, SCENARIO_BY_PROFESSION, scenarioById } from '@/lib/scenarios';
@@ -216,6 +217,7 @@ function whatsappHref(phone: string): string {
 
 const CONTACT = {
   heading: { cs: 'Jak kontaktovat', sk: 'Ako kontaktovať', en: 'How to get in touch' },
+  reach:   { cs: 'Dosažitelnost',   sk: 'Dosiahnuteľnosť',  en: 'Reachability' },
   call:    { cs: 'Zavolat',          sk: 'Zavolať',          en: 'Call' },
   callTip: { cs: 'Číslo je mobilní — voláte nejspíš přímo majiteli, ne na recepci.',
              sk: 'Číslo je mobilné — voláte najskôr priamo majiteľovi, nie na recepciu.',
@@ -287,6 +289,12 @@ function LockedContacts({ locale }: { locale: string }) {
 function ContactStrategy({ b, locale }: { b: BusinessResult; locale: string }) {
   const mobile = b.phone ? isCzMobile(b.phone) : false;
   const L = (x: { cs: string; sk?: string; en: string }) => localized(x, locale);
+  /**
+   * Dosažitelnost patří přesně sem, nad seznam cest ke kontaktu: je to jeho shrnutí do jednoho
+   * čísla. Vedle skóre leadu stojí schválně jinde a menší — to říká „stojí za oslovení",
+   * tohle „a jde to vůbec".
+   */
+  const reach = reachScore(b);
 
   /**
    * `value` je samotný údaj — číslo, e-mail, doména. Tlačítko nese akci, `value` nese fakt:
@@ -353,9 +361,20 @@ function ContactStrategy({ b, locale }: { b: BusinessResult; locale: string }) {
 
   return (
     <div className="mt-3 border-t border-line pt-3">
-      <p className="text-[11px] font-semibold text-ink-faint uppercase tracking-wider mb-2">
-        {L(CONTACT.heading)}
-      </p>
+      <div className="flex items-baseline justify-between gap-3 mb-2">
+        <p className="text-[11px] font-semibold text-ink-faint uppercase tracking-wider">
+          {L(CONTACT.heading)}
+        </p>
+        <span className="flex items-center gap-1.5 shrink-0" title={L(reachHint(b))}>
+          <span className="text-[10px] uppercase tracking-wider text-ink-faint">{L(CONTACT.reach)}</span>
+          {/* Proužek místo druhého velkého čísla: řádek už jedno má a dvě soutěžící čísla
+              se čtou hůř než jedno číslo a jedna délka. */}
+          <span className="h-1 w-12 rounded-full bg-ink/10 overflow-hidden" aria-hidden>
+            <span className="block h-full bg-ink" style={{ width: `${reach}%` }} />
+          </span>
+          <span className="text-[10px] tnum text-ink-muted">{reach}</span>
+        </span>
+      </div>
       <div className="space-y-2">
         {methods.map((m, i) => (
           <div key={m.key} className="flex items-start gap-2.5">

@@ -3,6 +3,7 @@ import { verifyToken } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { exportToExcel, WEBSITE_LABEL_CS } from '@/lib/excel-export';
 import { leadReason } from '@/lib/lead-reason';
+import { reachScore } from '@/lib/reach-score';
 import { resolveStatus } from '@/lib/website-status';
 
 function toCsv(
@@ -13,7 +14,7 @@ function toCsv(
     'Název firmy', 'IČO', 'Telefon', 'Email', 'Adresa', 'Web',
     'Kontaktní stránka', 'Má web', 'Facebook', 'Instagram', 'LinkedIn', 'Sítě ověřeny',
     'Plátce DPH', 'Nespolehlivý plátce',
-    'Skóre', 'Proč oslovit',
+    'Skóre', 'Dosažitelnost', 'Proč oslovit',
     'Zdroj',
   ];
 
@@ -46,6 +47,9 @@ function toCsv(
     vat(b.vatPayer),
     vat(b.vatUnreliable),
     b.leadScore,
+    // Druhé číslo vedle skóre: kolik cest k té firmě vlastně máme (viz lib/reach-score.ts).
+    // V tabulce se podle něj dá seřadit a začít od těch, které jde oslovit hned.
+    reachScore(b),
     leadReason(b, criteria, 'cs'),
     // Recenze a hodnocení pocházely jen z Google Places, které muselo pryč z licenčních důvodů.
     // Sloupce proto vyvážely samé nuly a prázdno — a nula recenzí je tvrzení, ne mezera.

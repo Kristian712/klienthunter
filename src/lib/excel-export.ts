@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx';
 import { BusinessResult } from '@prisma/client';
 import { leadReason } from './lead-reason';
+import { reachScore } from './reach-score';
 import { resolveStatus, type WebsiteStatus } from './website-status';
 
 /**
@@ -57,6 +58,9 @@ export function exportToExcel(
     // reasons. `reviewCount` is written as a hard 0 and `rating` is never set, so the two columns
     // exported nothing but zeroes and blanks — a made-up "0 recenzí" about every firm in the file.
     'Skóre': b.leadScore,
+    // Kolik cest k firmě máme (viz lib/reach-score.ts). Skóre říká „stojí za oslovení",
+    // tenhle sloupec „a jde to vůbec" — v Excelu se podle něj dá seřadit a začít odshora.
+    'Dosažitelnost': reachScore(b),
     'Proč oslovit': leadReason(b, criteria, 'cs'),
     'Kategorie': b.category || '',
     'Zdroj': b.source,
@@ -69,7 +73,7 @@ export function exportToExcel(
     { wch: 30 }, { wch: 10 }, { wch: 18 }, { wch: 28 }, { wch: 35 },
     { wch: 30 }, { wch: 34 }, { wch: 10 }, { wch: 38 }, { wch: 38 },
     { wch: 38 }, { wch: 12 }, { wch: 12 }, { wch: 18 }, { wch: 7 },
-    { wch: 70 }, { wch: 20 }, { wch: 16 },
+    { wch: 14 }, { wch: 70 }, { wch: 20 }, { wch: 16 },
   ];
 
   const wb = XLSX.utils.book_new();

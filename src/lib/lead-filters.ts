@@ -131,6 +131,16 @@ function hasSocial(b: FilterableLead): boolean {
 }
 
 /**
+ * Existuje aspoň jedna cesta, jak firmu oslovit?
+ *
+ * Primitivum sdílí filtr `can_reach` a skóre dosažitelnosti (`lib/reach-score.ts`). Bydlí tady,
+ * aby závislost mířila jedním směrem — reach-score → lead-filters — a nevznikl kruh.
+ */
+export function hasReachChannel(b: FilterableLead): boolean {
+  return Boolean(b.phone || b.email || b.contactUrl || hasSocial(b)) || webStatusOf(b) === 'HAS';
+}
+
+/**
  * Právní formy, které nejsou fyzická osoba.
  *
  * `100` a `101` jsou podnikající fyzická osoba — všechno ostatní je právnická osoba, tedy někdo,
@@ -313,6 +323,30 @@ export const LEAD_FILTERS: LeadFilter[] = [
     test: b => Boolean(b.contactUrl),
     // Odkaz na kontakty čteme jen z homepage. Bez webu jsme neměli kde hledat.
     unknown: b => !b.contactUrl && webStatusOf(b) !== 'HAS',
+  },
+  {
+    id: 'can_reach',
+    group: 'contact',
+    /**
+     * „Mám ji jak oslovit."
+     *
+     * Nejširší z kontaktních filtrů schválně: telefon, e-mail, profil na síti i web s kontakty
+     * jsou různě dobré cesty, ale všechny končí u člověka. Odfiltruje se přesně to, co skončí
+     * ve slepé uličce — firma, o které víme jen jméno a adresu sídla. Ve výsledcích hledání
+     * kadeřnictví ve Zlíně je to většina řádků, takže ten filtr má co dělat.
+     */
+    label: { cs: 'Mám jak oslovit', sk: 'Mám ako osloviť', en: 'I can reach them' },
+    where: {
+      OR: [
+        { NOT: [{ phone: null }, { phone: '' }] },
+        { NOT: [{ email: null }, { email: '' }] },
+        { NOT: [{ contactUrl: null }, { contactUrl: '' }] },
+        { hasFacebook: true },
+        { hasInstagram: true },
+        STATUS_HAS,
+      ],
+    },
+    test: b => hasReachChannel(b),
   },
   {
     id: 'has_contact',
