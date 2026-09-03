@@ -31,6 +31,9 @@ import {
  * paralelismu tedy nikoho nezahltí a vrátí čas, který stojí delší timeouty.
  */
 export const CONCURRENCY = 20;
+
+/** Strop dotazů do vyhledávače na jedno hledání. Sto dotazů je u Brave zhruba 5 % měsíční kvóty. */
+const MAX_WEB_SEARCHES = Number(process.env.MAX_WEB_SEARCHES ?? 100);
 const ENRICH_CONCURRENCY = 8;
 
 /**
@@ -215,6 +218,33 @@ export function mergeLeads(batches: RawLead[][], limit: number): Candidate[] {
   return candidates;
 }
 
+/** „prověřeno 5 domén" — čeština má u čísel tři tvary a strojový překlad je v UI hned vidět. */
+function domainWord(n: number): string {
+  if (n === 1) return 'doména';
+  if (n >= 2 && n <= 4) return 'domény';
+  return 'domén';
+}
+
+/**
+ * Verdikt pro firmu, na kterou nezbyl čas.
+ *
+ * `classify` bez sondy umí jen to, co řekly zdroje — a když neřekly nic, vrací UNKNOWN s větou
+ * „registr web neeviduje". To ale zní, jako by se něco zjišťovalo. Tady se říká, co se opravdu
+ * stalo: nestihli jsme to.
+ */
+function timedOutVerdict(c: Candidate): WebsiteVerdict {
+  const v = classify(c.signals);
+  return v.status === 'UNKNOWN'
+    ? { status: 'UNKNOWN', evidence: 'nestihli jsme web ověřit — na tuhle firmu nezbyl čas' }
+    : v;
+}
+
+/** Město z regionu tak, jak ho zadal uživatel: „Zlín, Zlínský kraj" → „Zlín". */
+function cityOfRegion(region: string): string | undefined {
+  const mesto = region.split(',')[0].trim();
+  return mesto.length >= 2 ? mesto : undefined;
+}
+
 export interface VerifiedCandidate {
   c: Candidate;
   verdict: WebsiteVerdict;
@@ -251,6 +281,13 @@ export async function enrichAndVerify(
 ): Promise<VerifiedCandidate[]> {
   const robots = createRobotsCache();
   const probe = createProbeCache(robots);
+  /**
+   * Kolik firem smí jedno hledání dohledávat přes vyhledávač.
+   *
+   * Platí se za dotaz, takže strop je tvrdý a spotřebuje ho jen ta firma, u které selhaly
+   * domény odvozené z názvu. Bez klíče (`BRAVE_SEARCH_API_KEY`) se stejně nic nestane.
+   */
+  let searchesLeft = MAX_WEB_SEARCHES;
 
   // Built from the whole result set, because that is what makes "dental" generic and "ajna"
   // distinctive without anyone maintaining a word list per trade.
@@ -306,16 +343,63 @@ export async function enrichAndVerify(
      * fetched page proves, so this can add websites but never invent one.
      */
     const found = await discoverWebsite(
-      { name: c.name, ico: c.ico },
+      // Telefon a adresa jdou do dohledávání jako důkaz: doména se hádá z názvu, takže shoda
+      // názvu na stránce je kruh. Teprve číslo nebo adresa z registru oddělí web téhle firmy
+      // od webu jmenovce — a mají je i firmy, které IČO na web nedají (většina, viz měření).
+      { name: c.name, ico: c.ico, phone: c.phone, address: c.address },
       nameIndex,
-      { tld, deadlineAt: discoveryDeadline, probe, tradeWords },
+      {
+        tld,
+        deadlineAt: discoveryDeadline,
+        probe,
+        tradeWords,
+        city: cityOfRegion(region),
+        // Dotaz do vyhledávače stojí peníze nebo kvótu, takže má strop na jedno hledání.
+        // Dojde-li, verdikt „web nemá" pořád stojí na prověřených doménách — jen bez té
+        // poslední pojistky, což se do evidence napíše.
+        search: searchesLeft > 0,
+      },
     );
-    if (!found) return verdict;
+    if (found.searched) searchesLeft--;
+    if (found.site) {
+      return {
+        status: 'HAS',
+        url: found.site.url,
+        evidence: found.site.evidence,
+        html: found.site.html,
+      };
+    }
+
+    /**
+     * Ticho se musí umět rozlišit — tohle je jádro celé aplikace.
+     *
+     * Dokud tady stálo `return verdict`, skončila každá firma bez webu jako UNKNOWN, protože
+     * ARES web needviduje a OpenStreetMap ho tagne u menšiny. Aplikace pak psala „web jsme
+     * nenašli" u firmy, o které se nikdy nic nezjišťovalo, i u firmy, u které se prověřilo
+     * všechno. To jsou dvě různá tvrzení a uživatel podle nich dělá různá rozhodnutí.
+     *
+     * Teď platí: prošly-li se všechny domény, které z názvu plynou, a nic nesedělo, je to
+     * **NONE** — a evidence říká, co se prověřovalo. Když došel čas, nešla z názvu odvodit
+     * doména nebo zdroj web uváděl a ten neodpověděl, zůstává **UNKNOWN**, a to se i napíše.
+     */
+    if (signals.claimedUrl) return verdict;
+    if (found.ranOut) {
+      return { status: 'UNKNOWN', evidence: 'nestihli jsme web ověřit — hledání došel čas' };
+    }
+    if (found.noCandidates) {
+      return { status: 'UNKNOWN', evidence: 'z názvu firmy nejde odvodit doména, kterou by šlo ověřit' };
+    }
+    if (found.inconclusive) {
+      return {
+        status: 'UNKNOWN',
+        evidence: 'doména odvozená z názvu firmy existuje, ale neodpověděla — web ani vyloučit nejde',
+      };
+    }
     return {
-      status: 'HAS',
-      url: found.url,
-      evidence: found.evidence,
-      html: found.html,
+      status: 'NONE',
+      evidence: `prověřeno ${found.checked} ${domainWord(found.checked)} z názvu firmy${
+        signals.emailDomainUrl ? ' i doména z e-mailu' : ''
+      }${found.searched ? ' i odkazy z vyhledávače' : ''} — žádný web firmy jsme nenašli`,
     };
   };
 
@@ -367,7 +451,7 @@ export async function enrichAndVerify(
       async c => {
         // Když se firma do stropu nevejde, platí verdikt z toho, co řekly zdroje — tedy totéž,
         // co dostane celostátní hledání, které se po síti neptá vůbec.
-        const verdict = await withCap(verify(c), () => classify(c.signals), PER_CANDIDATE_MS);
+        const verdict = await withCap(verify(c), () => timedOutVerdict(c), PER_CANDIDATE_MS);
         // Kontaktní stránka až po verdiktu: bez ověřeného webu není co číst, a strop na firmu
         // platí zvlášť, aby jedna pomalá stránka nesnědla rozpočet celého hledání.
         await withCap(contactsFromContactPage(c, verdict), () => undefined, PER_CANDIDATE_MS);
