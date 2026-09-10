@@ -17,6 +17,13 @@ model User {
   isVip            Boolean   @default(false)
   accessExpiresAt  DateTime?
   stripeCustomerId String?
+  /// Aktivní předplatné ve Stripe. Zapisuje ho jedině webhook — podle něj se pozná, že
+  /// uživatel má komu psát do portálu. NULL = nikdy nic nekoupil nebo předplatné skončilo.
+  stripeSubscriptionId String?   @unique
+  /// Které ceny (tedy kterého tarifu) se předplatné týká. Jen pro dohledání ve Stripe.
+  stripePriceId    String?
+  /// Do kdy je zaplacené období. Informativní: `plan` řídí webhook, ne tohle datum.
+  currentPeriodEnd DateTime?
   // Sloupce `brevoApiKey` a `brevoSenderEmail` byly odstraněny. Aplikace přestala odesílat
   // poštu ve Vlně 2, takže se od té doby jen držel cizí API klíč, který nic nedělal —
   // to je porušení minimalizace údajů (čl. 5 odst. 1 písm. c) GDPR) a zbytečné riziko.

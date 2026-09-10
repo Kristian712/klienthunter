@@ -20,9 +20,16 @@ export async function GET(req: NextRequest) {
     const payload = verifyToken(token);
     const user = await prisma.user.findUnique({
       where: { id: payload.userId },
-      select: { id: true, email: true, name: true, plan: true, isAdmin: true, isVip: true },
+      select: {
+        id: true, email: true, name: true, plan: true, isAdmin: true, isVip: true,
+        stripeSubscriptionId: true, currentPeriodEnd: true,
+      },
     });
-    return NextResponse.json({ user });
+    if (!user) return NextResponse.json({ user: null });
+    // Ceník potřebuje vědět, jestli má uživatel co spravovat v portálu. Stačí ano/ne —
+    // Stripe ID do prohlížeče nepatří, nemá tam co dělat.
+    const { stripeSubscriptionId, ...rest } = user;
+    return NextResponse.json({ user: { ...rest, hasSubscription: Boolean(stripeSubscriptionId) } });
   } catch {
     return NextResponse.json({ user: null });
   }
