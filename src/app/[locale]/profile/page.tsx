@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
-import { Crown, Shield, User, Mail, Calendar, Search, BarChart3, Edit2, Check, X, Lock, Target } from 'lucide-react';
+import Link from 'next/link';
+import { Crown, Shield, User, Mail, Calendar, Search, BarChart3, Edit2, Check, X, Lock, Target, CreditCard } from 'lucide-react';
 import { localized } from '@/lib/lead-filters';
 import { EMPTY_PROFILE, type UserProfile } from '@/lib/profile';
 import {
@@ -10,11 +11,13 @@ import {
   EMPTY_DRAFT, draftToPayload, toDraft, type ProfileDraft,
 } from '@/components/ProfileFields';
 import { industryLabel } from '@/lib/search-options';
+import { hasActiveSubscription, paymentFailing, trialDaysLeft } from '@/lib/subscription';
 
 interface ProfileData {
   user: UserProfile & {
     id: string; email: string; name?: string;
     plan: string; isAdmin: boolean; isVip: boolean; createdAt: string;
+    subscriptionStatus?: string | null; currentPeriodEnd?: string | null; trialEndsAt?: string | null;
     _count: { searches: number };
   };
   searches: Array<{
@@ -41,6 +44,23 @@ const T = {
 
 export default function ProfilePage() {
   const locale = useLocale();
+  const [portalBusy, setPortalBusy] = useState(false);
+
+  /** Otevře zákaznický portál Stripe. Adresu tvoří server — v prohlížeči žádné Stripe ID není. */
+  const openPortal = async () => {
+    setPortalBusy(true);
+    try {
+      const res = await fetch('/api/stripe/portal', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ locale }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.url) { window.location.assign(data.url); return; }
+    } catch { /* níž se jen odemkne tlačítko */ }
+    setPortalBusy(false);
+  };
   const isCs = locale === 'cs' || locale === 'sk';
 
   const [data, setData]         = useState<ProfileData | null>(null);
@@ -224,6 +244,68 @@ export default function ProfilePage() {
               <div className="text-xs text-ink-faint mt-1">{s.label}</div>
             </div>
           ))}
+        </div>
+
+        {/*
+          Předplatné.
+          Tarif sám je vidět v kartě účtu nahoře; tahle sekce je o penězích — kdy se strhne
+          další platba, jestli neprošla karta, a kde se to všechno mění. Kdo předplatné nemá
+          (VIP, tarif od admina, účet zdarma), vidí jen odkaz na ceník.
+        */}
+        <div className="card">
+          <h2 className="font-semibold text-ink flex items-center gap-2 mb-1">
+            <CreditCard size={16} className="text-ink-faint" />
+            {isCs ? 'Předplatné' : 'Subscription'}
+          </h2>
+
+          {paymentFailing(user) && (
+            <p className="mt-3 rounded-lg border border-accent px-3 py-2 text-sm text-ink">
+              {isCs
+                ? 'Poslední platba neprošla. Stripe ji ještě několik dní zkouší — tarif vám zatím běží. Opravte prosím kartu ve správě předplatného.'
+                : 'Your last payment failed. Stripe keeps retrying for a few days and your plan stays active meanwhile. Please fix your card in the billing portal.'}
+            </p>
+          )}
+
+          {trialDaysLeft(user) !== null && (
+            <p className="mt-3 text-sm text-ink-muted tnum">
+              {isCs
+                ? `Zkušební období, zbývá ${trialDaysLeft(user)} dní.`
+                : `Trial period, ${trialDaysLeft(user)} days left.`}
+            </p>
+          )}
+
+          {hasActiveSubscription(user) ? (
+            <>
+              {user.currentPeriodEnd && (
+                <p className="mt-3 text-sm text-ink-muted tnum">
+                  {isCs ? 'Zaplaceno do ' : 'Paid until '}
+                  {new Date(user.currentPeriodEnd).toLocaleDateString(isCs ? 'cs-CZ' : 'en-US')}
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={openPortal}
+                disabled={portalBusy}
+                className="btn-outline mt-4 inline-flex disabled:opacity-60"
+              >
+                {portalBusy
+                  ? (isCs ? 'Přesměrovávám…' : 'Redirecting…')
+                  : (isCs ? 'Správa předplatného' : 'Manage subscription')}
+              </button>
+              <p className="mt-2 text-xs text-ink-faint">
+                {isCs
+                  ? 'Změna tarifu, výměna karty, faktury i zrušení — všechno na jednom místě u Stripe.'
+                  : 'Change plan, update card, invoices and cancellation — all in one place at Stripe.'}
+              </p>
+            </>
+          ) : (
+            <p className="mt-3 text-sm text-ink-muted">
+              {isCs ? 'Žádné předplatné neběží. ' : 'No active subscription. '}
+              <Link href={`/${locale}/pricing`} className="text-ink underline underline-offset-2 hover:text-accent transition-colors">
+                {isCs ? 'Ceník' : 'Pricing'}
+              </Link>
+            </p>
+          )}
         </div>
 
         {/* Onboarding answers — editable for good, so a change of trade is one visit away */}

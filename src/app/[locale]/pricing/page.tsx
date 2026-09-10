@@ -7,6 +7,7 @@ import { Check } from 'lucide-react';
 import { localized } from '@/lib/lead-filters';
 import { OPERATOR } from '@/lib/legal';
 import { PLAN_LIMITS } from '@/lib/plans';
+import { paymentFailing, trialDaysLeft } from '@/lib/subscription';
 
 /**
  * Ceník se třemi tarify a tlačítky, která vedou do Stripe Checkoutu.
@@ -36,6 +37,8 @@ interface Me {
   isVip: boolean;
   hasSubscription: boolean;
   currentPeriodEnd: string | null;
+  subscriptionStatus: string | null;
+  trialEndsAt: string | null;
 }
 
 const T = {
@@ -92,6 +95,15 @@ const T = {
                sk: 'Máte neobmedzený prístup, tarify sa vás netýkajú.',
                en: 'You have unlimited access; plans do not apply to you.' },
   renews:    { cs: 'Zaplaceno do {d}', sk: 'Zaplatené do {d}', en: 'Paid until {d}' },
+  trial:     { cs: 'Zkušební období, zbývá {n} dní. Kartu vám strhneme až potom.',
+               sk: 'Skúšobné obdobie, zostáva {n} dní. Kartu vám strhneme až potom.',
+               en: 'Trial period, {n} days left. Your card is charged only after that.' },
+  trialLast: { cs: 'Zkušební období končí dnes.',
+               sk: 'Skúšobné obdobie končí dnes.',
+               en: 'Your trial ends today.' },
+  pastDue:   { cs: 'Poslední platba neprošla. Stripe ji ještě několik dní zkouší — dokud to trvá, tarif vám běží dál. Opravte kartu ve správě předplatného.',
+               sk: 'Posledná platba neprešla. Stripe ju ešte niekoľko dní skúša — kým to trvá, tarif vám beží ďalej. Opravte kartu v správe predplatného.',
+               en: 'Your last payment failed. Stripe keeps retrying for a few days and your plan stays active meanwhile. Fix your card in the billing portal.' },
   working:   { cs: 'Přesměrovávám…', sk: 'Presmerovávam…', en: 'Redirecting…' },
 
   success: {
@@ -185,6 +197,7 @@ export default function PricingPage() {
   };
 
   const unlimited = Boolean(me && (me.isAdmin || me.isVip));
+  const trialDays = me ? trialDaysLeft(me) : null;
   const currentPlan: PlanId = me && PLANS.includes(me.plan as PlanId) ? (me.plan as PlanId) : 'FREE';
 
   /** Tlačítko pod tarifem — podle toho, kdo se dívá. */
@@ -261,6 +274,22 @@ export default function PricingPage() {
 
           {unlimited && (
             <p className="mb-6 text-sm text-ink-muted">{t(T.unlimited)}</p>
+          )}
+
+          {/* Neprošlá platba patří nahoru a s odkazem, kde se to spraví — ne mezi tarify. */}
+          {me && paymentFailing(me) && (
+            <div className="mb-6 rounded-lg border border-accent px-4 py-3 text-sm text-ink max-w-2xl">
+              {t(T.pastDue)}{' '}
+              <button type="button" onClick={portal} disabled={busy !== null} className="underline underline-offset-2 hover:text-accent transition-colors">
+                {t(T.manage)}
+              </button>
+            </div>
+          )}
+
+          {me && trialDays !== null && (
+            <p className="mb-6 text-sm text-ink-muted tnum">
+              {trialDays > 0 ? t(T.trial).replace('{n}', String(trialDays)) : t(T.trialLast)}
+            </p>
           )}
 
           <div className="grid md:grid-cols-3 border-t border-line">
