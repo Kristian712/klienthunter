@@ -85,14 +85,6 @@ export function sessionFrom(req: { cookies: { get(name: string): { value: string
   }
 }
 
-export const PLAN_LIMITS = {
-  FREE:     { searches: 5,        resultsPerSearch: 20 },
-  PRO:      { searches: 100,      resultsPerSearch: 200 },
-  BUSINESS: { searches: Infinity, resultsPerSearch: 500 },
-  VIP:      { searches: Infinity, resultsPerSearch: 500 },
-};
-
-export function getPlanLimits(plan: string, isVip: boolean, isAdmin: boolean = false) {
-  if (isAdmin || isVip) return PLAN_LIMITS.VIP; // admins + VIP = unlimited
-  return PLAN_LIMITS[plan as keyof typeof PLAN_LIMITS] ?? PLAN_LIMITS.FREE;
-}
+// Limity tarifů se přestěhovaly do `plans.ts`, aby je mohl číst i ceník v prohlížeči.
+// Tady zůstává re-export, ať se nemusí přepisovat žádný z dosavadních importů.
+export { PLAN_LIMITS, getPlanLimits } from './plans';

@@ -71,7 +71,12 @@ export async function GET(
     const format = req.nextUrl.searchParams.get('format') ?? 'xlsx';
 
     // CSV is free for everyone; Excel requires Pro+
-    if (format === 'xlsx' && payload.plan === 'FREE' && !payload.isVip && !payload.isAdmin) {
+    // Tarif z databáze, ne z tokenu: kdo právě zaplatil, má mít Excel hned, ne po odhlášení.
+    const account = await prisma.user.findUnique({
+      where: { id: payload.userId },
+      select: { plan: true, isVip: true, isAdmin: true },
+    });
+    if (format === 'xlsx' && (account?.plan ?? 'FREE') === 'FREE' && !account?.isVip && !account?.isAdmin) {
       return NextResponse.json({ error: 'Excel export requires Pro plan' }, { status: 403 });
     }
 

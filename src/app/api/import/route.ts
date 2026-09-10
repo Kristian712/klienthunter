@@ -49,7 +49,14 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { filename, rows } = ImportSchema.parse(body);
 
-    const limits = getPlanLimits(payload.plan, payload.isVip, payload.isAdmin);
+    // Tarif z databáze, ne z tokenu — stejný důvod jako v `/api/search`: po zaplacení má
+    // vyšší limit platit hned, ne až po dalším přihlášení.
+    const account = await prisma.user.findUnique({
+      where: { id: payload.userId },
+      select: { plan: true, isVip: true, isAdmin: true },
+    });
+    if (!account) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const limits = getPlanLimits(account.plan, account.isVip, account.isAdmin);
 
     // An import costs the same minute of compute as a search, so it counts against the same
     // monthly allowance.
@@ -59,7 +66,10 @@ export async function POST(req: NextRequest) {
         where: { userId: payload.userId, createdAt: { gte: thirtyDaysAgo } },
       });
       if (used >= limits.searches) {
-        return NextResponse.json({ error: 'Search limit reached for your plan' }, { status: 403 });
+        return NextResponse.json(
+          { error: 'Search limit reached for your plan', code: 'PLAN_LIMIT' },
+          { status: 403 },
+        );
       }
     }
 

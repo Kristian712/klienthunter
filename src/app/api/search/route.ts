@@ -176,7 +176,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const limits = getPlanLimits(payload.plan, payload.isVip, payload.isAdmin);
+    /**
+     * Tarif z databáze, ne z tokenu.
+     *
+     * Token nese `plan` z chvíle přihlášení a platí sedm dní. Kdyby se limity braly z něj,
+     * zákazník by po zaplacení dostal vyšší tarif až po odhlášení — a Stripe mezitím zapsal
+     * PRO do databáze, kde ho nikdo nečetl. Jeden dotaz navíc na začátku hledání je levnější
+     * než ta reklamace.
+     */
+    const account = await prisma.user.findUnique({
+      where: { id: payload.userId },
+      select: { plan: true, isVip: true, isAdmin: true },
+    });
+    if (!account) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const limits = getPlanLimits(account.plan, account.isVip, account.isAdmin);
 
     if (limits.searches !== Infinity) {
       const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
@@ -184,7 +197,10 @@ export async function POST(req: NextRequest) {
         where: { userId: payload.userId, createdAt: { gte: thirtyDaysAgo } },
       });
       if (searchCount >= limits.searches) {
-        return NextResponse.json({ error: 'Search limit reached for your plan' }, { status: 403 });
+        return NextResponse.json(
+          { error: 'Search limit reached for your plan', code: 'PLAN_LIMIT' },
+          { status: 403 },
+        );
       }
     }
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
 import { useTranslations, useLocale } from 'next-intl';
 import {
   Search, Globe, Users, ExternalLink,
@@ -489,9 +490,12 @@ const S = {
   demoLocked: { cs: 'Kontakty jsou jen pro přihlášené',
                 sk: 'Kontakty sú len pre prihlásených',
                 en: 'Contacts are for signed-in users' },
-  errPlan:    { cs: 'Vyčerpali jste počet hledání ve svém plánu.',
-                sk: 'Vyčerpali ste počet hľadaní vo svojom pláne.',
+  errPlan:    { cs: 'Vyčerpali jste počet hledání ve svém tarifu.',
+                sk: 'Vyčerpali ste počet hľadaní vo svojom tarife.',
                 en: 'You have used up the searches in your plan.' },
+  errPlanLink:{ cs: 'Vyšší tarif je v ceníku.',
+                sk: 'Vyšší tarif je v cenníku.',
+                en: 'Higher plans are on the pricing page.' },
   errBurst:   { cs: 'Hledání jde rychle za sebou. Dejte tomu pár minut — data taháme z veřejných rejstříků, které je potřeba šetřit.',
                 sk: 'Hľadania idú rýchlo za sebou. Dajte tomu pár minút — dáta ťaháme z verejných registrov, ktoré treba šetriť.',
                 en: 'That is a lot of searches in a row. Give it a few minutes — the data comes from public registers we have to go easy on.' },
@@ -766,6 +770,8 @@ export default function SearchPage() {
   const [loading, setLoading]             = useState(false);
   const [loadingMsg, setLoadingMsg]       = useState('');
   const [error, setError]                 = useState('');
+  /** Chyba je vyčerpaný tarif — k větě patří odkaz na ceník. */
+  const [planLimitHit, setPlanLimitHit]   = useState(false);
   const [hasSearched, setHasSearched]     = useState(false);
 
   const effectiveRegion   = region === '__custom__'   ? customRegion   : region;
@@ -1009,6 +1015,7 @@ export default function SearchPage() {
     if (!effectiveRegion || !effectiveIndustry) return;
     setLoading(true);
     setError('');
+    setPlanLimitHit(false);
     setResults([]);
     resultsRef.current = 0;
     setJob(null);
@@ -1032,8 +1039,15 @@ export default function SearchPage() {
         // „ukázka je vyčerpaná". Rozliší je kód v těle, a když tělo není JSON, zůstane
         // původní hláška.
         let code = '';
-        if (res.status === 429) {
+        if (res.status === 429 || res.status === 403) {
           code = await res.json().then(d => d?.code ?? '').catch(() => '');
+        }
+        // Vyčerpaný tarif má vlastní zobrazení s odkazem na ceník — obyčejná věta by uživatele
+        // nechala u zdi bez dveří.
+        if (res.status === 403 && code === 'PLAN_LIMIT') {
+          setPlanLimitHit(true);
+          setError(localized(S.errPlan, locale));
+          return;
         }
         const byStatus =
           res.status === 401 ? S.errLogin  :
@@ -1278,7 +1292,17 @@ export default function SearchPage() {
         </form>
 
         {error && (
-          <div className="rounded-lg border border-ink px-4 py-3 text-sm font-medium text-ink mb-4">{error}</div>
+          <div className="rounded-lg border border-ink px-4 py-3 text-sm font-medium text-ink mb-4">
+            {error}
+            {planLimitHit && (
+              <>
+                {' '}
+                <Link href={`/${locale}/pricing`} className="underline underline-offset-2 hover:text-accent transition-colors">
+                  {localized(S.errPlanLink, locale)}
+                </Link>
+              </>
+            )}
+          </div>
         )}
 
         {job && job.status !== 'done' && (
