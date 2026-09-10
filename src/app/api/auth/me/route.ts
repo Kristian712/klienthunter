@@ -23,6 +23,7 @@ export async function GET(req: NextRequest) {
       select: {
         id: true, email: true, name: true, plan: true, isAdmin: true, isVip: true,
         stripeSubscriptionId: true, currentPeriodEnd: true,
+        subscriptionStatus: true, trialEndsAt: true,
       },
     });
     if (!user) return NextResponse.json({ user: null });

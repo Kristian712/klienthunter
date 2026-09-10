@@ -24,6 +24,12 @@ model User {
   stripePriceId    String?
   /// Do kdy je zaplacené období. Informativní: `plan` řídí webhook, ne tohle datum.
   currentPeriodEnd DateTime?
+  /// Stav předplatného ze Stripe: `none` | `trialing` | `active` | `past_due` | `canceled`.
+  /// Přístup řídí `plan` — tohle je pro uživatele: kolik dní zbývá ze zkušebního období
+  /// a jestli mu neprošla platba. Dvě různé otázky, dvě různá pole.
+  subscriptionStatus String  @default("none")
+  /// Konec zkušebního období, dokud běží.
+  trialEndsAt      DateTime?
   // Sloupce `brevoApiKey` a `brevoSenderEmail` byly odstraněny. Aplikace přestala odesílat
   // poštu ve Vlně 2, takže se od té doby jen držel cizí API klíč, který nic nedělal —
   // to je porušení minimalizace údajů (čl. 5 odst. 1 písm. c) GDPR) a zbytečné riziko.
@@ -261,4 +267,39 @@ model LeadTag {
 
   @@unique([userId, businessResultId])
   @@index([userId, status])
+}
+
+/// Události ze Stripe, které už webhook zpracoval.
+///
+/// Stripe doručuje nejméně jednou, takže tutéž událost pošle klidně třikrát — při timeoutu,
+/// při našem 500, nebo prostě proto. Handler sice zapisuje stav absolutně a dvojí doručení by
+/// mu nevadilo, jenže to platí jen pro zápisy do `User`. Jakmile přibude cokoli, co se dělá
+/// jednou (e-mail, faktura, kredit), musí existovat místo, kde je vidět, že už se to stalo.
+/// Řádek se zakládá dřív, než se událost začne zpracovávat: podruhé neprojde přes primární klíč.
+model StripeEvent {
+  /// `evt_…` přímo od Stripe.
+  id          String   @id
+  type        String
+  processedAt DateTime @default(now())
+
+  @@index([processedAt])
+}
+
+/// Platba, ke které se nenašel účet.
+///
+/// Stát se to může jediným způsobem: platba nevznikla přes Checkout v aplikaci (ta zákazníka
+/// zakládá i s `userId` v metadatech), ale přes odkaz Payment Link nebo ručně v dashboardu.
+/// Fronta k ručnímu spárování — zaplacené a nepřiřazené peníze nesmí skončit jako řádek v logu,
+/// který za týden nikdo nenajde.
+model UnmatchedPayment {
+  id                   String   @id @default(cuid())
+  stripeCustomerId     String
+  stripeSubscriptionId String?
+  email                String?
+  note                 String?
+  createdAt            DateTime @default(now())
+  /// Vyřešeno ručně — účet spárován, nebo peníze vráceny.
+  resolvedAt           DateTime?
+
+  @@index([createdAt])
 }

@@ -61,6 +61,9 @@ export async function GET(req: NextRequest) {
       select: {
         id: true, email: true, name: true, plan: true,
         isAdmin: true, isVip: true, createdAt: true,
+        // Stav předplatného kvůli varování o neprošlé platbě a odpočtu zkušebního období.
+        // Stripe ID zůstávají na serveru — v prohlížeči nemají co dělat.
+        subscriptionStatus: true, currentPeriodEnd: true, trialEndsAt: true,
         ...PROFILE_SELECT,
         _count: { select: { searches: true } },
       },
