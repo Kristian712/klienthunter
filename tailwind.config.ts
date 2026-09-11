@@ -26,7 +26,7 @@ const config: Config = {
           DEFAULT: 'rgb(var(--accent) / <alpha-value>)',
           /** Hover akcentového tlačítka. O stupeň světlejší, text na něm je pořád tmavý. */
           hover:   'rgb(var(--accent-hover) / <alpha-value>)',
-          /** Text na akcentové ploše. Bílý text na oranžové nesplní kontrast v žádném odstínu. */
+          /** Text na akcentové ploše. Na světle modré projde jen tmavý (11,5 : 1), světlý má 1,45 : 1. */
           ink:     'rgb(var(--accent-ink) / <alpha-value>)',
           soft:    'rgb(var(--accent) / 0.12)',
         },

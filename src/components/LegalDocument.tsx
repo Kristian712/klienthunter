@@ -80,7 +80,7 @@ export function LegalDocument({
         {OPERATOR.ico && ` · IČO ${OPERATOR.ico}`}
         {OPERATOR.address && ` · ${OPERATOR.address}`}
         {' · '}
-        <a href={`mailto:${OPERATOR.email}`} className="text-accent underline underline-offset-2 decoration-accent/40 hover:decoration-accent transition-colors">
+        <a href={`mailto:${OPERATOR.email}`} className="text-accent underline underline-offset-2 decoration-accent/60 hover:decoration-accent transition-colors">
           {OPERATOR.email}
         </a>
       </p>

@@ -32,12 +32,15 @@
    *   text        #EDECE8   16,7 : 1 na stránce · 15,6 na kartě · 14,4 v poli
    *   tlumený     #B2B2B8    9,4 : 1 · 8,7 · 8,1
    *   nejslabší   #94949B    6,6 : 1 · 6,1 · 5,6   (4,8 i na podbarvení ink/10)
-   *   akcent      #F07A1A    7,1 : 1 · 6,6 · 6,1   jako text i odkaz
-   *   na akcentu  #0A0A0B    7,1 : 1   — tlačítka mají tmavý text; bílý na oranžové je 2,8 : 1
+   *   akcent      #89CFF0   11,5 : 1 · 10,7 · 9,9  jako text, odkaz, focus ring i výplň
+   *   na akcentu  #0A0A0B   11,5 : 1  — tlačítka mají tmavý text; světlý #EDECE8 má 1,45 : 1
+   *   hover       #A7D8FF   13,1 : 1  s tmavým textem
    *
    * Nejslabší text dřív na světlém podkladu splňoval jen 3,4 : 1; tmavá paleta tu starou
-   * chybu zavírá. Akcent je o stupeň světlejší než oranžová bodů „web nemá" na mapě
-   * (#D55E00), takže tlačítko a datový bod jdou od sebe rozeznat — tvarem i odstínem.
+   * chybu zavírá. Akcent je světle modrý, ne oranžový: oranžová v UI působila jako sázková
+   * kancelář, ne jako nástroj pro firmy. Oranžová zůstává jediné věci — bodům „web nemá" na
+   * mapě (#D55E00). Na mapě se naopak akcent nepoužívá vůbec, protože od „Osloveno"
+   * (#56B4E9) se liší jen 1,35 : 1.
    *
    * `--line` je jen RGB bílé; průhlednost dodává Tailwind (`line`, `line-strong`, `field`).
    */
@@ -49,8 +52,8 @@
     --ink-muted:      178 178 184;
     --ink-faint:      148 148 155;
     --line:           255 255 255;
-    --accent:         240 122 26;
-    --accent-hover:   245 138 51;
+    --accent:         137 207 240;
+    --accent-hover:   167 216 255;
     --accent-ink:     10 10 11;
   }
 
@@ -122,11 +125,7 @@
   }
 
   /**
-   * Hlavní akce je oranžová s tmavým textem (7,1 : 1, na hoveru 8,1 : 1).
-   *
-   * Dřív byla černá, protože oranžová znamenala na mapě „web nemá" a tlačítka ji neměla
-   * ředit. Tu práci teď na mapě dělá kosočtverec a tmavší odstín #D55E00 — akcent tlačítek
-   * je světlejší a tvar bodu s ním splést nejde.
+   * Hlavní akce je světle modrá s tmavým textem (11,5 : 1, na hoveru 13,1 : 1).
    */
   .btn-primary {
     @apply btn bg-accent text-accent-ink hover:bg-accent-hover px-5 py-2.5 text-sm font-semibold;
@@ -180,8 +179,8 @@
   }
 
   /* ── Badges ────────────────────────────────────────────────────────────────
-     Monochrome by design. The accent means "opportunity"; a green badge next to it
-     would say nothing and dilute the one signal that matters. */
+     Monochrome by design. The accent is kept for actions, selection and the good-lead
+     signal; a second badge colour would say nothing and dilute it. */
   .badge {
     @apply inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium
            text-ink-muted border border-line-strong;
@@ -196,8 +195,9 @@
   .badge-accent { @apply badge border-accent/60 text-accent bg-accent/10; }
 
   /* ── Chips (filters) ───────────────────────────────────────────────────────
-     Zapnutý chip je světlý s tmavým textem, ne oranžový: filtrů svítí najednou i deset
-     a oranžová má zůstat vyhrazená hlavní akci a odkazům. */
+     Zapnutý chip má akcentovou výplň s tmavým textem (11,5 : 1), vypnutý tmavou plochu
+     s okrajem. Dokud byl akcent oranžový, zapnuté chipy byly světlé, aby deset oranžových
+     filtrů nekřičelo; modrá je dost klidná, aby výběr nesla barva. */
   .chip {
     @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
            border border-line-strong text-ink-muted bg-surface-muted
@@ -207,7 +207,8 @@
            disabled:opacity-40 disabled:pointer-events-none;
   }
   .chip-active {
-    @apply chip bg-ink text-surface border-ink hover:text-surface;
+    @apply chip bg-accent text-accent-ink border-accent
+           hover:bg-accent-hover hover:border-accent-hover hover:text-accent-ink;
   }
 
   /* ── Layout ── */
@@ -403,7 +404,12 @@
 }
 .kh-map-frame .maplibregl-ctrl-group button + button { border-top-color: rgb(var(--line) / .10); }
 .kh-map-frame .maplibregl-ctrl-group button:not(:disabled):hover { background-color: rgb(var(--line) / .08); }
-.kh-map-frame .maplibregl-ctrl-group button:focus:focus-visible { box-shadow: 0 0 0 2px rgb(var(--accent)); }
+/* Fokus světlý, ne akcentový: modrý akcent by se na mapě pletl s body „Osloveno". */
+.kh-map-frame .maplibregl-ctrl-group button:focus:focus-visible { box-shadow: 0 0 0 2px rgb(var(--ink)); }
+/* Fokus na bodech a tlačítkách mapy. Bez něj kreslí prohlížeč vlastní kroužek, na macOS modrý
+   podle systému — a modrá na mapě smí znamenat jen „Osloveno". Ovládání MapLibre má fokus výš. */
+.kh-map-ui button:focus-visible:not(.maplibregl-ctrl-group button),
+.kh-map-ui a:focus-visible { outline: 2px solid rgb(var(--ink)); outline-offset: 2px; }
 @media (forced-colors: none) {
   .kh-map-frame .maplibregl-ctrl-icon { filter: invert(1) brightness(.92); }
 }
@@ -423,8 +429,11 @@
     --ink-muted: 55 55 55;
     --ink-faint: 85 85 85;
     --line: 0 0 0;
-    --accent: 160 70 0;
+    /* Světle modrá na bílém papíře nečte (1,7 : 1); tmavá modrá #1D4ED8 má 6,7 : 1. */
+    --accent: 29 78 216;
     --accent-ink: 255 255 255;
   }
+  /* Pozadí se bez tohohle netiskne a bílý text tlačítka by vyšel bílý na bílé. */
+  .btn-primary, .chip-active { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   header, footer, .kh-map-frame { display: none !important; }
 }

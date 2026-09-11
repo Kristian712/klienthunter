@@ -632,7 +632,7 @@ export function ResultsMap({ leads, total, locale, onSetStatus, hideDone, hidden
       </div>
 
       <div className="flex flex-col md:flex-row gap-3">
-        <div className="relative flex-1 min-w-0">
+        <div className="kh-map-ui relative flex-1 min-w-0">
           <div
             ref={container}
             className="kh-map-frame w-full h-[26rem] md:h-[34rem] rounded-xl overflow-hidden border border-line-strong bg-surface-subtle"
@@ -697,25 +697,25 @@ export function ResultsMap({ leads, total, locale, onSetStatus, hideDone, hidden
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-[11px]">
                 {/* Kontakty nese jen menšina řádků (ARES je nemá), ale když je má, patří sem. */}
                 {selected.phone && (
-                  <a href={`tel:${selected.phone}`} className="font-mono text-ink hover:text-accent transition-colors">
+                  <a href={`tel:${selected.phone}`} className="font-mono text-ink hover:underline underline-offset-2">
                     {selected.phone}
                   </a>
                 )}
                 {selected.email && (
-                  <a href={`mailto:${selected.email}`} className="text-ink-muted hover:text-accent transition-colors truncate max-w-[11rem]">
+                  <a href={`mailto:${selected.email}`} className="text-ink-muted hover:text-ink hover:underline underline-offset-2 transition-colors truncate max-w-[11rem]">
                     {selected.email}
                   </a>
                 )}
                 {selected.website ? (
                   <a href={selected.website} target="_blank" rel="noopener noreferrer"
-                     className="text-accent underline underline-offset-2 decoration-accent/40 hover:decoration-accent transition-colors truncate max-w-[11rem]">
+                     className="text-ink underline underline-offset-2 decoration-ink/40 hover:decoration-ink transition-colors truncate max-w-[11rem]">
                     {selected.website.replace(/^https?:\/\//, '')}
                   </a>
                 ) : (
                   <span className="text-ink-muted">{localized(T.webNone, locale)}</span>
                 )}
                 <a href={googleMapsHref(selected)} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer"
-                   className="text-ink-muted hover:text-accent transition-colors">
+                   className="text-ink-muted hover:text-ink hover:underline underline-offset-2 transition-colors">
                   {localized(T.openMaps, locale)}
                 </a>
               </div>
@@ -746,8 +746,8 @@ export function ResultsMap({ leads, total, locale, onSetStatus, hideDone, hidden
                     >
                       <span
                         className="hidden md:block w-2 h-2 rounded-full shrink-0"
-                        // Na zapnutém (světlém) tlačítku tmavý obrys, aby tečka nesplynula s výplní.
-                        style={{ background: st.color, outline: zapnuto ? '1px solid rgb(var(--surface) / .6)' : undefined }}
+                        // Na zapnutém (světlém) tlačítku tmavý prstenec: žlutá „Jedná se" by na světlé výplni zmizela.
+                        style={{ background: st.color, boxShadow: zapnuto ? '0 0 0 2px rgb(var(--surface))' : undefined }}
                       />
                       {localized(st.label, locale)}
                     </button>

@@ -35,7 +35,7 @@ const UI = {
 };
 
 /** Odkaz v textu: akcent s tlumeným podtržením, které na hover zesílí. */
-const LINK = 'text-accent underline underline-offset-2 decoration-accent/40 hover:decoration-accent transition-colors';
+const LINK = 'text-accent underline underline-offset-2 decoration-accent/60 hover:decoration-accent transition-colors';
 
 /**
  * Podmínky a ochrana údajů. Navigace i patička jsou na /auth schované, takže jinak by se

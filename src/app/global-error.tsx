@@ -40,7 +40,8 @@ const T = {
 /**
  * Barvy natvrdo, protože `globals.css` se sem nenačte. Jsou to tytéž hodnoty jako tokeny
  * tmavého tématu, aby pád nevypadal jako jiná aplikace — dřív tu byla bílá stránka uprostřed
- * tmavého webu. Kontrast: text 16,7 : 1, tlumený 9,4, nejslabší 6,6, tlačítko 7,1.
+ * tmavého webu. Kontrast: text 16,7 : 1, tlumený 9,4, nejslabší 6,6, tlačítko 11,5
+ * (tmavý text na světle modré; světlý by měl jen 1,45).
  */
 const C = {
   surface: '#0A0A0B',
@@ -49,7 +50,7 @@ const C = {
   ink: '#EDECE8',
   muted: '#B2B2B8',
   faint: '#94949B',
-  accent: '#F07A1A',
+  accent: '#89CFF0',
   accentInk: '#0A0A0B',
 };
 

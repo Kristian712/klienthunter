@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useLocale } from 'next-intl';
-import { Crown, Shield, Users, RefreshCw, Ticket, Plus, Trash2, Copy, Check, Link2 } from 'lucide-react';
+import { Crown, Shield, Users, RefreshCw, Ticket, Plus, Trash2, Copy, Check, Clock, Link2 } from 'lucide-react';
 
 interface AdminUser {
   id: string; email: string; name?: string;
@@ -373,7 +373,7 @@ export default function AdminPage() {
                                 ? <span className="badge text-xs">✓ {isCs ? 'Použit' : 'Used'}</span>
                                 : expired
                                   ? <span className="badge badge-red text-xs">{isCs ? 'Expirován' : 'Expired'}</span>
-                                  : <span className={`${BADGE_STRONG} text-xs`}>⏳ {isCs ? 'Volný' : 'Available'}</span>}
+                                  : <span className={`${BADGE_STRONG} text-xs`}><Clock size={11} aria-hidden /> {isCs ? 'Volný' : 'Available'}</span>}
                             </td>
                             <td className="text-ink-faint text-xs">
                               {c.usedByUser ? (c.usedByUser.name || c.usedByUser.email) : '—'}
@@ -399,7 +399,7 @@ export default function AdminPage() {
                                 )}
                                 {!used && (
                                   <button onClick={() => deleteCode(c.id)} title={isCs ? 'Smazat kód' : 'Delete code'}
-                                    className="p-1.5 rounded-lg transition-colors text-ink-faint hover:text-accent hover:bg-ink/[0.06]">
+                                    className="p-1.5 rounded-lg transition-colors text-ink-faint hover:text-ink hover:bg-ink/10">
                                     <Trash2 size={14} />
                                   </button>
                                 )}

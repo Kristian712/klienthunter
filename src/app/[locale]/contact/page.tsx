@@ -49,7 +49,7 @@ export default function ContactPage() {
               {isCs
                 ? 'Zpráva je připravená ve vašem e-mailovém klientovi, stačí ji odeslat. Pokud se klient neotevřel, napište přímo na '
                 : 'The message is ready in your e-mail client; just send it. If no e-mail client opened, write directly to '}
-              <a href={`mailto:${OPERATOR.email}`} className="text-accent underline underline-offset-2 decoration-accent/40 hover:decoration-accent transition-colors">{OPERATOR.email}</a>.
+              <a href={`mailto:${OPERATOR.email}`} className="text-accent underline underline-offset-2 decoration-accent/60 hover:decoration-accent transition-colors">{OPERATOR.email}</a>.
             </p>
           </div>
         ) : (
@@ -77,7 +77,7 @@ export default function ContactPage() {
             </button>
             <p className="text-xs text-ink-faint text-center">
               {isCs ? 'Nebo nás kontaktujte přímo: ' : 'Or contact us directly: '}
-              <a href={`mailto:${OPERATOR.email}`} className="text-accent underline underline-offset-2 decoration-accent/40 hover:decoration-accent transition-colors">{OPERATOR.email}</a>
+              <a href={`mailto:${OPERATOR.email}`} className="text-accent underline underline-offset-2 decoration-accent/60 hover:decoration-accent transition-colors">{OPERATOR.email}</a>
             </p>
           </form>
         )}

@@ -33,11 +33,16 @@ export interface LeadStatusDef {
  * Tmavý web: „Osloveno" přešlo z tmavě modré #0072b2 na nebeskou #56b4e9 z téže sady. Tmavá
  * modrá měla na tmavé mapě jen 3,6 : 1 a přes silnici 2,9 : 1, pod hranicí 3 : 1 pro grafiku;
  * nebeská má 8,2 : 1. Jedná se, Klient a Odmítnuto mají i jako text na kartě 5,4 : 1 a víc.
+ *
+ * „Jedná se" je žlutá #f0e442 z téže sady místo oranžové #e69f00: oranžová patří v celé
+ * aplikaci jen bodům bez webu. Od #d55e00 ji rozezná i barvoslepý a na mapě má 14,3 : 1.
+ * Akcent UI je světle modrý (#89CFF0) a na mapě se schválně nepoužívá — od „Osloveno"
+ * (#56b4e9) se liší jen 1,35 : 1, takže modrá na mapě smí znamenat jedinou věc.
  */
 export const LEAD_STATUSES: LeadStatusDef[] = [
   { id: 'new',       label: { cs: 'Neosloveno', sk: 'Neoslovené', en: 'Not contacted' },  color: '#9ca3af' },
   { id: 'contacted', label: { cs: 'Osloveno',   sk: 'Oslovené',   en: 'Contacted' },      color: '#56b4e9' },
-  { id: 'talking',   label: { cs: 'Jedná se',   sk: 'Rokuje sa',  en: 'In talks' },       color: '#e69f00' },
+  { id: 'talking',   label: { cs: 'Jedná se',   sk: 'Rokuje sa',  en: 'In talks' },       color: '#f0e442' },
   { id: 'client',    label: { cs: 'Klient',     sk: 'Klient',     en: 'Client' },         color: '#009e73' },
   { id: 'rejected',  label: { cs: 'Nezájem',    sk: 'Nezáujem',   en: 'Not interested' }, color: '#cc79a7' },
 ];
@@ -75,8 +80,8 @@ export const WEB_COLORS = {
   has: '#8b98ab',
   /**
    * Web jsme prověřili a firma ho nemá — to je ta skupina, kvůli které se aplikace otvírá.
-   * Tmavší oranžová než akcent tlačítek (#F07A1A), takže bod a tlačítko jde rozeznat
-   * odstínem i tvarem (kosočtverec).
+   * Jediná oranžová v aplikaci — akcent UI je modrý a „Jedná se" žlutá — takže oranžový
+   * kosočtverec na mapě nejde splést s ničím jiným.
    */
   none: '#d55e00',
   /**

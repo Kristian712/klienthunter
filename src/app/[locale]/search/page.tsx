@@ -1302,7 +1302,7 @@ export default function SearchPage() {
             {planLimitHit && (
               <>
                 {' '}
-                <Link href={`/${locale}/pricing`} className="text-accent underline underline-offset-2 decoration-accent/40 hover:decoration-accent transition-colors">
+                <Link href={`/${locale}/pricing`} className="text-accent underline underline-offset-2 decoration-accent/60 hover:decoration-accent transition-colors">
                   {localized(S.errPlanLink, locale)}
                 </Link>
               </>
@@ -1460,7 +1460,7 @@ export default function SearchPage() {
                             className={on ? 'chip-active' : 'chip'}
                           >
                             {localized(f.label, locale)}
-                            <span className={`tnum ${on ? 'text-surface/70' : 'text-ink-faint'}`}>{n}</span>
+                            <span className={`tnum ${on ? 'text-accent-ink/70' : 'text-ink-faint'}`}>{n}</span>
                           </button>
                         );
                       })}

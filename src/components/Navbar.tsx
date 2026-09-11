@@ -4,7 +4,7 @@ import { useTranslations, useLocale } from 'next-intl';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
-import { Menu, X } from 'lucide-react';
+import { Check, Menu, X } from 'lucide-react';
 import { loadUser, clearUser, type StoredUser } from '@/lib/client-auth';
 
 type UserType = StoredUser;
@@ -17,8 +17,9 @@ const LANGUAGES = [
 ];
 
 /**
- * Dark bar, one hairline underneath, light type. The only colour is the accent on the
- * register button and under the active link — everything else earns attention through weight.
+ * Dark bar, one hairline underneath, light type. The only colour is the light-blue accent: the
+ * dot in the wordmark, the register button, the active page (underline on desktop, text in the mobile menu) and the
+ * chosen language — everything else earns attention through weight.
  *
  * The bar is 90 % opaque with a blur, so content scrolling under it stays faintly visible and
  * the bar reads as floating above the page. The hairline alone (white at 10 %) barely
@@ -105,6 +106,7 @@ export function Navbar() {
             const active = pathname.startsWith(l.href);
             return (
               <Link key={l.href} href={l.href}
+                aria-current={active ? 'page' : undefined}
                 className={`text-sm transition-colors ${
                   active
                     ? 'text-ink font-semibold border-b-2 border-accent -mb-[1px] pb-[2px]'
@@ -129,10 +131,12 @@ export function Navbar() {
                 {LANGUAGES.map(l => (
                   <button key={l.code} role="option" aria-selected={l.code === locale}
                     onClick={() => chooseLocale(l.code)}
-                    className={`block w-full text-left px-4 py-2 text-sm transition-colors hover:bg-ink/[0.06] ${
-                      l.code === locale ? 'text-ink font-semibold' : 'text-ink-muted hover:text-ink'
+                    className={`flex w-full items-center justify-between gap-2 text-left px-4 py-2 text-sm transition-colors hover:bg-ink/[0.06] ${
+                      l.code === locale ? 'text-accent font-semibold' : 'text-ink-muted hover:text-ink'
                     }`}>
                     {l.label}
+                    {/* Zvolený jazyk nese i značku, ne jen barvu: modrá od šedé textu má jen 1,2 : 1. */}
+                    {l.code === locale && <Check size={14} aria-hidden />}
                   </button>
                 ))}
               </div>
@@ -188,15 +192,27 @@ export function Navbar() {
 
       {mobile && (
         <div className="md:hidden border-t border-line px-5 py-4 space-y-1 bg-surface shadow-[0_12px_32px_rgba(0,0,0,.6)] animate-fade-in">
-          {links.map(l => (
-            <Link key={l.href} href={l.href}
-              className="block py-2.5 text-sm font-medium text-ink"
-              onClick={() => setMobile(false)}>
-              {l.label}
-            </Link>
-          ))}
+          {/* Mobilní menu dřív aktivní stránku nijak neukazovalo. Teď barva i svislá čárka — samotná
+              modrá se od světlého textu liší jen 1,45 : 1, tvar to musí nést taky. */}
+          {links.map(l => {
+            const active = pathname.startsWith(l.href);
+            return (
+              <Link key={l.href} href={l.href}
+                aria-current={active ? 'page' : undefined}
+                className={`block py-2.5 text-sm ${active ? 'font-semibold text-accent border-l-2 border-accent pl-3' : 'font-medium text-ink border-l-2 border-transparent pl-3'}`}
+                onClick={() => setMobile(false)}>
+                {l.label}
+              </Link>
+            );
+          })}
           {user && (
-            <Link href={`/${locale}/profile`} className="block py-2.5 text-sm font-medium text-ink"
+            <Link href={`/${locale}/profile`}
+              aria-current={pathname.startsWith(`/${locale}/profile`) ? 'page' : undefined}
+              className={`block py-2.5 text-sm ${
+                pathname.startsWith(`/${locale}/profile`)
+                  ? 'font-semibold text-accent border-l-2 border-accent pl-3'
+                  : 'font-medium text-ink border-l-2 border-transparent pl-3'
+              }`}
               onClick={() => setMobile(false)}>
               {locale === 'cs' ? 'Můj profil' : 'My profile'}
             </Link>
@@ -207,7 +223,7 @@ export function Navbar() {
                 <button key={l.code} onClick={() => chooseLocale(l.code)}
                   className={`flex-1 text-sm py-2 border rounded-lg transition-colors ${
                     l.code === locale
-                      ? 'border-ink text-ink font-semibold'
+                      ? 'border-accent text-accent font-semibold'
                       : 'border-line-strong text-ink-muted hover:text-ink'
                   }`}>
                   {l.label}

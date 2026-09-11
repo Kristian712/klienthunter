@@ -172,7 +172,7 @@ export default function DashboardPage() {
                     onClick={() => remove(s.id)}
                     disabled={deleting === s.id}
                     title={isCs ? 'Smazat' : 'Delete'}
-                    className="p-1.5 rounded-lg text-ink-faint hover:text-accent transition-colors disabled:opacity-40"
+                    className="p-1.5 rounded-lg text-ink-faint hover:text-ink hover:bg-ink/[0.06] transition-colors disabled:opacity-40"
                   >
                     <Trash2 size={14} />
                   </button>

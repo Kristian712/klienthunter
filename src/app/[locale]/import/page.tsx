@@ -245,7 +245,7 @@ export default function ImportPage() {
         <ShieldCheck size={16} className="text-ink-faint shrink-0 mt-0.5" />
         <p>
           Nahraná data zpracováváme jen pro vás a nikomu je nepředáváme. Kdykoli je smažete
-          v <Link href={`/${locale}/dashboard`} className="text-accent underline underline-offset-2 decoration-accent/40 hover:decoration-accent transition-colors">přehledu</Link> –
+          v <Link href={`/${locale}/dashboard`} className="text-accent underline underline-offset-2 decoration-accent/60 hover:decoration-accent transition-colors">přehledu</Link> –
           smazáním importu zmizí i všechny jeho řádky. Za to, že máte právo tyto kontakty
           zpracovávat, odpovídáte vy.
         </p>

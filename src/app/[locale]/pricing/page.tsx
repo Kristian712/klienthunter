@@ -229,7 +229,7 @@ const T = {
 const PLANS: PlanId[] = ['FREE', 'PRO', 'BUSINESS'];
 
 /** Odkaz v běžném textu: akcentový, podtržení tlumené a na hoveru plné. */
-const LINK = 'text-accent underline underline-offset-2 decoration-accent/40 hover:decoration-accent transition-colors';
+const LINK = 'text-accent underline underline-offset-2 decoration-accent/60 hover:decoration-accent transition-colors';
 
 function formatCzk(n: number): string {
   // Mezera jako oddělovač tisíců: „1 499 Kč" je běžný český zápis, „1,499" čte Čech jako desetiny.
@@ -238,8 +238,8 @@ function formatCzk(n: number): string {
 
 /**
  * Průhlednost pro zablokované tlačítko. Tlačítko, které právě přesměrovává, zůstává plné:
- * nese text „Přesměrovávám…" a průhlednost by ho na tmavém podkladu shodila pod čitelný
- * kontrast. Ostatní jsou jen neaktivní a zašednout smí.
+ * nese text „Přesměrovávám…" a musí být vidět, že se něco děje.
+ * Ostatní jsou jen neaktivní a zašednout smí.
  */
 function dimUnless(working: boolean): string {
   return working ? 'disabled:opacity-100' : 'disabled:opacity-60';
@@ -439,9 +439,10 @@ export default function PricingPage() {
             <p className="mb-6 text-sm text-ink-muted">{t(T.unlimited)}</p>
           )}
 
-          {/* Neprošlá platba patří nahoru a s odkazem, kde se to spraví — ne mezi tarify. */}
+          {/* Neprošlá platba patří nahoru a s odkazem, kde se to spraví — ne mezi tarify. Vzhled jako
+              chybová hláška (světlý rámeček), ne akcent: modrou tu nesou nabídky a vypadala by jako jedna z nich. */}
           {me && paymentFailing(me) && (
-            <div className="mb-6 max-w-2xl rounded-lg border border-accent/60 bg-accent/10 px-4 py-3 text-sm text-ink">
+            <div className="mb-6 max-w-2xl rounded-lg border border-ink px-4 py-3 text-sm font-medium text-ink">
               {t(T.pastDue)}{' '}
               <button type="button" onClick={portal} disabled={busy !== null} className={LINK}>
                 {t(T.manage)}

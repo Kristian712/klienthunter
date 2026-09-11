@@ -268,7 +268,7 @@ export default function ProfilePage() {
           </h2>
 
           {paymentFailing(user) && (
-            <p className="mt-3 rounded-lg border border-accent px-3 py-2 text-sm text-ink">
+            <p className="mt-3 rounded-lg border border-ink px-3 py-2 text-sm font-medium text-ink">
               {isCs
                 ? 'Poslední platba neprošla. Stripe ji ještě několik dní zkouší — tarif vám zatím běží. Opravte prosím kartu ve správě předplatného.'
                 : 'Your last payment failed. Stripe keeps retrying for a few days and your plan stays active meanwhile. Please fix your card in the billing portal.'}
@@ -318,7 +318,7 @@ export default function ProfilePage() {
           ) : (
             <p className="mt-3 text-sm text-ink-muted">
               {isCs ? 'Žádné předplatné neběží. ' : 'No active subscription. '}
-              <Link href={`/${locale}/pricing`} className="text-accent underline underline-offset-2 decoration-accent/40 hover:decoration-accent transition-colors">
+              <Link href={`/${locale}/pricing`} className="text-accent underline underline-offset-2 decoration-accent/60 hover:decoration-accent transition-colors">
                 {isCs ? 'Ceník' : 'Pricing'}
               </Link>
             </p>

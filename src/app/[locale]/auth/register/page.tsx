@@ -205,11 +205,11 @@ export default function RegisterPage() {
 
             <p className="text-[11px] leading-relaxed text-ink-faint">
               {localized(UI.consent.before, locale)}
-              <Link href={`/${locale}/terms`} className="text-accent underline underline-offset-2 decoration-accent/40 hover:decoration-accent transition-colors">
+              <Link href={`/${locale}/terms`} className="text-accent underline underline-offset-2 decoration-accent/60 hover:decoration-accent transition-colors">
                 {localized(UI.consent.terms, locale)}
               </Link>
               {localized(UI.consent.middle, locale)}
-              <Link href={`/${locale}/privacy`} className="text-accent underline underline-offset-2 decoration-accent/40 hover:decoration-accent transition-colors">
+              <Link href={`/${locale}/privacy`} className="text-accent underline underline-offset-2 decoration-accent/60 hover:decoration-accent transition-colors">
                 {localized(UI.consent.privacy, locale)}
               </Link>
               {localized(UI.consent.after, locale)}
@@ -231,7 +231,7 @@ export default function RegisterPage() {
 
           <p className="text-center text-sm text-ink-faint mt-6">
             {t('have_account')}{' '}
-            <Link href={`/${locale}/auth/login`} className="font-medium text-accent underline underline-offset-2 decoration-accent/40 hover:decoration-accent transition-colors">
+            <Link href={`/${locale}/auth/login`} className="font-medium text-accent underline underline-offset-2 decoration-accent/60 hover:decoration-accent transition-colors">
               {t('login_link')}
             </Link>
           </p>
