@@ -27,12 +27,16 @@ export interface LeadStatusDef {
  * barvoslepému slije v jednu hnědožlutou, a zrovna u „klient" versus „nezájem" je záměna nejdražší.
  *
  * Barva ale nikdy nenese informaci sama: web se pozná podle TVARU bodu (viz `pointShape`) a
- * označená firma má navíc tmavý kroužek. I kdyby čtenář dva odstíny zaměnil, pořád ví, jestli
+ * označená firma má navíc světlý prstenec. I kdyby čtenář dva odstíny zaměnil, pořád ví, jestli
  * firma má web a jestli ji už řešil.
+ *
+ * Tmavý web: „Osloveno" přešlo z tmavě modré #0072b2 na nebeskou #56b4e9 z téže sady. Tmavá
+ * modrá měla na tmavé mapě jen 3,6 : 1 a přes silnici 2,9 : 1, pod hranicí 3 : 1 pro grafiku;
+ * nebeská má 8,2 : 1. Jedná se, Klient a Odmítnuto mají i jako text na kartě 5,4 : 1 a víc.
  */
 export const LEAD_STATUSES: LeadStatusDef[] = [
   { id: 'new',       label: { cs: 'Neosloveno', sk: 'Neoslovené', en: 'Not contacted' },  color: '#9ca3af' },
-  { id: 'contacted', label: { cs: 'Osloveno',   sk: 'Oslovené',   en: 'Contacted' },      color: '#0072b2' },
+  { id: 'contacted', label: { cs: 'Osloveno',   sk: 'Oslovené',   en: 'Contacted' },      color: '#56b4e9' },
   { id: 'talking',   label: { cs: 'Jedná se',   sk: 'Rokuje sa',  en: 'In talks' },       color: '#e69f00' },
   { id: 'client',    label: { cs: 'Klient',     sk: 'Klient',     en: 'Client' },         color: '#009e73' },
   { id: 'rejected',  label: { cs: 'Nezájem',    sk: 'Nezáujem',   en: 'Not interested' }, color: '#cc79a7' },
@@ -64,12 +68,23 @@ export function statusLabel(id: string | null | undefined, locale: string): stri
 export type WebState = 'HAS' | 'NONE' | 'UNKNOWN';
 
 export const WEB_COLORS = {
-  /** Web jsme ověřili. Šedá schválně: je to ta nezajímavá skupina, nemá strhávat pozornost. */
-  has: '#64748b',
-  /** Web jsme prověřili a firma ho nemá — to je ta skupina, kvůli které se aplikace otvírá. */
+  /**
+   * Web jsme ověřili. Šedomodrá schválně: je to ta nezajímavá skupina, nemá strhávat pozornost.
+   * Na tmavé mapě 6,5 : 1 (dřívější #64748b měl 4,0 : 1 a přes silnici 3,1 : 1).
+   */
+  has: '#8b98ab',
+  /**
+   * Web jsme prověřili a firma ho nemá — to je ta skupina, kvůli které se aplikace otvírá.
+   * Tmavší oranžová než akcent tlačítek (#F07A1A), takže bod a tlačítko jde rozeznat
+   * odstínem i tvarem (kosočtverec).
+   */
   none: '#d55e00',
-  /** Nevíme. Bledá a tichá: nic netvrdí, jen přiznává, že odpověď chybí. */
-  unknown: '#b8b4ae',
+  /**
+   * Nevíme. Tichá: nic netvrdí, jen přiznává, že odpověď chybí. Na světlé mapě to byla bledá
+   * #b8b4ae; na tmavé by tatáž barva byla nejjasnější bod ze všech (9,2 : 1). Proto tlumená
+   * šedá, která pořád splní 3 : 1 vůči mapě i silnici, ale nekřičí.
+   */
+  unknown: '#7a7c82',
 };
 
 export function pointColor(web: WebState, status: string | null | undefined): string {

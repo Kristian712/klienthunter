@@ -119,12 +119,15 @@ export function googleMapsHref(lead: MapLead): string {
 }
 
 /**
- * Přebarví načtený podklad do palety webovkyvanek.cz.
+ * Přebarví načtený podklad do tmavé palety webu.
  *
- * Positron je nejtišší styl, jaký OpenFreeMap nabízí, ale je studeně šedozelený a maluje plochy
- * zeleně, které na mapě firem nic neznamenají. Tady dostane teplou špinavě bílou `#f6f5f2` —
- * tedy přesně pozadí webu — bílé silnice a tlumené popisky. Body jsou pak jediná sytá věc na
- * obrazovce, což je celý smysl té mapy.
+ * Positron je nejtišší styl, jaký OpenFreeMap nabízí, ale je světlý a maluje plochy zeleně,
+ * které na mapě firem nic neznamenají. Tady dostane skoro černý podklad o stupeň světlejší než
+ * stránka, silnice jen o kousek světlejší než zem a tlumené popisky (6,8 : 1 na podkladu,
+ * 5,4 : 1 přes silnici). Body jsou pak jediná sytá věc na obrazovce, což je celý smysl té mapy.
+ *
+ * Tmavý styl OpenFreeMap (`/styles/dark`) se nepoužívá schválně: jeho popisky mají kontrast
+ * 3,4 : 1 a názvy silnic 2,4 : 1. Přebarvit Positron dává nad každou barvou kontrolu.
  *
  * Mění se hotový styl po načtení, ne jeho JSON před vytvořením mapy: kdyby se čekalo na stažení
  * a úpravu stylu, neexistovala by mapa, do které se dají sázet body, a první dávka firem by se
@@ -136,30 +139,33 @@ function tintVanek(m: MapLibreMap) {
 
   for (const layer of style.layers) {
     const id = layer.id;
-    // POI: na mapě, kde každý bod je firma, jsou cizí ikony jen další tečky navíc.
-    if (/poi/i.test(id)) {
+    // POI: na mapě, kde každý bod je firma, jsou cizí ikony jen další tečky navíc. Štíty silnic
+    // a letiště jsou rastrové ikony, které přebarvit nejde — na tmavé mapě by svítily jako skvrny.
+    if (/poi|shield|airport/i.test(id)) {
       if (m.getLayer(id)) m.removeLayer(id);
       continue;
     }
     try {
-      if (layer.type === 'background') m.setPaintProperty(id, 'background-color', '#f6f5f2');
+      if (layer.type === 'background') m.setPaintProperty(id, 'background-color', '#101113');
       if (layer.type === 'fill') {
         const voda = /water/i.test(id);
         // Domy zůstávají, jen skoro splynou s podkladem. Dávají městu strukturu, ve které bod
         // sedí v ulici a ne v prázdnu — a ve 3D režimu z nich vyrostou skutečné bloky.
         const dum = /building/i.test(id);
         const park = /park|wood|landcover|grass/i.test(id);
-        m.setPaintProperty(id, 'fill-color', voda ? '#dfe1e4' : dum ? '#edece7' : park ? '#f1f1ec' : '#f0efeb');
-        if (dum) m.setPaintProperty(id, 'fill-outline-color', '#e6e5df');
+        m.setPaintProperty(id, 'fill-color', voda ? '#171a1f' : dum ? '#18191c' : park ? '#141518' : '#131417');
+        if (dum) m.setPaintProperty(id, 'fill-outline-color', '#1f2024');
       }
       if (layer.type === 'line') {
-        if (/water|river|stream/i.test(id)) m.setPaintProperty(id, 'line-color', '#d3d7db');
-        else if (/boundary|admin/i.test(id)) m.setPaintProperty(id, 'line-color', 'rgba(16,16,17,.22)');
-        else m.setPaintProperty(id, 'line-color', '#ffffff');
+        if (/water|river|stream/i.test(id)) m.setPaintProperty(id, 'line-color', '#1c2027');
+        else if (/boundary|admin/i.test(id)) m.setPaintProperty(id, 'line-color', 'rgba(255,255,255,.18)');
+        // Silnice jen o kousek světlejší než zem: struktura města bez šumu. Bílé by na tmavé
+        // mapě přezářily body, které mají být to jediné výrazné.
+        else m.setPaintProperty(id, 'line-color', '#26272c');
       }
       if (layer.type === 'symbol') {
-        m.setPaintProperty(id, 'text-color', '#83848a');
-        m.setPaintProperty(id, 'text-halo-color', '#f6f5f2');
+        m.setPaintProperty(id, 'text-color', '#9a9ba1');
+        m.setPaintProperty(id, 'text-halo-color', '#101113');
         m.setPaintProperty(id, 'text-halo-width', 1.4);
       }
     } catch {
@@ -210,7 +216,7 @@ function dotSize(score: number): number {
 /** Barva záře pod bodem. Ze stejného odstínu jako bod, jen průhledná — jinak by to byl druhý bod. */
 function glow(hex: string, alpha: number): string {
   const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  if (!m) return `rgba(16,16,17,${alpha})`;
+  if (!m) return `rgba(237,236,232,${alpha})`;
   const [r, g, b] = [m[1], m[2], m[3]].map(v => parseInt(v, 16));
   return `rgba(${r},${g},${b},${alpha})`;
 }
@@ -222,15 +228,16 @@ function dotStyle(color: string, shape: PointShape, tagged: boolean, size: numbe
     width: size,
     height: size,
     background: color,
-    border: '2px solid #fff',
-    boxShadow: '0 1px 3px rgba(0,0,0,.4)',
+    // Stejný lem jako bod na mapě (globals.css `.kh-pin__core`): tmavá mezera a jemný obrys.
+    border: '2px solid rgb(var(--surface-subtle))',
+    boxShadow: '0 0 0 1px rgb(var(--line) / .16)',
     borderRadius: shape === 'diamond' ? 2 : '50%',
     transform: shape === 'diamond' ? 'rotate(45deg)' : undefined,
     // Kroužek: prázdný uvnitř, protože nic netvrdí. Barva je jen v obrysu.
     ...(shape === 'ring' ? { background: 'transparent', border: `2px solid ${color}`, boxShadow: 'none' } : null),
-    // Označená firma dostane tmavý kroužek. Je to nebarevný klíč navíc: „už jsem ji řešil"
-    // se pozná i bez rozeznání odstínu.
-    outline: tagged ? '1.5px solid rgba(0,0,0,.55)' : undefined,
+    // Označená firma dostane světlý prstenec. Je to nebarevný klíč navíc: „už jsem ji řešil"
+    // se pozná i bez rozeznání odstínu. Tmavý by na tmavé legendě zmizel.
+    outline: tagged ? '1.5px solid rgb(var(--ink) / .8)' : undefined,
   };
 }
 
@@ -259,7 +266,7 @@ function Swatch({ color, shape, tagged }: { color: string; shape: PointShape; ta
 function Legend({ locale, labelsOn }: { locale: string; labelsOn: boolean }) {
   const tags = LEAD_STATUSES.filter(s => s.id !== 'new');
   return (
-    <aside className="md:w-52 shrink-0 border border-line rounded-xl p-3 bg-surface-subtle">
+    <aside className="md:w-52 shrink-0 border border-line-strong rounded-xl p-3 bg-surface-subtle">
       <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint mb-2">
         {localized(T.legend, locale)}
       </p>
@@ -558,10 +565,10 @@ export function ResultsMap({ leads, total, locale, onSetStatus, hideDone, hidden
           'source-layer': 'building',
           minzoom: 15,
           paint: {
-            'fill-extrusion-color': '#e7e6e1',
+            'fill-extrusion-color': '#232429',
             'fill-extrusion-height': ['coalesce', ['get', 'render_height'], 8],
             'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], 0],
-            'fill-extrusion-opacity': 0.85,
+            'fill-extrusion-opacity': 0.9,
             // Náběh výšky, aby domy při přiblížení vyrostly, ne vyskočily.
             'fill-extrusion-vertical-gradient': true,
           },
@@ -616,7 +623,7 @@ export function ResultsMap({ leads, total, locale, onSetStatus, hideDone, hidden
             onClick={onToggleHideDone}
             aria-pressed={hideDone}
             className={`text-xs px-2 py-1 border rounded-lg transition-colors ${
-              hideDone ? 'border-ink text-ink font-semibold' : 'border-line text-ink-muted hover:text-ink'
+              hideDone ? 'border-ink text-ink font-semibold' : 'border-line-strong text-ink-muted hover:text-ink hover:border-ink'
             }`}
           >
             {localized(T.hideDone, locale)}
@@ -628,7 +635,7 @@ export function ResultsMap({ leads, total, locale, onSetStatus, hideDone, hidden
         <div className="relative flex-1 min-w-0">
           <div
             ref={container}
-            className="kh-map-frame w-full h-[26rem] md:h-[34rem] rounded-xl overflow-hidden border border-line"
+            className="kh-map-frame w-full h-[26rem] md:h-[34rem] rounded-xl overflow-hidden border border-line-strong bg-surface-subtle"
           />
 
           {/* Přepínač pohledu. Vlevo nahoře, aby si nelezl do cesty s ovládáním přiblížení. */}
@@ -641,7 +648,7 @@ export function ResultsMap({ leads, total, locale, onSetStatus, hideDone, hidden
             className={`absolute z-20 left-3 top-3 text-[11px] font-mono tracking-wider px-2.5 py-1.5 rounded-lg border transition-colors ${
               tilted
                 ? 'border-ink bg-ink text-surface'
-                : 'border-line bg-surface-subtle/90 text-ink-muted hover:text-ink hover:border-ink'
+                : 'border-line-strong bg-surface-subtle/90 backdrop-blur-sm text-ink hover:border-ink'
             }`}
           >
             {tilted ? '2D' : '3D'}
@@ -649,7 +656,7 @@ export function ResultsMap({ leads, total, locale, onSetStatus, hideDone, hidden
 
           {placeable.length === 0 && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <p className="bg-surface-subtle/95 border border-line px-4 py-3 text-sm text-ink-muted max-w-xs text-center">
+              <p className="bg-surface-subtle/95 border border-line-strong rounded-lg shadow-[0_8px_24px_rgba(0,0,0,.5)] px-4 py-3 text-sm text-ink-muted max-w-xs text-center">
                 {localized(T.none, locale)}
               </p>
             </div>
@@ -665,7 +672,8 @@ export function ResultsMap({ leads, total, locale, onSetStatus, hideDone, hidden
              */
             <div className="absolute z-30 inset-x-2 bottom-2 md:inset-x-auto md:left-3 md:bottom-20
                             md:w-80 max-h-[33%] md:max-h-none overflow-y-auto
-                            bg-surface-subtle border border-ink rounded-lg p-3 md:p-3.5">
+                            bg-surface-subtle border border-line-strong rounded-lg p-3 md:p-3.5
+                            shadow-[0_12px_32px_rgba(0,0,0,.55)]">
               <div className="flex items-start justify-between gap-2">
                 <p className="font-display font-extrabold text-[15px] leading-tight tracking-[-0.02em] min-w-0">
                   {selected.name}
@@ -700,7 +708,7 @@ export function ResultsMap({ leads, total, locale, onSetStatus, hideDone, hidden
                 )}
                 {selected.website ? (
                   <a href={selected.website} target="_blank" rel="noopener noreferrer"
-                     className="text-ink underline underline-offset-2 hover:text-accent transition-colors truncate max-w-[11rem]">
+                     className="text-accent underline underline-offset-2 decoration-accent/40 hover:decoration-accent transition-colors truncate max-w-[11rem]">
                     {selected.website.replace(/^https?:\/\//, '')}
                   </a>
                 ) : (
@@ -733,12 +741,13 @@ export function ResultsMap({ leads, total, locale, onSetStatus, hideDone, hidden
                         text-[10px] md:text-[11px] px-1 md:px-2 py-1 md:py-1.5 rounded-md border transition-colors ${
                         zapnuto
                           ? 'border-ink bg-ink text-surface'
-                          : 'border-line text-ink-muted hover:border-ink hover:text-ink'
+                          : 'border-line-strong text-ink-muted hover:border-ink hover:text-ink'
                       }`}
                     >
                       <span
                         className="hidden md:block w-2 h-2 rounded-full shrink-0"
-                        style={{ background: st.color, outline: zapnuto ? '1px solid rgba(255,255,255,.5)' : undefined }}
+                        // Na zapnutém (světlém) tlačítku tmavý obrys, aby tečka nesplynula s výplní.
+                        style={{ background: st.color, outline: zapnuto ? '1px solid rgb(var(--surface) / .6)' : undefined }}
                       />
                       {localized(st.label, locale)}
                     </button>
