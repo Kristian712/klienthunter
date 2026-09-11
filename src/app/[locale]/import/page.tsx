@@ -141,14 +141,18 @@ export default function ImportPage() {
 
       {/* Krok 1 – soubor */}
       <div className="card mb-6">
-        <label className="flex flex-col items-center justify-center gap-3 py-10 border border-dashed border-line rounded-lg cursor-pointer hover:border-ink transition-colors">
+        {/* Pole je `sr-only`, ne `hidden`: s `display: none` by se na něj z klávesnice nedalo
+            dostat. Když na pole přijde fokus z klávesnice, rozsvítí se kroužek kolem celé plochy.
+            Záměrně `:focus-visible`, ne `focus-within` — klik myší na label přesune fokus do pole
+            a kroužek by po zavření dialogu zůstal svítit. */}
+        <label className="flex flex-col items-center justify-center gap-3 py-10 border-2 border-dashed border-line-strong bg-surface rounded-lg cursor-pointer hover:border-accent transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent has-[:focus-visible]:ring-offset-2 has-[:focus-visible]:ring-offset-surface-subtle">
           <Upload size={24} className="text-ink" />
           <span className="font-medium">{filename || 'Vyberte soubor CSV'}</span>
           <span className="text-xs text-ink-faint">první řádek musí být hlavička s názvy sloupců</span>
           <input
             type="file"
             accept=".csv,text/csv"
-            className="hidden"
+            className="sr-only"
             onChange={e => {
               const f = e.target.files?.[0];
               if (f) onFile(f);
@@ -241,7 +245,7 @@ export default function ImportPage() {
         <ShieldCheck size={16} className="text-ink-faint shrink-0 mt-0.5" />
         <p>
           Nahraná data zpracováváme jen pro vás a nikomu je nepředáváme. Kdykoli je smažete
-          v <Link href={`/${locale}/dashboard`} className="text-ink underline underline-offset-2 hover:text-accent">přehledu</Link> –
+          v <Link href={`/${locale}/dashboard`} className="text-accent underline underline-offset-2 decoration-accent/40 hover:decoration-accent transition-colors">přehledu</Link> –
           smazáním importu zmizí i všechny jeho řádky. Za to, že máte právo tyto kontakty
           zpracovávat, odpovídáte vy.
         </p>

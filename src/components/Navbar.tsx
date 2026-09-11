@@ -17,8 +17,18 @@ const LANGUAGES = [
 ];
 
 /**
- * White bar, one hairline underneath, black type. The only colour is the accent on the
+ * Dark bar, one hairline underneath, light type. The only colour is the accent on the
  * register button and under the active link — everything else earns attention through weight.
+ *
+ * The bar is 90 % opaque with a blur, so content scrolling under it stays faintly visible and
+ * the bar reads as floating above the page. The hairline alone (white at 10 %) barely
+ * separates two dark surfaces.
+ *
+ * Both dropdowns use surface-muted, the top of the page < card < menu ladder, so they stay
+ * lighter than any card they open over. They also get a stronger edge and a shadow, because
+ * neighbouring dark surfaces differ by only about 1.1 : 1. Their items hover to a faint ink
+ * wash rather than to a surface token: the panel's own colour gave no feedback at all, and
+ * `surface` is darker, so the item sank instead of lifting.
  */
 export function Navbar() {
   const t = useTranslations('nav');
@@ -83,7 +93,7 @@ export function Navbar() {
 
   if (standalone) return null;
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-surface border-b border-line">
+    <header className="fixed top-0 left-0 right-0 z-50 bg-surface/90 backdrop-blur-md border-b border-line">
       <nav className="max-w-6xl mx-auto px-5 flex items-center h-14 gap-8">
 
         <Link href={`/${locale}`} className="font-extrabold text-[17px] tracking-tight shrink-0">
@@ -115,11 +125,11 @@ export function Navbar() {
             </button>
             {langOpen && (
               <div role="listbox"
-                className="absolute right-0 top-full mt-2 w-36 bg-surface-subtle border border-line rounded-lg py-1 animate-fade-in">
+                className="absolute right-0 top-full mt-2 w-36 bg-surface-muted border border-line-strong rounded-lg py-1 shadow-[0_12px_32px_rgba(0,0,0,.6)] animate-fade-in">
                 {LANGUAGES.map(l => (
                   <button key={l.code} role="option" aria-selected={l.code === locale}
                     onClick={() => chooseLocale(l.code)}
-                    className={`block w-full text-left px-4 py-2 text-sm transition-colors hover:bg-surface ${
+                    className={`block w-full text-left px-4 py-2 text-sm transition-colors hover:bg-ink/[0.06] ${
                       l.code === locale ? 'text-ink font-semibold' : 'text-ink-muted hover:text-ink'
                     }`}>
                     {l.label}
@@ -138,23 +148,23 @@ export function Navbar() {
               </button>
 
               {dropdown && (
-                <div className="absolute right-0 top-full mt-2 w-52 bg-surface-subtle border border-line rounded-lg py-1 animate-fade-in">
+                <div className="absolute right-0 top-full mt-2 w-52 bg-surface-muted border border-line-strong rounded-lg py-1 shadow-[0_12px_32px_rgba(0,0,0,.6)] animate-fade-in">
                   <Link href={`/${locale}/profile`} onClick={() => setDropdown(false)}
-                    className="block px-4 py-2.5 text-sm text-ink hover:bg-surface-subtle transition-colors">
+                    className="block px-4 py-2.5 text-sm text-ink hover:bg-ink/[0.06] transition-colors">
                     {locale === 'cs' ? 'Můj profil' : 'My profile'}
                   </Link>
                   <Link href={`/${locale}/dashboard`} onClick={() => setDropdown(false)}
-                    className="block px-4 py-2.5 text-sm text-ink hover:bg-surface-subtle transition-colors">
+                    className="block px-4 py-2.5 text-sm text-ink hover:bg-ink/[0.06] transition-colors">
                     {t('dashboard')}
                   </Link>
                   {user.isAdmin && (
                     <Link href={`/${locale}/admin`} onClick={() => setDropdown(false)}
-                      className="block px-4 py-2.5 text-sm text-ink hover:bg-surface-subtle transition-colors">
+                      className="block px-4 py-2.5 text-sm text-ink hover:bg-ink/[0.06] transition-colors">
                       Admin panel
                     </Link>
                   )}
                   <button onClick={handleLogout}
-                    className="block w-full text-left px-4 py-2.5 text-sm text-ink-muted hover:text-ink hover:bg-surface-subtle transition-colors border-t border-line mt-1">
+                    className="block w-full text-left px-4 py-2.5 text-sm text-ink-muted hover:text-ink hover:bg-ink/[0.06] transition-colors border-t border-line mt-1">
                     {t('logout')}
                   </button>
                 </div>
@@ -177,7 +187,7 @@ export function Navbar() {
       </nav>
 
       {mobile && (
-        <div className="md:hidden border-t border-line px-5 py-4 space-y-1 bg-surface animate-fade-in">
+        <div className="md:hidden border-t border-line px-5 py-4 space-y-1 bg-surface shadow-[0_12px_32px_rgba(0,0,0,.6)] animate-fade-in">
           {links.map(l => (
             <Link key={l.href} href={l.href}
               className="block py-2.5 text-sm font-medium text-ink"
@@ -198,7 +208,7 @@ export function Navbar() {
                   className={`flex-1 text-sm py-2 border rounded-lg transition-colors ${
                     l.code === locale
                       ? 'border-ink text-ink font-semibold'
-                      : 'border-line text-ink-muted hover:text-ink'
+                      : 'border-line-strong text-ink-muted hover:text-ink'
                   }`}>
                   {l.label}
                 </button>

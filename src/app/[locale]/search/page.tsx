@@ -279,9 +279,11 @@ function LockedContacts({ locale }: { locale: string }) {
         {localized(S.demoLocked, locale)}
       </p>
       <div className="flex items-center gap-2 flex-wrap" aria-hidden="true">
-        <span className="h-6 w-28 rounded-lg bg-ink/10" />
-        <span className="h-6 w-36 rounded-lg bg-ink/[0.07]" />
-        <span className="h-6 w-20 rounded-lg bg-ink/[0.05]" />
+        {/* Stupně jsou silnější, než by stačilo na světlém podkladu: pruhy s 5–7 % světlé barvy
+            na tmavém řádku splývaly s pozadím a ukázka vypadala rozbitě, ne zamčeně. */}
+        <span className="h-6 w-28 rounded-lg bg-ink/[0.16]" />
+        <span className="h-6 w-36 rounded-lg bg-ink/[0.12]" />
+        <span className="h-6 w-20 rounded-lg bg-ink/[0.09]" />
       </div>
     </div>
   );
@@ -369,9 +371,10 @@ function ContactStrategy({ b, locale }: { b: BusinessResult; locale: string }) {
         <span className="flex items-center gap-1.5 shrink-0" title={L(reachHint(b))}>
           <span className="text-[10px] uppercase tracking-wider text-ink-faint">{L(CONTACT.reach)}</span>
           {/* Proužek místo druhého velkého čísla: řádek už jedno má a dvě soutěžící čísla
-              se čtou hůř než jedno číslo a jedna délka. */}
-          <span className="h-1 w-12 rounded-full bg-ink/10 overflow-hidden" aria-hidden>
-            <span className="block h-full bg-ink" style={{ width: `${reach}%` }} />
+              se čtou hůř než jedno číslo a jedna délka. Výplň je tlumeně šedá, ne plně světlá —
+              na tmavém řádku by jinak svítila víc než název firmy i skóre. */}
+          <span className="h-1 w-12 rounded-full bg-ink/15 overflow-hidden" aria-hidden>
+            <span className="block h-full bg-ink-muted" style={{ width: `${reach}%` }} />
           </span>
           <span className="text-[10px] tnum text-ink-muted">{reach}</span>
         </span>
@@ -387,8 +390,8 @@ function ContactStrategy({ b, locale }: { b: BusinessResult; locale: string }) {
               rel="noopener noreferrer"
               className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs shrink-0 border transition-colors ${
                 i === 0
-                  ? 'border-ink text-ink font-semibold hover:bg-ink hover:text-white'
-                  : 'border-line text-ink-muted hover:border-ink hover:text-ink'
+                  ? 'border-ink text-ink font-semibold hover:bg-ink hover:text-surface'
+                  : 'border-field text-ink-muted hover:border-ink hover:text-ink'
               }`}
             >
               {m.icon}
@@ -1230,12 +1233,14 @@ export default function SearchPage() {
                   role="combobox"
                 />
                 {industryOpen && (
-                  <ul className="absolute z-20 left-0 right-0 mt-1 max-h-64 overflow-y-auto bg-surface-subtle border border-ink">
+                  /* Nabídka plave nad kartou s formulářem a tmavé plochy se od sebe liší jen
+                     o chlup — proto o stupeň světlejší plocha, silnější linka a stín. */
+                  <ul className="absolute z-20 left-0 right-0 mt-1 max-h-64 overflow-y-auto bg-surface-muted border border-line-strong shadow-[0_12px_32px_rgba(0,0,0,.6)]">
                     {industryMatches.map(item => (
                       <li key={item.value}>
                         <button
                           type="button"
-                          className="w-full text-left px-3 py-2 text-sm hover:bg-ink hover:text-white transition-colors"
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-ink/[0.06] transition-colors"
                           onMouseDown={e => e.preventDefault()}
                           onClick={() => {
                             setIndustry(item.value);
@@ -1297,7 +1302,7 @@ export default function SearchPage() {
             {planLimitHit && (
               <>
                 {' '}
-                <Link href={`/${locale}/pricing`} className="underline underline-offset-2 hover:text-accent transition-colors">
+                <Link href={`/${locale}/pricing`} className="text-accent underline underline-offset-2 decoration-accent/40 hover:decoration-accent transition-colors">
                   {localized(S.errPlanLink, locale)}
                 </Link>
               </>
@@ -1337,8 +1342,8 @@ export default function SearchPage() {
                     prázdný pruh je poctivější než animace, která předstírá postup. U hledání
                     po městech se počítá z fází: `foundCount` je jen to, co zdroje vrátily
                     dosud, takže by pruh po každé fázi skákal zpátky. */}
-                <div className="h-1 bg-line mt-3 overflow-hidden">
-                  <div className="h-1 bg-ink transition-all duration-500"
+                <div className="h-1 bg-ink/10 mt-3 overflow-hidden">
+                  <div className="h-1 bg-accent transition-all duration-500"
                        style={{ width: job.stageCount > 1
                          ? `${Math.round(job.stageIndex / job.stageCount * 100)}%`
                          : job.foundCount > 0
@@ -1455,7 +1460,7 @@ export default function SearchPage() {
                             className={on ? 'chip-active' : 'chip'}
                           >
                             {localized(f.label, locale)}
-                            <span className={`tnum ${on ? 'text-white/60' : 'text-ink-faint'}`}>{n}</span>
+                            <span className={`tnum ${on ? 'text-surface/70' : 'text-ink-faint'}`}>{n}</span>
                           </button>
                         );
                       })}
@@ -1535,19 +1540,28 @@ export default function SearchPage() {
 
                         {/* Kde jsem s touhle firmou. Select, ne pět chipů — pět tlačítek na
                             každém z pěti set řádků by z výsledků udělalo houštinu, a na mapě,
-                            kde je na výběr místo, chipy zůstávají. */}
+                            kde je na výběr místo, chipy zůstávají.
+                            Barvu stavu nese puntík, text zůstává světlý: barvy z `lead-tags.ts`
+                            jsou laděné na body mapy, ne na 11px písmo, a jako text by na tmavém
+                            poli 4,5 : 1 splnit nemusely. Puntíku stačí 3 : 1. */}
                         {!isDemo && (
-                          <select
-                            value={statusOf(b) ?? 'new'}
-                            onChange={e => setLeadStatus(b.id, e.target.value as LeadStatus)}
-                            aria-label={localized({ cs: 'Stav', sk: 'Stav', en: 'Status' }, locale)}
-                            className="text-[11px] border border-line rounded-lg px-1.5 py-0.5 bg-surface-subtle cursor-pointer hover:border-ink transition-colors"
-                            style={{ color: statusDef(statusOf(b))?.color ?? undefined }}
-                          >
-                            {LEAD_STATUSES.map(st => (
-                              <option key={st.id} value={st.id}>{localized(st.label, locale)}</option>
-                            ))}
-                          </select>
+                          <span className="relative inline-flex items-center">
+                            <span
+                              aria-hidden
+                              className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 h-1.5 w-1.5 rounded-full"
+                              style={{ backgroundColor: statusDef(statusOf(b) ?? 'new')?.color }}
+                            />
+                            <select
+                              value={statusOf(b) ?? 'new'}
+                              onChange={e => setLeadStatus(b.id, e.target.value as LeadStatus)}
+                              aria-label={localized({ cs: 'Stav', sk: 'Stav', en: 'Status' }, locale)}
+                              className="text-[11px] text-ink border border-field rounded-lg pl-4 pr-1.5 py-0.5 bg-surface-muted cursor-pointer hover:border-ink transition-colors"
+                            >
+                              {LEAD_STATUSES.map(st => (
+                                <option key={st.id} value={st.id}>{localized(st.label, locale)}</option>
+                              ))}
+                            </select>
+                          </span>
                         )}
                         {b.vatUnreliable && (
                           <span className="badge-red" title="Finanční správa firmu vede jako nespolehlivého plátce DPH">
@@ -1610,8 +1624,8 @@ export default function SearchPage() {
         )}
 
         {!hasSearched && (
-          <div className="card text-center py-16 text-ink-faint border-dashed">
-            <Search size={40} className="mx-auto mb-3 opacity-20" />
+          <div className="card text-center py-16 text-ink-faint border-dashed border-line-strong">
+            <Search size={40} className="mx-auto mb-3 opacity-30" />
             <p className="font-medium text-ink-muted mb-1">{isCs ? 'Vyber kraj a obor výše' : 'Select region and industry above'}</p>
             <p className="text-sm">{isCs ? 'např. Jihomoravský kraj + Instalatér, nebo Celá ČR + Kadeřnictví' : 'e.g. London + Plumber'}</p>
           </div>

@@ -104,7 +104,7 @@ export default function LocaleError({ error, reset }: { error: Error & { digest?
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
-      <div className="w-full max-w-md border border-line p-6">
+      <div className="card w-full max-w-md">
         <h1 className="text-xl font-extrabold tracking-tight">{t.title}</h1>
         <p className="text-sm text-ink-muted mt-2">{t.body}</p>
         {/*

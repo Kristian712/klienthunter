@@ -20,6 +20,15 @@ interface InviteCode {
   usedByUser?: { name?: string; email: string };
 }
 
+// Row action pills, monochrome. All have a 1px border (transparent on On/Off) so heights match.
+const ROW_BTN       = 'flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-colors';
+const ROW_BTN_OFF   = `${ROW_BTN} font-medium border-transparent bg-ink/[0.06] text-ink-faint hover:bg-ink/10 hover:text-ink`;
+const ROW_BTN_ON    = `${ROW_BTN} font-medium border-transparent bg-ink text-surface hover:bg-ink/90`;
+const ROW_BTN_BLOCK = `${ROW_BTN} font-medium border-field text-ink-muted hover:border-ink hover:text-ink`;
+
+// Paid plans and unused codes
+const BADGE_STRONG = 'badge border-field text-ink';
+
 export default function AdminPage() {
   const locale = useLocale();
   const isCs = locale === 'cs' || locale === 'sk';
@@ -140,27 +149,27 @@ export default function AdminPage() {
   };
 
   return (
-    <div className="min-h-screen bg-surface-subtle pt-16">
+    <div className="min-h-screen pt-16">
       {toast && (
-        <div className="fixed top-20 right-4 z-50 bg-ink text-white text-sm px-4 py-3 rounded-xl shadow-card-hover animate-fade-in">
+        <div className="fixed top-20 right-4 z-50 bg-surface-muted text-ink border border-line-strong text-sm px-4 py-3 rounded-xl shadow-[0_12px_32px_rgba(0,0,0,.55)] animate-fade-in">
           {toast}
         </div>
       )}
 
       {/* Header */}
-      <div className="bg-[#07071a] border-b border-white/5">
+      <div className="border-b border-line">
         <div className="max-w-6xl mx-auto px-4 py-8 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-brand-600/20 border border-brand-500/30 flex items-center justify-center">
-              <Shield size={20} className="text-brand-400" />
+            <div className="w-10 h-10 rounded-xl bg-accent/10 border border-accent/30 flex items-center justify-center">
+              <Shield size={20} className="text-accent" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-white">Admin panel</h1>
-              <p className="text-white/40 text-xs">{isCs ? 'Správa uživatelů a invite kódů' : 'User and invite code management'}</p>
+              <h1 className="text-xl font-bold text-ink">Admin panel</h1>
+              <p className="text-ink-faint text-xs">{isCs ? 'Správa uživatelů a invite kódů' : 'User and invite code management'}</p>
             </div>
           </div>
           <button onClick={() => { fetchUsers(); fetchCodes(); }}
-            className="btn-ghost text-white/50 hover:text-white gap-2 text-sm">
+            className="btn-ghost">
             <RefreshCw size={14} />{isCs ? 'Obnovit' : 'Refresh'}
           </button>
         </div>
@@ -171,36 +180,32 @@ export default function AdminPage() {
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           {[
-            { label: isCs ? 'Uživatelů' : 'Users',      value: stats.total,       icon: <Users size={18} />,  color: 'text-brand-500 bg-brand-500/10' },
-            { label: isCs ? 'VIP'        : 'VIP',        value: stats.vip,         icon: <Crown size={18} />,  color: 'text-yellow-500 bg-yellow-500/10' },
-            { label: isCs ? 'Adminů'     : 'Admins',     value: stats.admins,      icon: <Shield size={18} />, color: 'text-purple-500 bg-purple-500/10' },
-            { label: isCs ? 'Volné kódy' : 'Free codes', value: stats.unusedCodes, icon: <Ticket size={18} />, color: 'text-emerald-500 bg-emerald-500/10' },
+            { label: isCs ? 'Uživatelů' : 'Users',      value: stats.total,       icon: <Users size={18} />  },
+            { label: isCs ? 'VIP'        : 'VIP',        value: stats.vip,         icon: <Crown size={18} />  },
+            { label: isCs ? 'Adminů'     : 'Admins',     value: stats.admins,      icon: <Shield size={18} /> },
+            { label: isCs ? 'Volné kódy' : 'Free codes', value: stats.unusedCodes, icon: <Ticket size={18} /> },
           ].map(s => (
             <div key={s.label} className="card">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium" style={{ color: 'rgb(var(--ink-faint))' }}>{s.label}</span>
-                <span className={`p-1.5 rounded-lg ${s.color}`}>{s.icon}</span>
+                <span className="text-xs font-medium text-ink-faint">{s.label}</span>
+                <span className="p-1.5 rounded-lg text-ink-muted bg-ink/[0.06]">{s.icon}</span>
               </div>
-              <span className="text-3xl font-bold" style={{ color: 'rgb(var(--ink))' }}>{s.value}</span>
+              <span className="text-3xl font-bold text-ink tnum">{s.value}</span>
             </div>
           ))}
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-1 mb-6 bg-surface-muted p-1 rounded-xl w-fit">
+        {/* Tabs (transparent border on the inactive one: no 2px shift) */}
+        <div className="flex gap-1 mb-6 bg-surface-muted border border-line p-1 rounded-xl w-fit">
           {(['users', 'codes'] as const).map(t => (
             <button key={t} onClick={() => setTab(t)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
                 tab === t
-                  ? 'shadow-sm'
-                  : 'hover:text-[rgb(var(--ink))]'
-              }`}
-            style={tab === t
-              ? { backgroundColor: 'rgb(var(--card-bg))', color: 'rgb(var(--ink))' }
-              : { color: 'rgb(var(--ink-faint))' }
-            }>
+                  ? 'bg-surface text-ink border-line-strong'
+                  : 'border-transparent text-ink-faint hover:text-ink'
+              }`}>
               {t === 'users' ? (isCs ? 'Uživatelé' : 'Users') : (isCs ? 'Invite kódy' : 'Invite codes')}
-              <span className="ml-2 text-xs opacity-60">
+              <span className="ml-2 text-xs tnum text-ink-faint">
                 {t === 'users' ? users.length : codes.length}
               </span>
             </button>
@@ -210,66 +215,71 @@ export default function AdminPage() {
         {/* ── Users tab ── */}
         {tab === 'users' && (
           <div className="card p-0 overflow-hidden">
-            <div className="px-6 py-4 border-b border-ink/5 flex items-center gap-2">
+            <div className="px-6 py-4 border-b border-line flex items-center gap-2">
               <Users size={16} className="text-ink-faint" />
               <h2 className="font-semibold text-ink">{isCs ? 'Uživatelé' : 'Users'}</h2>
             </div>
             {loadingUsers ? (
               <div className="flex justify-center py-16">
-                <svg className="animate-spin h-6 w-6 text-brand-500" viewBox="0 0 24 24" fill="none">
+                <svg className="animate-spin h-6 w-6 text-ink-faint" viewBox="0 0 24 24" fill="none">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
                 </svg>
               </div>
             ) : (
-              <table className="w-full text-sm results-table">
-                <thead><tr>
-                  <th>{isCs ? 'Uživatel' : 'User'}</th>
-                  <th>{isCs ? 'Plán' : 'Plan'}</th>
-                  <th>{isCs ? 'Vyhledávání' : 'Searches'}</th>
-                  <th>{isCs ? 'Registrace' : 'Joined'}</th>
-                  <th>VIP</th><th>Admin</th>
-                  <th>{isCs ? 'Přístup' : 'Access'}</th>
-                </tr></thead>
-                <tbody>
-                  {users.map(user => {
-                    const isBlocked = !!user.accessExpiresAt && new Date(user.accessExpiresAt) < new Date();
-                    return (
-                    <tr key={user.id} className={isBlocked ? 'opacity-50' : ''}>
-                      <td>
-                        <div className="font-medium text-ink">{user.name || '—'}</div>
-                        <div className="text-xs text-ink-faint">{user.email}</div>
-                      </td>
-                      <td><span className={user.plan === 'PRO' ? 'badge-purple' : user.plan === 'BUSINESS' ? 'badge-green' : 'badge-yellow'}>{user.plan}</span></td>
-                      <td className="text-ink-muted">{user._count.searches}</td>
-                      <td className="text-ink-faint text-xs">{new Date(user.createdAt).toLocaleDateString(isCs ? 'cs-CZ' : 'en-US')}</td>
-                      <td>
-                        <button onClick={() => toggleVip(user)} disabled={updating === user.id + '-vip'}
-                          className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-all ${user.isVip ? 'bg-yellow-500/15 text-yellow-500 hover:bg-yellow-500/25' : 'bg-[rgb(var(--ink)/0.06)] text-[rgb(var(--ink-faint))] hover:bg-[rgb(var(--ink)/0.1)]'}`}>
-                          <Crown size={13} className={user.isVip ? 'fill-yellow-500 text-yellow-500' : ''} />
-                          {user.isVip ? 'VIP' : (isCs ? 'Přidat' : 'Grant')}
-                        </button>
-                      </td>
-                      <td>
-                        <button onClick={() => toggleAdmin(user)} disabled={updating === user.id + '-admin'}
-                          className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-all ${user.isAdmin ? 'bg-purple-500/15 text-purple-400 hover:bg-purple-500/25' : 'bg-[rgb(var(--ink)/0.06)] text-[rgb(var(--ink-faint))] hover:bg-[rgb(var(--ink)/0.1)]'}`}>
-                          <Shield size={13} />
-                          {user.isAdmin ? 'Admin' : (isCs ? 'Přidat' : 'Grant')}
-                        </button>
-                      </td>
-                      <td>
-                        {!user.isAdmin && (
-                          <button onClick={() => toggleBlock(user)} disabled={updating === user.id + '-block'}
-                            className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-all ${isBlocked ? 'bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/25' : 'bg-red-500/10 text-red-400 hover:bg-red-500/20'}`}>
-                            {isBlocked ? (isCs ? '✓ Odblokovat' : '✓ Unblock') : (isCs ? '✕ Zablokovat' : '✕ Block')}
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm results-table">
+                  <thead><tr>
+                    <th>{isCs ? 'Uživatel' : 'User'}</th>
+                    <th>{isCs ? 'Plán' : 'Plan'}</th>
+                    <th>{isCs ? 'Vyhledávání' : 'Searches'}</th>
+                    <th>{isCs ? 'Registrace' : 'Joined'}</th>
+                    <th>VIP</th><th>Admin</th>
+                    <th>{isCs ? 'Přístup' : 'Access'}</th>
+                  </tr></thead>
+                  <tbody>
+                    {users.map(user => {
+                      const isBlocked = !!user.accessExpiresAt && new Date(user.accessExpiresAt) < new Date();
+                      return (
+                      <tr key={user.id}>
+                        <td>
+                          <div className="font-medium text-ink">
+                            {user.name || '—'}
+                            {isBlocked && <span className="badge-red ml-2 align-middle">{isCs ? 'Bez přístupu' : 'No access'}</span>}
+                          </div>
+                          <div className="text-xs text-ink-faint">{user.email}</div>
+                        </td>
+                        <td><span className={user.plan === 'PRO' || user.plan === 'BUSINESS' ? BADGE_STRONG : 'badge'}>{user.plan}</span></td>
+                        <td className="text-ink-muted">{user._count.searches}</td>
+                        <td className="text-ink-faint text-xs">{new Date(user.createdAt).toLocaleDateString(isCs ? 'cs-CZ' : 'en-US')}</td>
+                        <td>
+                          <button onClick={() => toggleVip(user)} disabled={updating === user.id + '-vip'}
+                            className={user.isVip ? ROW_BTN_ON : ROW_BTN_OFF}>
+                            <Crown size={13} className={user.isVip ? 'fill-current' : ''} />
+                            {user.isVip ? 'VIP' : (isCs ? 'Přidat' : 'Grant')}
                           </button>
-                        )}
-                      </td>
-                    </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                        </td>
+                        <td>
+                          <button onClick={() => toggleAdmin(user)} disabled={updating === user.id + '-admin'}
+                            className={user.isAdmin ? ROW_BTN_ON : ROW_BTN_OFF}>
+                            <Shield size={13} />
+                            {user.isAdmin ? 'Admin' : (isCs ? 'Přidat' : 'Grant')}
+                          </button>
+                        </td>
+                        <td>
+                          {!user.isAdmin && (
+                            <button onClick={() => toggleBlock(user)} disabled={updating === user.id + '-block'}
+                              className={isBlocked ? ROW_BTN_OFF : ROW_BTN_BLOCK}>
+                              {isBlocked ? (isCs ? '✓ Odblokovat' : '✓ Unblock') : (isCs ? '✕ Zablokovat' : '✕ Block')}
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         )}
@@ -280,7 +290,7 @@ export default function AdminPage() {
             {/* Generate form */}
             <div className="card">
               <h2 className="font-semibold text-ink mb-4 flex items-center gap-2">
-                <Plus size={16} className="text-brand-600" />
+                <Plus size={16} className="text-ink-faint" />
                 {isCs ? 'Vygenerovat nové kódy' : 'Generate new codes'}
               </h2>
               <form onSubmit={generateCodes} className="grid sm:grid-cols-5 gap-3 items-end">
@@ -318,13 +328,13 @@ export default function AdminPage() {
 
             {/* Codes list */}
             <div className="card p-0 overflow-hidden">
-              <div className="px-6 py-4 border-b border-ink/5 flex items-center gap-2">
+              <div className="px-6 py-4 border-b border-line flex items-center gap-2">
                 <Ticket size={16} className="text-ink-faint" />
                 <h2 className="font-semibold text-ink">{isCs ? 'Všechny invite kódy' : 'All invite codes'}</h2>
               </div>
               {loadingCodes ? (
                 <div className="flex justify-center py-12">
-                  <svg className="animate-spin h-6 w-6 text-brand-500" viewBox="0 0 24 24" fill="none">
+                  <svg className="animate-spin h-6 w-6 text-ink-faint" viewBox="0 0 24 24" fill="none">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
                   </svg>
@@ -335,70 +345,72 @@ export default function AdminPage() {
                   {isCs ? 'Žádné invite kódy. Vygeneruj první.' : 'No invite codes yet.'}
                 </div>
               ) : (
-                <table className="w-full text-sm results-table">
-                  <thead><tr>
-                    <th>{isCs ? 'Kód' : 'Code'}</th>
-                    <th>{isCs ? 'Poznámka' : 'Note'}</th>
-                    <th>{isCs ? 'Stav' : 'Status'}</th>
-                    <th>{isCs ? 'Použil' : 'Used by'}</th>
-                    <th>{isCs ? 'Přístup' : 'Access'}</th>
-                    <th>{isCs ? 'Platnost' : 'Expires'}</th>
-                    <th>{isCs ? 'Vytvořeno' : 'Created'}</th>
-                    <th>{isCs ? 'Akce' : 'Actions'}</th>
-                  </tr></thead>
-                  <tbody>
-                    {codes.map(c => {
-                      const used    = Boolean(c.usedAt);
-                      const expired = c.expiresAt ? new Date(c.expiresAt) < new Date() : false;
-                      const isCopied = copiedId === c.id;
-                      return (
-                        <tr key={c.id}>
-                          <td>
-                            <span className="font-mono font-bold text-ink tracking-wider">{c.code}</span>
-                          </td>
-                          <td className="text-ink-muted">{c.note || '—'}</td>
-                          <td>
-                            {used
-                              ? <span className="badge badge-green text-xs">✓ {isCs ? 'Použit' : 'Used'}</span>
-                              : expired
-                                ? <span className="badge badge-red text-xs">{isCs ? 'Expirován' : 'Expired'}</span>
-                                : <span className="badge badge-yellow text-xs">⏳ {isCs ? 'Volný' : 'Available'}</span>}
-                          </td>
-                          <td className="text-ink-faint text-xs">
-                            {c.usedByUser ? (c.usedByUser.name || c.usedByUser.email) : '—'}
-                          </td>
-                          <td className="text-ink-faint text-xs">
-                            {c.accessDurationMinutes
-                              ? <span className="text-orange-500 font-medium">{c.accessDurationMinutes} min</span>
-                              : <span>∞</span>}
-                          </td>
-                          <td className="text-ink-faint text-xs">
-                            {c.expiresAt ? new Date(c.expiresAt).toLocaleDateString(isCs ? 'cs-CZ' : 'en-US') : '∞'}
-                          </td>
-                          <td className="text-ink-faint text-xs">
-                            {new Date(c.createdAt).toLocaleDateString(isCs ? 'cs-CZ' : 'en-US')}
-                          </td>
-                          <td>
-                            <div className="flex items-center gap-1">
-                              {!used && (
-                                <button onClick={() => copyCode(c)} title={isCs ? 'Kopírovat odkaz pro registraci' : 'Copy registration link'}
-                                  className={`p-1.5 rounded-lg transition-all ${isCopied ? 'bg-emerald-500/15 text-emerald-400' : 'text-[rgb(var(--ink-faint))] hover:text-brand-500 hover:bg-brand-500/10'}`}>
-                                  {isCopied ? <Check size={14} /> : <Link2 size={14} />}
-                                </button>
-                              )}
-                              {!used && (
-                                <button onClick={() => deleteCode(c.id)} title={isCs ? 'Smazat kód' : 'Delete code'}
-                                  className="p-1.5 rounded-lg transition-all text-[rgb(var(--ink-faint))] hover:text-red-400 hover:bg-red-500/10">
-                                  <Trash2 size={14} />
-                                </button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm results-table">
+                    <thead><tr>
+                      <th>{isCs ? 'Kód' : 'Code'}</th>
+                      <th>{isCs ? 'Poznámka' : 'Note'}</th>
+                      <th>{isCs ? 'Stav' : 'Status'}</th>
+                      <th>{isCs ? 'Použil' : 'Used by'}</th>
+                      <th>{isCs ? 'Přístup' : 'Access'}</th>
+                      <th>{isCs ? 'Platnost' : 'Expires'}</th>
+                      <th>{isCs ? 'Vytvořeno' : 'Created'}</th>
+                      <th>{isCs ? 'Akce' : 'Actions'}</th>
+                    </tr></thead>
+                    <tbody>
+                      {codes.map(c => {
+                        const used    = Boolean(c.usedAt);
+                        const expired = c.expiresAt ? new Date(c.expiresAt) < new Date() : false;
+                        const isCopied = copiedId === c.id;
+                        return (
+                          <tr key={c.id}>
+                            <td>
+                              <span className="font-mono font-bold text-ink tracking-wider">{c.code}</span>
+                            </td>
+                            <td className="text-ink-muted">{c.note || '—'}</td>
+                            <td>
+                              {used
+                                ? <span className="badge text-xs">✓ {isCs ? 'Použit' : 'Used'}</span>
+                                : expired
+                                  ? <span className="badge badge-red text-xs">{isCs ? 'Expirován' : 'Expired'}</span>
+                                  : <span className={`${BADGE_STRONG} text-xs`}>⏳ {isCs ? 'Volný' : 'Available'}</span>}
+                            </td>
+                            <td className="text-ink-faint text-xs">
+                              {c.usedByUser ? (c.usedByUser.name || c.usedByUser.email) : '—'}
+                            </td>
+                            <td className="text-ink-faint text-xs">
+                              {c.accessDurationMinutes
+                                ? <span className="text-ink font-medium tnum">{c.accessDurationMinutes} min</span>
+                                : <span>∞</span>}
+                            </td>
+                            <td className="text-ink-faint text-xs">
+                              {c.expiresAt ? new Date(c.expiresAt).toLocaleDateString(isCs ? 'cs-CZ' : 'en-US') : '∞'}
+                            </td>
+                            <td className="text-ink-faint text-xs">
+                              {new Date(c.createdAt).toLocaleDateString(isCs ? 'cs-CZ' : 'en-US')}
+                            </td>
+                            <td>
+                              <div className="flex items-center gap-1">
+                                {!used && (
+                                  <button onClick={() => copyCode(c)} title={isCs ? 'Kopírovat odkaz pro registraci' : 'Copy registration link'}
+                                    className={`p-1.5 rounded-lg transition-colors ${isCopied ? 'text-ink bg-ink/10' : 'text-ink-faint hover:text-accent hover:bg-ink/[0.06]'}`}>
+                                    {isCopied ? <Check size={14} /> : <Link2 size={14} />}
+                                  </button>
+                                )}
+                                {!used && (
+                                  <button onClick={() => deleteCode(c.id)} title={isCs ? 'Smazat kód' : 'Delete code'}
+                                    className="p-1.5 rounded-lg transition-colors text-ink-faint hover:text-accent hover:bg-ink/[0.06]">
+                                    <Trash2 size={14} />
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
           </div>

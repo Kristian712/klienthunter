@@ -103,9 +103,9 @@ const STEPS: Array<[Text, Text]> = [
   ],
   [
     { cs: 'Seřadíme podle tvých kritérií', sk: 'Zoradíme podľa tvojich kritérií', en: 'We rank by your criteria' },
-    // Export do Excelu je zamčený za plán PRO, který si zatím nikdo koupit nemůže (žádné platby
-    // neexistují). Slibovat ho na titulce by byl přesně ten druh tvrzení, kvůli kterému šly z
-    // ceníku pryč vymyšlené funkce. CSV dostane každý, tak se píše jen CSV.
+    // Export do Excelu mají jen placené tarify (API ho váže na tarif, viz /api/export). Krok
+    // popisuje, co dostane každý účet včetně bezplatného, takže se píše jen CSV — Excel by tu byl
+    // slib, který většina čtenářů po registraci nedostane.
     { cs: 'Nahoře je firma, která splňuje nejvíc z toho, co sis nastavil. U každé vidíš, co přesně splnila. Výsledky si stáhneš v CSV.',
       sk: 'Hore je firma, ktorá spĺňa najviac z toho, čo si si nastavil. Pri každej vidíš, čo presne splnila. Výsledky si stiahneš v CSV.',
       en: 'Top of the list is whoever meets most of what you set. Each row shows exactly what it met. Download the results as CSV.' },
@@ -145,9 +145,12 @@ const FAQ: Array<{ q: Text; a: Text }> = [
   },
   {
     q: { cs: 'Je to zdarma?', sk: 'Je to zadarmo?', en: 'Is it free?' },
-    a: { cs: 'Základní plán je zdarma – 5 vyhledávání měsíčně, 20 výsledků každé. Registrace je zatím na pozvánku.',
-         sk: 'Základný plán je zadarmo – 5 vyhľadávaní mesačne, 20 výsledkov každé. Registrácia je zatiaľ na pozvánku.',
-         en: 'The basic plan is free – 5 searches a month, 20 results each. Registration is currently invite-only.' },
+    // Čísla musí sedět s aplikací: limity a délka zkušebního období v `lib/plans.ts`, ceny
+    // v `PRICE_CZK` na ceníku. Limit vyhledávání je klouzavých 30 dní, ne kalendářní měsíc.
+    // `\u00a0` je nezlomitelná mezera, aby se „1 499 Kč" nerozdělilo na dva řádky.
+    a: { cs: 'Základní plán je zdarma — 5 vyhledávání za 30 dní, 20 výsledků každé, bez platební karty. Kdo potřebuje víc, má Pro za 499\u00a0Kč nebo Business za 1\u00a0499\u00a0Kč měsíčně; při první objednávce je prvních 7 dní zdarma.',
+         sk: 'Základný plán je zadarmo — 5 vyhľadávaní za 30 dní, 20 výsledkov každé, bez platobnej karty. Kto potrebuje viac, má Pro za 499\u00a0Kč alebo Business za 1\u00a0499\u00a0Kč mesačne; pri prvej objednávke je prvých 7 dní zadarmo.',
+         en: 'The basic plan is free — 5 searches every 30 days, 20 results each, no card required. If you need more, there is Pro at CZK\u00a0499 or Business at CZK\u00a01,499 a month; the first 7 days of your first order are free.' },
   },
   {
     q: { cs: 'Mohu nahrát vlastní seznam firem?', sk: 'Môžem nahrať vlastný zoznam firiem?', en: 'Can I upload my own list?' },
@@ -189,7 +192,7 @@ export default function HomePage() {
   const t = (text: Text) => localized(text, locale);
 
   return (
-    <div className="bg-white">
+    <div>
 
       {/* ── Hero: one headline, one line, one button ── */}
       <section className="px-5 pt-32 pb-16 md:pt-44 md:pb-24">
@@ -231,7 +234,7 @@ export default function HomePage() {
                 <div
                   key={d.name}
                   className="stagger row flex items-center gap-5 py-5 pl-4 border-l-[3px]"
-                  style={{ '--i': i, borderLeftColor: score >= GOOD_LEAD ? '#e63900' : 'transparent' } as React.CSSProperties}
+                  style={{ '--i': i, borderLeftColor: score >= GOOD_LEAD ? 'rgb(var(--accent))' : 'transparent' } as React.CSSProperties}
                 >
                   <LeadScore value={score} />
                   <div className="min-w-0 flex-1">

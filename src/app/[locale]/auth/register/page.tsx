@@ -121,7 +121,7 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen flex">
       {/* Left panel */}
-      <div className="hidden lg:flex flex-col justify-between w-[420px] shrink-0 p-10 border-r border-line">
+      <div className="hidden lg:flex flex-col justify-between w-[420px] shrink-0 p-10 bg-surface-subtle border-r border-line">
         <Link href={`/${locale}`} className="font-extrabold text-[17px] tracking-tight">
           KlientHunter<span className="text-accent">.</span>
         </Link>
@@ -170,7 +170,7 @@ export default function RegisterPage() {
               </p>
             </div>
 
-            <div className="border-t border-ink/5 pt-4">
+            <div className="border-t border-line pt-4">
               <div>
                 <label className="label">{t('name_label')}</label>
                 <div className="relative">
@@ -205,11 +205,11 @@ export default function RegisterPage() {
 
             <p className="text-[11px] leading-relaxed text-ink-faint">
               {localized(UI.consent.before, locale)}
-              <Link href={`/${locale}/terms`} className="text-ink underline underline-offset-2 hover:text-accent transition-colors">
+              <Link href={`/${locale}/terms`} className="text-accent underline underline-offset-2 decoration-accent/40 hover:decoration-accent transition-colors">
                 {localized(UI.consent.terms, locale)}
               </Link>
               {localized(UI.consent.middle, locale)}
-              <Link href={`/${locale}/privacy`} className="text-ink underline underline-offset-2 hover:text-accent transition-colors">
+              <Link href={`/${locale}/privacy`} className="text-accent underline underline-offset-2 decoration-accent/40 hover:decoration-accent transition-colors">
                 {localized(UI.consent.privacy, locale)}
               </Link>
               {localized(UI.consent.after, locale)}
@@ -231,7 +231,7 @@ export default function RegisterPage() {
 
           <p className="text-center text-sm text-ink-faint mt-6">
             {t('have_account')}{' '}
-            <Link href={`/${locale}/auth/login`} className="font-medium text-ink underline underline-offset-2 hover:text-accent transition-colors">
+            <Link href={`/${locale}/auth/login`} className="font-medium text-accent underline underline-offset-2 decoration-accent/40 hover:decoration-accent transition-colors">
               {t('login_link')}
             </Link>
           </p>

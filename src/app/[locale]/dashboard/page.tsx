@@ -91,7 +91,7 @@ export default function DashboardPage() {
         <h1 className="text-3xl font-bold">
           {user?.name ? `${isCs ? 'Vítejte' : 'Welcome'}, ${user.name}!` : (isCs ? 'Přehled' : 'Dashboard')}
         </h1>
-        <div className="flex items-center gap-2 border border-line rounded-lg px-4 py-2">
+        <div className="flex items-center gap-2 border border-line-strong rounded-lg px-4 py-2">
           <Crown size={16} className="text-ink-faint" />
           <span className="text-sm font-medium text-ink">
             {PLAN_LABELS[user?.plan ?? 'FREE']}

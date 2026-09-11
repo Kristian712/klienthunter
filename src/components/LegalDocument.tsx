@@ -65,7 +65,7 @@ export function LegalDocument({
               <ul className="mt-3 space-y-1.5">
                 {block.bullets.map((b, j) => (
                   <li key={j} className="flex gap-2.5 text-ink-muted leading-relaxed">
-                    <span className="mt-2 h-px w-3 shrink-0 bg-line" aria-hidden />
+                    <span className="mt-2 h-px w-3 shrink-0 bg-ink-faint" aria-hidden />
                     <span>{t(b)}</span>
                   </li>
                 ))}
@@ -80,7 +80,7 @@ export function LegalDocument({
         {OPERATOR.address && ` · ${OPERATOR.address}`}
         {OPERATOR.ico && ` · IČO ${OPERATOR.ico}`}
         {' · '}
-        <a href={`mailto:${OPERATOR.email}`} className="text-ink underline underline-offset-2 hover:text-accent transition-colors">
+        <a href={`mailto:${OPERATOR.email}`} className="text-accent underline underline-offset-2 decoration-accent/40 hover:decoration-accent transition-colors">
           {OPERATOR.email}
         </a>
       </p>

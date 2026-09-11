@@ -24,7 +24,7 @@ export default function ContactPage() {
   };
 
   return (
-    <div className="min-h-screen bg-surface-subtle pt-16">
+    <div className="min-h-screen pt-16">
       <div className="max-w-2xl mx-auto px-4 py-16">
         <div className="text-center mb-12">
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg border border-line text-ink mb-4">
@@ -73,7 +73,7 @@ export default function ContactPage() {
             </button>
             <p className="text-xs text-ink-faint text-center">
               {isCs ? 'Nebo nás kontaktujte přímo: ' : 'Or contact us directly: '}
-              <a href={`mailto:${OPERATOR.email}`} className="text-ink underline underline-offset-2 hover:text-accent transition-colors">{OPERATOR.email}</a>
+              <a href={`mailto:${OPERATOR.email}`} className="text-accent underline underline-offset-2 decoration-accent/40 hover:decoration-accent transition-colors">{OPERATOR.email}</a>
             </p>
           </form>
         )}

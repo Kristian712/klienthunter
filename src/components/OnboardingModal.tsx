@@ -114,12 +114,15 @@ export function OnboardingModal({ locale, initial, onDone }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-ink/40 flex items-start md:items-center justify-center overflow-y-auto p-4"
+      className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-start md:items-center justify-center overflow-y-auto p-4"
       role="dialog"
       aria-modal="true"
       aria-label={localized(T.title, locale)}
     >
-      <div className="bg-white border border-ink w-full max-w-2xl my-4">
+      {/* On dark the panel and the dimmed page differ by only about 1.1 : 1. The line-strong
+          edge is what separates them; the shadow barely shows on the near-black scrim and only
+          helps over brighter content, so the border must stay. */}
+      <div className="bg-surface-subtle border border-line-strong shadow-[0_24px_64px_rgba(0,0,0,.6)] w-full max-w-2xl my-4">
 
         <div className="flex items-start justify-between gap-6 px-6 pt-6 pb-4 border-b border-line">
           <div className="min-w-0">

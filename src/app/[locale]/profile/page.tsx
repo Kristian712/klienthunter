@@ -29,6 +29,14 @@ interface ProfileData {
 
 const PLAN_LABELS: Record<string, string> = { FREE: 'Zdarma', PRO: 'Pro', BUSINESS: 'Business' };
 
+/** „zbývá 1 den / zbývají 3 dny / zbývá 5 dní“ — čeština se skloňuje podle čísla. */
+function daysLeftText(n: number, cs: boolean): string {
+  if (!cs) return `${n} ${n === 1 ? 'day' : 'days'} left`;
+  if (n === 1) return 'zbývá 1 den';
+  if (n >= 2 && n <= 4) return `zbývají ${n} dny`;
+  return `zbývá ${n} dní`;
+}
+
 const T = {
   title:      { cs: 'Koho hledáte',  sk: 'Koho hľadáte',  en: 'Who you are looking for' },
   lead:       { cs: 'Odpovědi z úvodního dotazníku. Předvyplňují hledání a určují pořadí výsledků — nic neodfiltrují.',
@@ -161,11 +169,12 @@ export default function ProfilePage() {
   );
 
   const { user, searches, totalResults } = data;
+  const trialDays = trialDaysLeft(user);
 
   return (
-    <div className="min-h-screen bg-surface-subtle pt-16">
+    <div className="min-h-screen pt-16">
       {toast && (
-        <div className="fixed top-20 right-4 z-50 bg-ink text-white text-sm px-4 py-3 rounded-lg animate-fade-in">
+        <div className="fixed top-20 right-4 z-50 bg-surface-muted text-ink border border-line-strong shadow-[0_12px_32px_rgba(0,0,0,.55)] text-sm px-4 py-3 rounded-lg animate-fade-in">
           {toast}
         </div>
       )}
@@ -185,7 +194,7 @@ export default function ProfilePage() {
                   <div className="flex items-center gap-2">
                     <input className="input py-1 text-lg font-bold w-48" value={nameVal}
                       onChange={e => setNameVal(e.target.value)} autoFocus />
-                    <button onClick={saveName} disabled={saving} className="p-1.5 rounded-lg bg-ink text-white hover:bg-ink/85 transition-colors">
+                    <button onClick={saveName} disabled={saving} className="p-1.5 rounded-lg bg-accent text-accent-ink hover:bg-accent-hover transition-colors">
                       <Check size={15} />
                     </button>
                     <button onClick={() => setEditName(false)} className="p-1.5 rounded-lg bg-ink/5 text-ink-faint hover:bg-ink/10">
@@ -266,17 +275,25 @@ export default function ProfilePage() {
             </p>
           )}
 
-          {trialDaysLeft(user) !== null && (
+          {/* Když předplatné běží, zkušební období i se zbývajícími dny ukazuje řádek níž.
+              Sem patří jen případ, kdy je stav pořád „trialing“, ale `currentPeriodEnd` už uplynul. */}
+          {trialDays !== null && !hasActiveSubscription(user) && (
             <p className="mt-3 text-sm text-ink-muted tnum">
-              {isCs
-                ? `Zkušební období, zbývá ${trialDaysLeft(user)} dní.`
-                : `Trial period, ${trialDaysLeft(user)} days left.`}
+              {isCs ? 'Zkušební období, ' : 'Trial period, '}
+              {daysLeftText(trialDays, isCs)}.
             </p>
           )}
 
           {hasActiveSubscription(user) ? (
             <>
-              {user.currentPeriodEnd && (
+              {/* Ve zkušebním období se ještě nic nezaplatilo, „Zaplaceno do“ by nebyla pravda. */}
+              {trialDays !== null && user.trialEndsAt ? (
+                <p className="mt-3 text-sm text-ink-muted tnum">
+                  {isCs ? 'Zkušební období do ' : 'Trial until '}
+                  {new Date(user.trialEndsAt).toLocaleDateString(isCs ? 'cs-CZ' : 'en-US')}
+                  {', '}{daysLeftText(trialDays, isCs)}.
+                </p>
+              ) : user.currentPeriodEnd && (
                 <p className="mt-3 text-sm text-ink-muted tnum">
                   {isCs ? 'Zaplaceno do ' : 'Paid until '}
                   {new Date(user.currentPeriodEnd).toLocaleDateString(isCs ? 'cs-CZ' : 'en-US')}
@@ -301,7 +318,7 @@ export default function ProfilePage() {
           ) : (
             <p className="mt-3 text-sm text-ink-muted">
               {isCs ? 'Žádné předplatné neběží. ' : 'No active subscription. '}
-              <Link href={`/${locale}/pricing`} className="text-ink underline underline-offset-2 hover:text-accent transition-colors">
+              <Link href={`/${locale}/pricing`} className="text-accent underline underline-offset-2 decoration-accent/40 hover:decoration-accent transition-colors">
                 {isCs ? 'Ceník' : 'Pricing'}
               </Link>
             </p>
@@ -385,7 +402,7 @@ export default function ProfilePage() {
 
         {/* Search history */}
         <div className="card p-0 overflow-hidden">
-          <div className="px-6 py-4 border-b border-ink/5">
+          <div className="px-6 py-4 border-b border-line">
             <h2 className="font-semibold text-ink flex items-center gap-2">
               <Search size={16} className="text-ink-faint" />
               {isCs ? 'Historie vyhledávání' : 'Search history'}
@@ -418,9 +435,7 @@ export default function ProfilePage() {
                     <td className="text-ink-faint text-xs">
                       {new Date(s.createdAt).toLocaleDateString(isCs ? 'cs-CZ' : 'en-US')}
                       {' '}
-                      <span className="opacity-60">
-                        {new Date(s.createdAt).toLocaleTimeString(isCs ? 'cs-CZ' : 'en-US', { hour: '2-digit', minute: '2-digit' })}
-                      </span>
+                      {new Date(s.createdAt).toLocaleTimeString(isCs ? 'cs-CZ' : 'en-US', { hour: '2-digit', minute: '2-digit' })}
                     </td>
                   </tr>
                 ))}

@@ -29,7 +29,28 @@ const UI = {
   sources: { cs: 'Data z ARESu a OpenStreetMap.',
              sk: 'Dáta z ARESu a OpenStreetMap.',
              en: 'Data from ARES and OpenStreetMap.' },
+  // Stejný název, jaký nese stránka /terms i souhlas u registrace — jinak by odkaz sliboval jiný dokument.
+  terms:   { cs: 'Podmínky použití',       sk: 'Podmienky používania',    en: 'Terms of Service' },
+  privacy: { cs: 'Ochrana osobních údajů', sk: 'Ochrana osobných údajov', en: 'Privacy Policy' },
 };
+
+/** Odkaz v textu: akcent s tlumeným podtržením, které na hover zesílí. */
+const LINK = 'text-accent underline underline-offset-2 decoration-accent/40 hover:decoration-accent transition-colors';
+
+/**
+ * Podmínky a ochrana údajů. Navigace i patička jsou na /auth schované, takže jinak by se
+ * z přihlášení k těm dokumentům nedalo dostat. Na velké obrazovce sedí pod uvedením zdrojů
+ * v levém panelu, na menší (kde panel není) pod formulářem.
+ */
+function LegalLinks({ locale, className }: { locale: string; className?: string }) {
+  return (
+    <p className={className}>
+      <Link href={`/${locale}/terms`} className={LINK}>{localized(UI.terms, locale)}</Link>
+      <span aria-hidden="true" className="mx-2">·</span>
+      <Link href={`/${locale}/privacy`} className={LINK}>{localized(UI.privacy, locale)}</Link>
+    </p>
+  );
+}
 
 export default function LoginPage() {
   const t = useTranslations('auth');
@@ -67,16 +88,18 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex">
-      <div className="hidden lg:flex flex-col justify-between w-[420px] shrink-0 p-10 border-r border-line">
+      {/* Panel má vlastní plochu: bez ní by na tmavém podkladu splynul s formulářem v jednu černou plochu. */}
+      <div className="hidden lg:flex flex-col justify-between w-[420px] shrink-0 p-10 bg-surface-subtle border-r border-line">
         <Link href={`/${locale}`} className="font-extrabold text-[17px] tracking-tight">
           KlientHunter<span className="text-accent">.</span>
         </Link>
         <p className="display-sm leading-[0.9]">
           {localized(UI.welcome, locale)}<span className="text-accent">.</span>
         </p>
-        <p className="text-sm text-ink-faint">
-          {localized(UI.sources, locale)}
-        </p>
+        <div className="text-sm text-ink-faint space-y-2">
+          <p>{localized(UI.sources, locale)}</p>
+          <LegalLinks locale={locale} />
+        </div>
       </div>
 
       <div className="flex-1 flex items-center justify-center px-4">
@@ -118,10 +141,11 @@ export default function LoginPage() {
           </form>
           <p className="text-center text-sm text-ink-faint mt-6">
             {t('no_account')}{' '}
-            <Link href={`/${locale}/auth/register`} className="font-medium text-ink underline underline-offset-2 hover:text-accent transition-colors">
+            <Link href={`/${locale}/auth/register`} className={`font-medium ${LINK}`}>
               {t('register_link')}
             </Link>
           </p>
+          <LegalLinks locale={locale} className="lg:hidden text-center text-xs text-ink-faint mt-8" />
         </div>
       </div>
     </div>

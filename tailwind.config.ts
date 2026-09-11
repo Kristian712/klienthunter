@@ -22,15 +22,6 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        /**
-         * Stará oranžová řada. Používá ji už jen admin a zmizí, jakmile se přepíše na `accent`.
-         * Kroky ukazují na tentýž akcent, aby do té doby nebyly na webu dvě různé oranžové.
-         */
-        brand: {
-          400: 'rgb(var(--accent) / <alpha-value>)',
-          500: 'rgb(var(--accent) / <alpha-value>)',
-          600: 'rgb(var(--accent) / <alpha-value>)',
-        },
         accent: {
           DEFAULT: 'rgb(var(--accent) / <alpha-value>)',
           /** Hover akcentového tlačítka. O stupeň světlejší, text na něm je pořád tmavý. */
