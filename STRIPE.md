@@ -69,14 +69,10 @@ stripe login
    do `.env` jako `STRIPE_WEBHOOK_SECRET` (jen pro lokální běh, v produkci je jiný):
 
 ```bash
-stripe listen --forward-to localhost:3000/api/stripe-webhook
-```
-
-Pozor na cestu: endpoint téhle aplikace je **`/api/stripe/webhook`** (lomítko, ne pomlčka):
-
-```bash
 stripe listen --forward-to localhost:3000/api/stripe/webhook
 ```
+
+Pozor na cestu: endpoint je **`/api/stripe/webhook`** — lomítko, ne pomlčka.
 
 3. V druhém okně spusť aplikaci a projdi nákup přes ceník.
 
@@ -89,8 +85,13 @@ stripe trigger customer.subscription.updated
 ## Nastavení v produkci
 
 1. **Produkty.** Product catalog → dva produkty, každý s měsíční cenou v CZK:
-   Pro 499 Kč, Business 1 499 Kč. Zkušební období se nastavuje u ceny (`trial period`)
-   a Checkout ho převezme sám.
+   Pro 499 Kč, Business 1 499 Kč.
+
+   **Zkušební období aplikace nenabízí.** Checkout ho z ceny nepřevezme — zkušební doba
+   nastavená u ceny v dashboardu se u Checkout Session ignoruje a jde jen parametrem
+   `subscription_data.trial_period_days` při zakládání session. Kdyby se mělo zapnout, je to
+   jeden řádek v `src/app/api/stripe/checkout/route.ts`; webhook i UI (`trialing`, odpočet dní)
+   už s ním počítají.
 2. **Webhook.** Developers → Webhooks → Add endpoint:
    - URL `https://klienthunter.vercel.app/api/stripe/webhook`
    - události: `checkout.session.completed`, `customer.subscription.created`,
@@ -98,7 +99,7 @@ stripe trigger customer.subscription.updated
    - po uložení zkopíruj **Signing secret** do `STRIPE_WEBHOOK_SECRET` na Vercelu
 3. **Portál.** Settings → Billing → Customer portal → zapnout, povolit zrušení a změnu tarifu,
    přidat oba produkty. Bez toho tlačítko „Správa předplatného" vrátí chybu.
-4. Po uložení proměnných na Vercelu **nasadit znovu** — proměnné se načítají při buildu.
+4. Po uložení proměnných na Vercelu **nasadit znovu** — nová hodnota platí až pro nové nasazení.
 
 ## Testovací karty
 
@@ -114,8 +115,8 @@ Datum expirace libovolné budoucí, CVC libovolné tři číslice.
 
 - [ ] **Nákup.** Ceník → Koupit → testovací karta. Do pár vteřin se na ceníku ukáže „Váš tarif".
       V databázi má uživatel `plan`, `stripeSubscriptionId` a `subscriptionStatus`.
-- [ ] **Zkušební období.** Když je u ceny nastavené, po nákupu je stav `trialing` a na ceníku
-      i v profilu se ukazuje, kolik dní zbývá.
+- [ ] **Zkušební období** (jen pokud se v Checkoutu zapne `trial_period_days`). Po nákupu je
+      stav `trialing` a na ceníku i v profilu se ukazuje, kolik dní zbývá.
 - [ ] **Konec zkušebního období.** Ve Stripe u předplatného Actions → *End trial now*.
       Stav přeskočí na `active`, tarif zůstává.
 - [ ] **Neúspěšná platba.** `stripe trigger invoice.payment_failed`, nebo karta `…0341` a počkat
