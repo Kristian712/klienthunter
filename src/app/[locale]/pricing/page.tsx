@@ -6,7 +6,7 @@ import { useLocale } from 'next-intl';
 import { Check } from 'lucide-react';
 import { localized } from '@/lib/lead-filters';
 import { OPERATOR } from '@/lib/legal';
-import { PLAN_LIMITS } from '@/lib/plans';
+import { PLAN_LIMITS, TRIAL_DAYS, trialDaysFor } from '@/lib/plans';
 import { paymentFailing, trialDaysLeft } from '@/lib/subscription';
 
 /**
@@ -89,6 +89,8 @@ const T = {
   register:  { cs: 'Mám kód pozvánky',     sk: 'Mám kód pozvánky',      en: 'I have an invite code' },
   login:     { cs: 'Přihlásit se a koupit', sk: 'Prihlásiť sa a kúpiť', en: 'Sign in to buy' },
   buy:       { cs: 'Koupit',               sk: 'Kúpiť',                 en: 'Buy' },
+  tryFree:   { cs: 'Vyzkoušet zdarma',     sk: 'Vyskúšať zadarmo',      en: 'Try it free' },
+  trialLine: { cs: '{n} dní zdarma',       sk: '{n} dní zadarmo',       en: '{n} days free' },
   current:   { cs: 'Váš tarif',            sk: 'Váš tarif',             en: 'Your plan' },
   manage:    { cs: 'Spravovat předplatné', sk: 'Spravovať predplatné',  en: 'Manage subscription' },
   unlimited: { cs: 'Máte neomezený přístup, tarify se vás netýkají.',
@@ -198,6 +200,8 @@ export default function PricingPage() {
 
   const unlimited = Boolean(me && (me.isAdmin || me.isVip));
   const trialDays = me ? trialDaysLeft(me) : null;
+  /** Dostane tenhle návštěvník v Checkoutu zkušební období? Nepřihlášený = budoucí nový účet = ano. */
+  const trialEligible = me === null || (me !== undefined && trialDaysFor(me.subscriptionStatus) !== undefined);
   const currentPlan: PlanId = me && PLANS.includes(me.plan as PlanId) ? (me.plan as PlanId) : 'FREE';
 
   /** Tlačítko pod tarifem — podle toho, kdo se dívá. */
@@ -207,7 +211,7 @@ export default function PricingPage() {
     if (!me) {
       return (
         <Link href={`/${locale}/auth/${plan === 'FREE' ? 'register' : 'login'}`} className={`${plan === 'FREE' ? 'btn-primary' : 'btn-outline'} mt-6 inline-flex`}>
-          {t(plan === 'FREE' ? T.register : T.login)}
+          {t(plan === 'FREE' ? T.register : T.tryFree)}
         </Link>
       );
     }
@@ -232,7 +236,7 @@ export default function PricingPage() {
 
     return (
       <button type="button" onClick={() => buy(plan)} disabled={busy !== null} className="btn-primary mt-6 inline-flex disabled:opacity-60">
-        {busy === plan ? t(T.working) : t(T.buy)}
+        {busy === plan ? t(T.working) : t(trialEligible ? T.tryFree : T.buy)}
       </button>
     );
   };
@@ -316,6 +320,13 @@ export default function PricingPage() {
                   </div>
 
                   {plan === 'FREE' && <p className="mt-2 text-sm text-ink-muted">{t(T.freeNote)}</p>}
+                  {/* Jen kdo trial opravdu dostane. Kdo už předplatné měl, ho v Checkoutu nedostane,
+                      a slibovat mu ho tady by byla lež přímo pod cenou. */}
+                  {plan !== 'FREE' && trialEligible && !unlimited && !isCurrent && !(me && me.hasSubscription) && (
+                    <p className="mt-2 text-sm font-semibold text-accent">
+                      {t(T.trialLine).replace('{n}', String(TRIAL_DAYS))}
+                    </p>
+                  )}
                   {isCurrent && plan !== 'FREE' && me?.currentPeriodEnd && (
                     <p className="mt-2 text-sm text-ink-muted tnum">
                       {t(T.renews).replace('{d}', new Date(me.currentPeriodEnd).toLocaleDateString(locale === 'en' ? 'en-GB' : 'cs-CZ'))}
