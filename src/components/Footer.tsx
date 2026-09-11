@@ -26,7 +26,7 @@ const T = {
   contact:  { cs: 'Kontakt',   sk: 'Kontakt',   en: 'Contact' },
   legal:    { cs: 'Právní',    sk: 'Právne',    en: 'Legal' },
   privacy:  { cs: 'Ochrana údajů', sk: 'Ochrana údajov', en: 'Privacy' },
-  terms:    { cs: 'Podmínky',  sk: 'Podmienky', en: 'Terms' },
+  terms:    { cs: 'Obchodní podmínky', sk: 'Obchodné podmienky', en: 'Terms of Service' },
   language: { cs: 'Jazyk',     sk: 'Jazyk',     en: 'Language' },
   sources: {
     cs: `Data: ARES a živnostenský rejstřík (MF ČR), registr plátců DPH (FS ČR), ${OSM_ATTRIBUTION_L.cs}`,
@@ -76,7 +76,13 @@ export function Footer({ locale }: { locale: string }) {
         </div>
 
         <div className="border-t border-line mt-10 pt-6 flex flex-col md:flex-row justify-between gap-2 text-xs text-ink-faint">
-          <span>© 2026 KlientHunter · {OPERATOR.name}</span>
+          {/* Jméno, IČO a sídlo na každé stránce: § 435 obč. zák. je u podnikatele chce na webu,
+              ne jen schované v podmínkách. */}
+          <span>
+            © 2026 KlientHunter · {OPERATOR.name}
+            {OPERATOR.ico && ` · IČO ${OPERATOR.ico}`}
+            {OPERATOR.address && ` · ${OPERATOR.address}`}
+          </span>
           <span>{t(T.sources)}</span>
         </div>
       </div>

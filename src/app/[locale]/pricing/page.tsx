@@ -6,7 +6,7 @@ import { useLocale } from 'next-intl';
 import { Check } from 'lucide-react';
 import { localized } from '@/lib/lead-filters';
 import { OPERATOR } from '@/lib/legal';
-import { PLAN_LIMITS, TRIAL_DAYS, trialDaysFor } from '@/lib/plans';
+import { PLAN_LIMITS, PLAN_PRICES_CZK, TRIAL_DAYS, trialDaysFor } from '@/lib/plans';
 import { paymentFailing, trialDaysLeft } from '@/lib/subscription';
 
 /**
@@ -26,8 +26,12 @@ import { paymentFailing, trialDaysLeft } from '@/lib/subscription';
  * že tarif už platí, ani že se platilo — při prvním nákupu běží zkušební období a nestrhlo se nic.
  */
 
-/** Cena za měsíc v Kč. Musí se rovnat ceně nastavené ve Stripe (STRIPE_PRICE_*). */
-const PRICE_CZK: Record<'PRO' | 'BUSINESS', number> = { PRO: 499, BUSINESS: 1499 };
+/**
+ * Cena za měsíc v Kč. Musí se rovnat ceně nastavené ve Stripe (STRIPE_PRICE_*). Bere se
+ * z `lib/plans.ts`, odkud ji čtou i obchodní podmínky — ceník a smlouva tak nemůžou uvádět
+ * dvě různé částky.
+ */
+const PRICE_CZK: Record<'PRO' | 'BUSINESS', number> = PLAN_PRICES_CZK;
 
 type PaidPlan = 'PRO' | 'BUSINESS';
 type PlanId = 'FREE' | PaidPlan;

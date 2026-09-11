@@ -1,23 +1,23 @@
 import { localized } from '@/lib/lead-filters';
-import { LEGAL_UPDATED, OPERATOR, OPERATOR_INCOMPLETE, type LegalBlock } from '@/lib/legal';
+import { HOSTING_UNVERIFIED, LEGAL_UPDATED, OPERATOR, OPERATOR_INCOMPLETE, type LegalBlock } from '@/lib/legal';
 
 /**
  * Renders a legal document from data, so the Czech, Slovak and English versions cannot drift
  * apart the way they did when each page hand-wrote `isCs ? '…' : '…'` — which silently served
  * Czech to every Slovak visitor and had no third branch at all.
  *
- * The warning strip at the top is deliberate. If the operator is not yet identified (see
- * `OPERATOR` in lib/legal.ts), the page says so out loud instead of quietly shipping a privacy
- * policy that names nobody. An unfinished document that admits it is unfinished is honest; one
- * that looks complete is a trap for whoever reads it.
+ * The warning strip at the top is deliberate. If the operator is not fully identified or the
+ * hosting facts are not verified (see `OPERATOR` and `HOSTING` in lib/legal.ts), the page says so
+ * out loud instead of quietly shipping a document that looks complete. The wording is for
+ * visitors, not a to-do note for the developer: they are the ones who read it.
  */
 
 const T = {
   updated: { cs: 'Naposledy upraveno', sk: 'Naposledy upravené', en: 'Last updated' },
   warning: {
-    cs: 'Tento dokument zatím neuvádí sídlo ani IČO provozovatele. Než službu spustíš pro veřejnost, doplň je — bez nich není správce údajů řádně identifikovaný.',
-    sk: 'Tento dokument zatiaľ neuvádza sídlo ani IČO prevádzkovateľa. Kým službu spustíš pre verejnosť, doplň ich — bez nich nie je správca údajov riadne identifikovaný.',
-    en: 'This document does not yet state the operator’s registered address or company number. Fill them in before launching publicly — without them the data controller is not properly identified.',
+    cs: 'Některé údaje v tomto dokumentu se ještě doplňují. Než službu začnete platit, ověřte si prosím aktuální znění, případně se zeptejte na uvedeném e-mailu.',
+    sk: 'Niektoré údaje v tomto dokumente sa ešte dopĺňajú. Kým začnete za službu platiť, overte si prosím aktuálne znenie, prípadne sa opýtajte na uvedenom e-maile.',
+    en: 'Some details in this document are still being completed. Before you start paying for the service, please check the current version or ask at the e-mail address given.',
   },
 };
 
@@ -42,7 +42,7 @@ export function LegalDocument({
         {t(T.updated)}: {LEGAL_UPDATED}
       </p>
 
-      {OPERATOR_INCOMPLETE && (
+      {(OPERATOR_INCOMPLETE || HOSTING_UNVERIFIED) && (
         <p className="mt-6 border border-line border-l-2 border-l-ink px-4 py-3 text-sm text-ink-muted">
           {t(T.warning)}
         </p>
@@ -77,8 +77,8 @@ export function LegalDocument({
 
       <p className="mt-14 border-t border-line pt-6 text-sm text-ink-faint">
         {OPERATOR.name}
-        {OPERATOR.address && ` · ${OPERATOR.address}`}
         {OPERATOR.ico && ` · IČO ${OPERATOR.ico}`}
+        {OPERATOR.address && ` · ${OPERATOR.address}`}
         {' · '}
         <a href={`mailto:${OPERATOR.email}`} className="text-accent underline underline-offset-2 decoration-accent/40 hover:decoration-accent transition-colors">
           {OPERATOR.email}

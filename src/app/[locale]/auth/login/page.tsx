@@ -30,7 +30,7 @@ const UI = {
              sk: 'Dáta z ARESu a OpenStreetMap.',
              en: 'Data from ARES and OpenStreetMap.' },
   // Stejný název, jaký nese stránka /terms i souhlas u registrace — jinak by odkaz sliboval jiný dokument.
-  terms:   { cs: 'Podmínky použití',       sk: 'Podmienky používania',    en: 'Terms of Service' },
+  terms:   { cs: 'Obchodní podmínky',      sk: 'Obchodné podmienky',      en: 'Terms of Service' },
   privacy: { cs: 'Ochrana osobních údajů', sk: 'Ochrana osobných údajov', en: 'Privacy Policy' },
 };
 

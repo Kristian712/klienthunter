@@ -13,6 +13,15 @@ export const PLAN_LIMITS = {
   VIP:      { searches: Infinity, resultsPerSearch: 500 },
 } as const;
 
+/**
+ * Měsíční cena placených tarifů v Kč.
+ *
+ * Skutečnou částku strhává cena ve Stripe (`STRIPE_PRICE_*`), ne tohle číslo. Je tady, aby
+ * obchodní podmínky četly tutéž hodnotu jako ceník: kdo změní cenu ve Stripe, musí ji změnit
+ * i tady, jinak podmínky slibují jinou částku, než kolik se strhne.
+ */
+export const PLAN_PRICES_CZK = { PRO: 499, BUSINESS: 1499 } as const;
+
 export function getPlanLimits(plan: string, isVip: boolean, isAdmin: boolean = false) {
   if (isAdmin || isVip) return PLAN_LIMITS.VIP; // admins + VIP = unlimited
   return PLAN_LIMITS[plan as keyof typeof PLAN_LIMITS] ?? PLAN_LIMITS.FREE;

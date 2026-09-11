@@ -52,7 +52,7 @@ const UI = {
   // čl. 4 bodu 11 GDPR neplatný a jen by mátl. Odkaz před tlačítkem je to, co je správně.
   consent: {
     before: { cs: 'Vytvořením účtu souhlasíš s ', sk: 'Vytvorením účtu súhlasíš s ', en: 'By creating an account you agree to the ' },
-    terms:  { cs: 'podmínkami použití',  sk: 'podmienkami použitia', en: 'terms of use' },
+    terms:  { cs: 'obchodními podmínkami', sk: 'obchodnými podmienkami', en: 'terms of service' },
     middle: { cs: ' a bereš na vědomí ', sk: ' a berieš na vedomie ', en: ' and acknowledge the ' },
     privacy:{ cs: 'zpracování osobních údajů', sk: 'spracovanie osobných údajov', en: 'privacy policy' },
     after:  { cs: '.', sk: '.', en: '.' },

@@ -15,10 +15,11 @@ export default function ContactPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    // mailto fallback (no backend email service needed)
+    // Aplikace poštu neodesílá, formulář jen připraví zprávu v e-mailovém klientovi. Stejná karta,
+    // ne `window.open`: to v některých prohlížečích nechá po `mailto:` otevřenou prázdnou kartu.
     const subject = encodeURIComponent(`KlientHunter – zpráva od ${form.name}`);
     const body = encodeURIComponent(`Jméno: ${form.name}\nEmail: ${form.email}\n\n${form.message}`);
-    window.open(`mailto:${OPERATOR.email}?subject=${subject}&body=${body}`);
+    window.location.href = `mailto:${OPERATOR.email}?subject=${subject}&body=${body}`;
     setSent(true);
     setLoading(false);
   };
@@ -45,7 +46,10 @@ export default function ContactPage() {
               {isCs ? 'Děkujeme!' : 'Thank you!'}
             </h2>
             <p className="text-ink-muted">
-              {isCs ? 'Otevřel se váš emailový klient. Odešlete zprávu.' : 'Your email client opened. Please send the message.'}
+              {isCs
+                ? 'Zpráva je připravená ve vašem e-mailovém klientovi, stačí ji odeslat. Pokud se klient neotevřel, napište přímo na '
+                : 'The message is ready in your e-mail client; just send it. If no e-mail client opened, write directly to '}
+              <a href={`mailto:${OPERATOR.email}`} className="text-accent underline underline-offset-2 decoration-accent/40 hover:decoration-accent transition-colors">{OPERATOR.email}</a>.
             </p>
           </div>
         ) : (
