@@ -4,6 +4,7 @@ import { enrichAndVerify, mergeLeads } from './lead-pipeline';
 import { fillCoordinates } from './ruian';
 import { CZ_STAGES } from './search-options';
 import { discoverAll } from './sources';
+import { createSearchQuota } from './web-search-quota';
 
 /**
  * Hledání, které běží po odeslání odpovědi.
@@ -41,6 +42,14 @@ const NETWORK_BUDGET_MS = 270_000;
  */
 const STAGE_MIN_MS = 60_000;
 
+/**
+ * Strop placených dotazů do vyhledávače na jedno celé hledání — přes všechny fáze i navazující běhy.
+ *
+ * Dřív platil pro jedno volání `enrichAndVerify`, tedy pro jednu fáze, a „Celá ČR" se čtrnácti fázemi
+ * smělo položit 1 400 dotazů. Nad tímhle stropem hlídá měsíční strop celé aplikace (web-search-quota.ts).
+ */
+const MAX_WEB_SEARCHES = Number(process.env.MAX_WEB_SEARCHES ?? 100);
+
 /** Job, který se takhle dlouho neposunul, už se nevrátí — instance ho vzala s sebou. */
 export const STALE_AFTER_MS = 5 * 60 * 1000;
 
@@ -70,6 +79,7 @@ export async function runSearchJob(jobId: string): Promise<void> {
     const deadlineAt = Date.now() + NETWORK_BUDGET_MS;
     const stages = stagesFor(job.region);
     const startAt = Math.min(job.stageIndex, stages.length - 1);
+    const searchQuota = createSearchQuota(MAX_WEB_SEARCHES - job.webSearchCount);
 
     await prisma.searchJob.update({
       where: { id: jobId },
@@ -150,6 +160,7 @@ export async function runSearchJob(jobId: string): Promise<void> {
         region: stage.value,
         industry: job.industry,
         batchSize: BATCH,
+        searchQuota,
         onBatch: async batch => {
           const rows = await persistResults(job.searchId, batch, user?.targetFilters);
           processed += batch.length;
@@ -159,6 +170,12 @@ export async function runSearchJob(jobId: string): Promise<void> {
             data: { processedCount: processed },
           });
         },
+      });
+
+      // Spotřebované dotazy se ukládají po každé fázi, aby je navazující běh odečetl od stropu hledání.
+      await prisma.searchJob.update({
+        where: { id: jobId },
+        data: { webSearchCount: job.webSearchCount + searchQuota.used() },
       });
     }
 

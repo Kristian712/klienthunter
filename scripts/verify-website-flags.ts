@@ -267,7 +267,9 @@ async function detect(concurrency: number, outName: string): Promise<void> {
         probe,
         deadlineAt: Date.now() + PER_CANDIDATE_MS,
         probeNetwork: true,
-        search: true,
+        // Skript měsíční strop aplikace nepoužívá (lokální databáze je jiná než produkční);
+        // s WEB_SEARCH_ENABLED=1 se ptá bez omezení počtu, jinak vůbec.
+        searchQuota: webSearchEnabled() ? { reserve: async () => 'skript', release: async () => {} } : undefined,
       },
     );
     return verdict;

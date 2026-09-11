@@ -331,6 +331,20 @@ function domainLabel(url: string): string {
   }
 }
 
+/**
+ * Povolení položit placený dotaz do vyhledávače.
+ *
+ * Dohledávání samo na databázi nesahá (pouštějí ho i skripty bez ní), takže strop hlídá volající
+ * a sem ho jen předá — viz `createSearchQuota` v web-search-quota.ts. Bez kvóty se vyhledávač
+ * nepoužije vůbec.
+ */
+export interface SearchQuota {
+  /** Lístek na jeden dotaz, nebo `null`, když se ptát nesmí (strop hledání nebo měsíční strop). */
+  reserve(): Promise<string | null>;
+  /** Vyhledávač neodpověděl. Brave takový dotaz neúčtuje, takže se lístek vrací. */
+  release(ticket: string): Promise<void>;
+}
+
 export interface DiscoveredSite {
   url: string;
   html?: string;
@@ -597,10 +611,10 @@ export async function discoverWebsite(
     /** Firma je člověk — viz `looksLikePerson`. */
     person?: boolean;
     /**
-     * Smí se firma dohledávat i přes vyhledávač? Volající tím drží počet placených dotazů:
-     * pouští se to jen na firmy, u kterých by jinak padl verdikt „web nemá".
+     * Kvóta na placené dotazy do vyhledávače. Chybí-li, vyhledávač se nepoužije — tak se chovají
+     * ukázka pro nepřihlášené i import CSV, aby nespotřebovaly strop placeným hledáním.
      */
-    search?: boolean;
+    searchQuota?: SearchQuota;
   },
 ): Promise<DiscoveryOutcome> {
   const domains = domainCandidates(firm.name, index, opts.tld, {
@@ -726,10 +740,15 @@ export async function discoverWebsite(
    */
   let searched = false;
   let searchAnswered = false;
-  if (opts.search && webSearchEnabled() && Date.now() < opts.deadlineAt) {
+  const listek = opts.searchQuota && webSearchEnabled() && Date.now() < opts.deadlineAt
+    ? await opts.searchQuota.reserve()
+    : null;
+  if (listek && opts.searchQuota) {
     searched = true;
     const dotaz = [`"${firm.name}"`, opts.city, opts.tradeWords?.[0]].filter(Boolean).join(' ');
     const odpoved = await searchDomains(dotaz, 3);
+    // Brave účtuje jen úspěšné dotazy, takže neúspěšný se do stropu nepočítá.
+    if (!odpoved.ok) await opts.searchQuota.release(listek);
     searchAnswered = odpoved.ok;
     for (const host of odpoved.hosts) {
       if (Date.now() >= opts.deadlineAt) {

@@ -63,6 +63,12 @@ interface DetectRow { id: string; status: 'HAS' | 'NONE' | 'UNKNOWN'; url: strin
 
 let lastCall = 0;
 let requests = 0;
+/**
+ * Hlavičky X-RateLimit-* z první a poslední odpovědi. Brave v nich posílá limity za sekundu
+ * a za měsíc; pokud tarif s kreditem hlásí zbývající měsíční dotazy, může se o ně opřít strop
+ * v aplikaci — to číslo totiž zahrnuje i dotazy z testů a z vývoje, které produkční databáze nevidí.
+ */
+const rateHeaders: Array<Record<string, string | null>> = [];
 
 async function brave(q: string, gapMs: number): Promise<{ ok: boolean; status: number; urls: string[] }> {
   const key = process.env.BRAVE_SEARCH_API_KEY;
@@ -84,6 +90,8 @@ async function brave(q: string, gapMs: number): Promise<{ ok: boolean; status: n
         signal: AbortSignal.timeout(10_000),
       });
       if (res.status === 429) { await new Promise(r => setTimeout(r, 2_000 * (attempt + 1))); continue; }
+      const h = Object.fromEntries(['x-ratelimit-limit', 'x-ratelimit-remaining', 'x-ratelimit-reset', 'x-ratelimit-policy'].map(k => [k, res.headers.get(k)]));
+      if (rateHeaders.length === 0) rateHeaders.push(h); else rateHeaders[1] = h;
       if (res.status !== 200) return { ok: false, status: res.status, urls: [] };
       const data = await res.json() as { web?: { results?: Array<{ url?: string }> } };
       return { ok: true, status: 200, urls: (data.web?.results ?? []).map(r => r.url ?? '').filter(Boolean) };
@@ -202,7 +210,7 @@ async function main() {
     if (++n % 10 === 0) console.log(`  ${n}/${todo.length} firem, ${requests} dotazů`);
   }
 
-  fs.writeFileSync(path.join(OUT_DIR, 'web-search.json'), JSON.stringify({ ranAt: new Date().toISOString(), requests, outcomes }, null, 1));
+  fs.writeFileSync(path.join(OUT_DIR, 'web-search.json'), JSON.stringify({ ranAt: new Date().toISOString(), requests, rateHeaders, outcomes }, null, 1));
 
   // ── Vyhodnocení strategií ─────────────────────────────────────────────────
   type Strategy = { label: string; uses: number[] };
@@ -212,6 +220,7 @@ async function main() {
     { label: 'Q1 → Q2 → Q3 (IČO)', uses: [0, 1, 2] },
   ];
   const lines: string[] = [`# Vyhledávač Brave na vzorku — ${new Date().toISOString().slice(0, 10)}`, '', `Firem ${outcomes.length}, dotazů celkem ${requests} (neúspěšných ${outcomes.flatMap(o => o.queries).filter(q => !q.ok).length}).`];
+  lines.push('', 'Hlavičky limitů (první a poslední odpověď):', '', '```', JSON.stringify(rateHeaders, null, 2), '```');
 
   for (const rule of ['search', 'current'] as const) {
     lines.push('', `## Pravidlo: ${rule === 'search' ? 'pro výsledky vyhledávače (IČO / telefon / adresa / název+obec+obor)' : 'dnešní pageEvidence (doména nese název)'}`, '');

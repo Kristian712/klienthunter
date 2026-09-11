@@ -10,6 +10,7 @@ import {
   probeOnce,
   tldForRegion,
   type NameIndex,
+  type SearchQuota,
 } from './website-discovery';
 import {
   classify,
@@ -42,8 +43,6 @@ import {
  */
 export const CONCURRENCY = 20;
 
-/** Strop dotazů do vyhledávače na jedno hledání. Sto dotazů je u Brave zhruba 5 % měsíční kvóty. */
-const MAX_WEB_SEARCHES = Number(process.env.MAX_WEB_SEARCHES ?? 100);
 const ENRICH_CONCURRENCY = 8;
 
 /**
@@ -292,8 +291,8 @@ export interface WebsiteCheck {
   deadlineAt: number;
   /** `false` = žádná HTTP sonda, verdikt jen z toho, co řekly zdroje. */
   probeNetwork: boolean;
-  /** Smí se firma dohledávat i přes vyhledávač (stojí dotaz). */
-  search: boolean;
+  /** Kvóta na placené dotazy do vyhledávače. Bez ní se vyhledávač nepoužije. */
+  searchQuota?: SearchQuota;
 }
 
 /**
@@ -355,7 +354,7 @@ export async function verifyWebsite(
       tradeWords: ctx.tradeWords,
       city: domainCityFor(c.address, ctx.region),
       person: looksLikePerson(c.name, c.legalForm),
-      search: ctx.search,
+      searchQuota: ctx.searchQuota,
     },
   );
   const searched = found.searched;
@@ -421,7 +420,7 @@ export interface VerifiedCandidate {
  */
 export async function enrichAndVerify(
   candidates: Candidate[],
-  { probeNetwork, deadlineAt, region = '', industry = '', onBatch, batchSize = 25 }:
+  { probeNetwork, deadlineAt, region = '', industry = '', onBatch, batchSize = 25, searchQuota }:
     {
       probeNetwork: boolean;
       deadlineAt: number;
@@ -439,17 +438,15 @@ export async function enrichAndVerify(
        */
       onBatch?: (batch: VerifiedCandidate[]) => Promise<void>;
       batchSize?: number;
+      /**
+       * Kvóta na placené dotazy do vyhledávače (strop hledání + měsíční strop). Posílá ji jen
+       * hledání přihlášeného uživatele; ukázka a import CSV bez ní vyhledávač nepoužijí.
+       */
+      searchQuota?: SearchQuota;
     },
 ): Promise<VerifiedCandidate[]> {
   const robots = createRobotsCache();
   const probe = createProbeCache(robots);
-  /**
-   * Kolik firem smí jedno hledání dohledávat přes vyhledávač.
-   *
-   * Platí se za dotaz, takže strop je tvrdý a spotřebuje ho jen ta firma, u které selhaly
-   * domény odvozené z názvu. Bez klíče (`BRAVE_SEARCH_API_KEY`) se stejně nic nestane.
-   */
-  let searchesLeft = MAX_WEB_SEARCHES;
 
   // Built from the whole result set, because that is what makes "dental" generic and "ajna"
   // distinctive without anyone maintaining a word list per trade.
@@ -481,9 +478,9 @@ export async function enrichAndVerify(
     }
   };
 
-  // Rozhodnutí o webu je ve `verifyWebsite`; tady se jen hlídá strop placených dotazů do vyhledávače.
+  // Rozhodnutí o webu je ve `verifyWebsite`; strop placených dotazů hlídá `searchQuota`.
   const verify = async (c: Candidate): Promise<WebsiteVerdict> => {
-    const { verdict, searched } = await verifyWebsite(c, {
+    const { verdict } = await verifyWebsite(c, {
       nameIndex,
       tld,
       region,
@@ -491,11 +488,8 @@ export async function enrichAndVerify(
       probe,
       deadlineAt: discoveryDeadline,
       probeNetwork,
-      // Dotaz do vyhledávače stojí peníze, takže má strop na jedno hledání. Dojde-li, verdikt
-      // pořád stojí na prověřených doménách — jen bez té poslední pojistky.
-      search: searchesLeft > 0,
+      searchQuota,
     });
-    if (searched) searchesLeft--;
     return verdict;
   };
 

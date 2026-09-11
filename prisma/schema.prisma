@@ -114,6 +114,9 @@ model SearchJob {
   stageCount     Int       @default(1)
   /// Jméno města, ve kterém se právě hledá. Jen pro průběh v UI.
   stageLabel     String?
+  /// Kolik placených dotazů do vyhledávače už tohle hledání položilo — přes všechny fáze
+  /// i navazující běhy. Strop je `MAX_WEB_SEARCHES` v search-job.ts.
+  webSearchCount Int       @default(0)
   /// Kolik jich je už zapsaných v databázi.
   processedCount Int       @default(0)
   startedAt      DateTime?
@@ -302,4 +305,15 @@ model UnmatchedPayment {
   resolvedAt           DateTime?
 
   @@index([createdAt])
+}
+
+/// Jeden placený dotaz do vyhledávače (Brave Search API).
+///
+/// Z počtu řádků za posledních 31 dní se hlídá tvrdý měsíční strop, aby provoz nikdy nepřekročil
+/// bezplatný kredit — viz src/lib/web-search-quota.ts. Neúspěšný dotaz (Brave ho neúčtuje) se smaže.
+model WebSearchCall {
+  id String   @id @default(cuid())
+  at DateTime @default(now())
+
+  @@index([at])
 }
