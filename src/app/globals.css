@@ -3,41 +3,55 @@
 @tailwind utilities;
 
 /**
- * White background, black text, grey for everything secondary, and exactly one accent.
- * Hierarchy comes from type size and weight, not from colour, shadows or boxes.
+ * Tmavý podklad, světlý text, šedá na všechno druhotné a jeden akcent.
+ * Hierarchie jde z velikosti a váhy písma, ne z barev, stínů a rámečků.
  *
- * The class names are the same as before on purpose: pages that were not redesigned by hand
- * (the admin panel) pick up the new look without being touched.
+ * Názvy tříd zůstaly stejné schválně: stránky, které se ručně nepřekreslovaly, převezmou
+ * tmavý vzhled samy, protože jejich barvy vedou přes proměnné níž.
  */
 
 @layer base {
   *, *::before, *::after { box-sizing: border-box; }
 
+  /**
+   * `color-scheme: dark` říká prohlížeči, že i jeho vlastní prvky mají být tmavé: posuvníky,
+   * rozbalovací seznam `<select>`, kalendář u pole s datem, šipky u čísel. Bez toho by na
+   * tmavé stránce svítily bílé posuvníky a bílý seznam možností.
+   */
   html {
+    color-scheme: dark;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     scroll-behavior: smooth;
+    scrollbar-color: rgb(var(--ink-faint) / .45) rgb(var(--surface));
   }
 
   /**
-   * Paleta je převzatá z webovkyvanek.cz, aby appka a web nevypadaly jako dvě různé firmy.
+   * Paleta a kontrast (WCAG 2.x, spočítáno, ne odhadnuto):
    *
-   * Podklad je teplá špinavě bílá, ne čistá — čistá bílá vedle černého textu svítí a dělá
-   * z rozhraní formulář. Text není absolutní černá ze stejného důvodu.
+   *   text        #EDECE8   16,7 : 1 na stránce · 15,6 na kartě · 14,4 v poli
+   *   tlumený     #B2B2B8    9,4 : 1 · 8,7 · 8,1
+   *   nejslabší   #94949B    6,6 : 1 · 6,1 · 5,6   (4,8 i na podbarvení ink/10)
+   *   akcent      #F07A1A    7,1 : 1 · 6,6 · 6,1   jako text i odkaz
+   *   na akcentu  #0A0A0B    7,1 : 1   — tlačítka mají tmavý text; bílý na oranžové je 2,8 : 1
    *
-   * Oranžová zůstává jako `--accent`, ale odešla z tlačítek. Nově znamená jedinou věc: data.
-   * Na mapě „web jsme nenašli", v logu tečku za jménem. Když barva neoznačuje nic jiného,
-   * oko ji na mapě mezi pěti sty body najde okamžitě.
+   * Nejslabší text dřív na světlém podkladu splňoval jen 3,4 : 1; tmavá paleta tu starou
+   * chybu zavírá. Akcent je o stupeň světlejší než oranžová bodů „web nemá" na mapě
+   * (#D55E00), takže tlačítko a datový bod jdou od sebe rozeznat — tvarem i odstínem.
+   *
+   * `--line` je jen RGB bílé; průhlednost dodává Tailwind (`line`, `line-strong`, `field`).
    */
   :root {
-    --surface:        246 245 242;
-    --surface-subtle: 255 254 252;
-    --surface-muted:  240 239 235;
-    --ink:            16 16 17;
-    --ink-muted:      69 70 74;
-    --ink-faint:      131 132 138;
-    --line:           229 229 229;
-    --accent:         214 94 0;
+    --surface:        10 10 11;
+    --surface-subtle: 20 20 22;
+    --surface-muted:  28 28 31;
+    --ink:            237 236 232;
+    --ink-muted:      178 178 184;
+    --ink-faint:      148 148 155;
+    --line:           255 255 255;
+    --accent:         240 122 26;
+    --accent-hover:   245 138 51;
+    --accent-ink:     10 10 11;
   }
 
   body {
@@ -47,7 +61,7 @@
 
   ::selection {
     background-color: rgb(var(--accent));
-    color: #fff;
+    color: rgb(var(--accent-ink));
   }
 
   /* Nadpisy nese displejové písmo; těsný proklad je jeho charakter, ne dekorace. */
@@ -56,6 +70,33 @@
     font-weight: 800;
     letter-spacing: -0.035em;
   }
+
+  /* Placeholder i u polí bez třídy `.input` — jinak by si vzaly šedou z preflightu. */
+  input::placeholder, textarea::placeholder { color: rgb(var(--ink-faint)); }
+
+  /**
+   * Automatické vyplnění. Chrome a Safari si u uloženého e-mailu a hesla kreslí vlastní
+   * světlé pozadí s tmavým textem, které se běžným `background` přebít nedá — na přihlášení
+   * by jinak svítily dva bílé obdélníky. Vnitřní stín pozadí přemaluje, `transition` zabrání
+   * probliknutí.
+   */
+  input:-webkit-autofill,
+  textarea:-webkit-autofill,
+  select:-webkit-autofill {
+    -webkit-text-fill-color: rgb(var(--ink));
+    caret-color: rgb(var(--ink));
+    -webkit-box-shadow: 0 0 0 1000px rgb(var(--surface-muted)) inset;
+    transition: background-color 9999s ease-out 0s;
+  }
+
+  /* Možnosti v `<select>`. Chrome na Windows/Linuxu a Firefox je kreslí barvami stránky. */
+  option, optgroup {
+    background-color: rgb(var(--surface-muted));
+    color: rgb(var(--ink));
+  }
+
+  /* Ikona kalendáře u `type="date"` je v některých prohlížečích černá i v tmavém schématu. */
+  input::-webkit-calendar-picker-indicator { filter: invert(1) brightness(.85); }
 }
 
 @layer components {
@@ -76,16 +117,19 @@
     @apply inline-flex items-center justify-center gap-2 font-medium rounded-lg
            transition-colors duration-150 select-none focus-visible:outline-none
            focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2
+           focus-visible:ring-offset-surface
            disabled:opacity-40 disabled:pointer-events-none whitespace-nowrap;
   }
 
   /**
-   * Hlavní akce je černá, ne oranžová. Barva v téhle aplikaci znamená data — oranžový bod na
-   * mapě je „web jsme nenašli". Kdyby stejná oranžová byla i na každém tlačítku, přestala by
-   * na mapě něco znamenat.
+   * Hlavní akce je oranžová s tmavým textem (7,1 : 1, na hoveru 8,1 : 1).
+   *
+   * Dřív byla černá, protože oranžová znamenala na mapě „web nemá" a tlačítka ji neměla
+   * ředit. Tu práci teď na mapě dělá kosočtverec a tmavší odstín #D55E00 — akcent tlačítek
+   * je světlejší a tvar bodu s ním splést nejde.
    */
   .btn-primary {
-    @apply btn bg-ink text-surface hover:bg-ink/85 px-5 py-2.5 text-sm;
+    @apply btn bg-accent text-accent-ink hover:bg-accent-hover px-5 py-2.5 text-sm font-semibold;
   }
 
   /* Alias na primární. Zůstává, aby starší markup dál kompiloval. */
@@ -93,8 +137,9 @@
     @apply btn-primary;
   }
 
+  /* Obrys musí být vidět i bez výplně: `field` drží 3,3 : 1 vůči stránce i kartě. */
   .btn-outline {
-    @apply btn border border-line-strong bg-surface-subtle text-ink hover:border-ink
+    @apply btn border border-field bg-transparent text-ink hover:border-ink hover:bg-ink/[0.04]
            text-sm px-5 py-2.5;
   }
 
@@ -105,10 +150,12 @@
   .btn-lg  { @apply px-7 py-3.5 text-base; }
   .btn-sm  { @apply px-3 py-1.5 text-xs; }
 
-  /* ── Inputs ── */
+  /* ── Inputs ────────────────────────────────────────────────────────────────
+     Pole stojí o stupeň výš než karta a má okraj 3,3 : 1. Jen výplní se od podkladu
+     odlišit nedá — tmavé plochy mezi sebou mají kontrast kolem 1,1 : 1. */
   .input {
-    @apply w-full rounded-lg px-4 py-2.5 text-sm bg-surface-subtle text-ink
-           border border-line-strong
+    @apply w-full rounded-lg px-4 py-2.5 text-sm bg-surface-muted text-ink
+           border border-field
            focus:outline-none focus:border-ink transition-colors duration-150;
   }
   .input::placeholder { color: rgb(var(--ink-faint)); }
@@ -119,12 +166,12 @@
   }
 
   /* ── Surfaces ──────────────────────────────────────────────────────────────
-     A card is a hairline outline, never a floating panel. No shadows anywhere. */
+     Karta je o stupeň světlejší plocha s jemnou linkou. Stránka < karta < pole a menu. */
   .card {
     @apply rounded-lg p-6 bg-surface-subtle border border-line;
   }
   .card-hover {
-    @apply card hover:border-ink transition-colors duration-150 cursor-pointer;
+    @apply card hover:border-line-strong hover:bg-surface-muted transition-colors duration-150 cursor-pointer;
   }
 
   /* A data row: separated from its neighbour by one line, nothing else. */
@@ -137,32 +184,36 @@
      would say nothing and dilute the one signal that matters. */
   .badge {
     @apply inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium
-           text-ink-muted border border-line;
+           text-ink-muted border border-line-strong;
   }
   .badge-green  { @apply badge; }
   .badge-yellow { @apply badge; }
   .badge-purple { @apply badge; }
-  /* The single exception: facts the user must not miss (unreliable VAT payer). Black on
-     white, bold — loud through weight rather than through a second colour. */
+  /* The single exception: facts the user must not miss (unreliable VAT payer). Light on
+     dark, bold — loud through weight rather than through a second colour. */
   .badge-red    { @apply badge border-ink text-ink font-semibold; }
 
-  .badge-accent { @apply badge border-accent text-accent; }
+  .badge-accent { @apply badge border-accent/60 text-accent bg-accent/10; }
 
-  /* ── Chips (filters) ── */
+  /* ── Chips (filters) ───────────────────────────────────────────────────────
+     Zapnutý chip je světlý s tmavým textem, ne oranžový: filtrů svítí najednou i deset
+     a oranžová má zůstat vyhrazená hlavní akci a odkazům. */
   .chip {
     @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
-           border border-line text-ink-muted bg-surface-subtle
+           border border-line-strong text-ink-muted bg-surface-muted
            hover:border-ink hover:text-ink transition-colors duration-150
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent
+           focus-visible:ring-offset-2 focus-visible:ring-offset-surface
            disabled:opacity-40 disabled:pointer-events-none;
   }
   .chip-active {
-    @apply chip bg-ink text-white border-ink hover:text-white;
+    @apply chip bg-ink text-surface border-ink hover:text-surface;
   }
 
   /* ── Layout ── */
   .section   { @apply py-20 px-5 md:py-28; }
   .container { @apply max-w-6xl mx-auto; }
-  .divider   { border-top: 1px solid rgb(var(--line)); }
+  .divider   { border-top: 1px solid rgb(var(--line) / .10); }
 }
 
 /* ── Motion ──────────────────────────────────────────────────────────────────
@@ -202,14 +253,14 @@
   letter-spacing: .06em;
   text-align: left;
   color: rgb(var(--ink-faint));
-  border-bottom: 1px solid rgb(var(--line));
+  border-bottom: 1px solid rgb(var(--line) / .10);
 }
 .results-table td {
   padding: 14px 16px;
   font-size: 14px;
   color: rgb(var(--ink));
 }
-.results-table tbody tr { border-bottom: 1px solid rgb(var(--line)); }
+.results-table tbody tr { border-bottom: 1px solid rgb(var(--line) / .10); }
 
 /* ── Mapa výsledků ──────────────────────────────────────────────────────────
    Bod na mapě nese tři věci naráz a každou jiným kanálem: tvar říká, jestli firma má web,
@@ -238,16 +289,17 @@
 .kh-pin:focus-visible .kh-pin__hit { transform: scale(1.45); }
 .kh-pin[data-selected='true'] .kh-pin__hit { transform: scale(1.5); }
 
-/* Samotný puntík. Bílý lem ho drží čitelný nad tmavou i světlou plochou, měkká záře pod ním
-   dělá hloubku, kterou plochá tečka nemá. */
+/* Samotný puntík. Tmavá mezera ho oddělí od podkladu a od sousedů, tenký světlý obrys ho
+   drží čitelný i nad silnicí. Bílý lem ze světlé verze by na tmavé mapě u pěti set bodů
+   oslňoval víc než samy barvy. Měkká záře pod ním dělá hloubku. */
 .kh-pin__core {
   width: 100%;
   height: 100%;
   border-radius: 50%;
   background: var(--kh-color);
   box-shadow:
-    0 0 0 2px #fff,
-    0 2px 5px rgba(16, 16, 17, .35),
+    0 0 0 2px rgb(var(--surface)),
+    0 0 0 3px rgb(var(--line) / .16),
     0 0 14px var(--kh-glow);
 }
 .kh-pin[data-shape='diamond'] .kh-pin__core { border-radius: 3px; transform: rotate(45deg); }
@@ -255,10 +307,16 @@
 .kh-pin[data-shape='ring'] .kh-pin__core {
   background: transparent;
   border: 2.5px solid var(--kh-color);
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, .9), 0 1px 3px rgba(16, 16, 17, .25);
+  box-shadow: 0 0 0 2px rgb(var(--surface) / .9);
 }
-/* Značka uživatele: tmavý prstenec navíc, aby „už jsem ji řešil" šlo přečíst i bez barvy. */
-.kh-pin[data-tagged='true'] .kh-pin__core { box-shadow: 0 0 0 2px #fff, 0 0 0 3.5px rgba(16, 16, 17, .6), 0 2px 5px rgba(16, 16, 17, .35); }
+/**
+ * Značka uživatele: světlý prstenec navíc, aby „už jsem ji řešil" šlo přečíst i bez barvy.
+ * Na světlé mapě byl tmavý; na tmavé by zmizel a s ním jediné vodítko, které nestojí na
+ * rozlišení odstínu. Proto teď tmavá mezera a světlý prstenec (9,6 : 1 vůči mapě).
+ */
+.kh-pin[data-tagged='true'] .kh-pin__core {
+  box-shadow: 0 0 0 2px rgb(var(--surface)), 0 0 0 3.5px rgb(var(--ink) / .8), 0 2px 6px rgba(0, 0, 0, .6);
+}
 
 /* Vlna. Jen u příležitostí: firma bez nalezeného webu, kterou uživatel ještě neoznačil. */
 .kh-pin__ring {
@@ -300,7 +358,7 @@
 }
 .kh-pin[data-selected='true'] .kh-pin__halo { opacity: .85; transform: scale(1); }
 
-/* Popisek u bodu. Ukazuje ho rozvrh v komponentě, ne hover. */
+/* Popisek u bodu. Ukazuje ho rozvrh v komponentě, ne hover. Tmavá plocha, světlý text. */
 .kh-pin__label {
   position: absolute;
   left: calc(var(--kh-size) - 1px);
@@ -309,18 +367,18 @@
   white-space: nowrap;
   font: 500 11px var(--font-inter), system-ui, sans-serif;
   color: rgb(var(--ink));
-  background: rgba(255, 254, 252, .92);
+  background: rgb(var(--surface-subtle) / .92);
   backdrop-filter: blur(6px);
   padding: 2px 6px;
   border-radius: 6px;
-  border: 1px solid rgba(16, 16, 17, .08);
-  box-shadow: 0 2px 8px rgba(16, 16, 17, .1);
+  border: 1px solid rgb(var(--line) / .12);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .5);
   pointer-events: none;
   display: none;
 }
 
-/* Rám mapy. Vinětace uvnitř drží pozornost ve středu a odděluje podklad od stránky, která má
-   stejné pozadí — bez ní mapa splývá s okolím. */
+/* Rám mapy. Tmavá mapa a tmavá stránka mají kontrast kolem 1,05 : 1; bez vnitřní linky
+   a vinětace by mapa ve stránce zmizela. */
 .kh-map-frame { position: relative; }
 .kh-map-frame::after {
   content: '';
@@ -328,5 +386,45 @@
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
-  box-shadow: inset 0 0 0 1px rgba(16, 16, 17, .1), inset 0 22px 60px -30px rgba(16, 16, 17, .28);
+  box-shadow: inset 0 0 0 1px rgb(var(--line) / .08), inset 0 22px 60px -30px rgba(0, 0, 0, .6);
+}
+
+/**
+ * Ovládání MapLibre (přiblížení, kompas). Knihovna ho kreslí bílé s tmavými ikonami a tmavou
+ * variantu nemá. Pravidla jsou pod `.kh-map-frame`, protože CSS knihovny se načítá s komponentou
+ * a mohlo by přijít až po `globals.css` — se stejnou specifičností by vyhrálo.
+ */
+.kh-map-frame .maplibregl-ctrl-group {
+  background: rgb(var(--surface-subtle));
+  border-radius: 8px;
+}
+.kh-map-frame .maplibregl-ctrl-group:not(:empty) {
+  box-shadow: 0 0 0 1px rgb(var(--line) / .14), 0 4px 12px rgba(0, 0, 0, .5);
+}
+.kh-map-frame .maplibregl-ctrl-group button + button { border-top-color: rgb(var(--line) / .10); }
+.kh-map-frame .maplibregl-ctrl-group button:not(:disabled):hover { background-color: rgb(var(--line) / .08); }
+.kh-map-frame .maplibregl-ctrl-group button:focus:focus-visible { box-shadow: 0 0 0 2px rgb(var(--accent)); }
+@media (forced-colors: none) {
+  .kh-map-frame .maplibregl-ctrl-icon { filter: invert(1) brightness(.92); }
+}
+
+/**
+ * Tisk. Prohlížeče pozadí netisknou, takže světlý text z tmavého tématu by na papíře vyšel
+ * 1,2 : 1 — vytištěné obchodní podmínky by byly prázdná stránka. Pro tisk se paleta otočí
+ * zpátky a navigace s mapou zmizí.
+ */
+@media print {
+  :root {
+    color-scheme: light;
+    --surface: 255 255 255;
+    --surface-subtle: 255 255 255;
+    --surface-muted: 245 245 245;
+    --ink: 0 0 0;
+    --ink-muted: 55 55 55;
+    --ink-faint: 85 85 85;
+    --line: 0 0 0;
+    --accent: 160 70 0;
+    --accent-ink: 255 255 255;
+  }
+  header, footer, .kh-map-frame { display: none !important; }
 }

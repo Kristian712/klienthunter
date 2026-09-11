@@ -37,6 +37,22 @@ const T = {
   },
 };
 
+/**
+ * Barvy natvrdo, protože `globals.css` se sem nenačte. Jsou to tytéž hodnoty jako tokeny
+ * tmavého tématu, aby pád nevypadal jako jiná aplikace — dřív tu byla bílá stránka uprostřed
+ * tmavého webu. Kontrast: text 16,7 : 1, tlumený 9,4, nejslabší 6,6, tlačítko 7,1.
+ */
+const C = {
+  surface: '#0A0A0B',
+  card: '#141416',
+  line: 'rgba(255,255,255,0.12)',
+  ink: '#EDECE8',
+  muted: '#B2B2B8',
+  faint: '#94949B',
+  accent: '#F07A1A',
+  accentInk: '#0A0A0B',
+};
+
 export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   const seg = typeof window !== 'undefined' ? window.location.pathname.split('/')[1] : 'cs';
   const t = T[seg as keyof typeof T] ?? T.cs;
@@ -49,23 +65,23 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
   }, [error]);
 
   return (
-    <html lang={lang}>
-      <body style={{ fontFamily: 'system-ui, sans-serif', margin: 0, padding: '2rem', color: '#111' }}>
-        <div style={{ maxWidth: '32rem', margin: '4rem auto', border: '1px solid #e5e5e5', padding: '1.5rem' }}>
+    <html lang={lang} style={{ colorScheme: 'dark', background: C.surface }}>
+      <body style={{ fontFamily: 'system-ui, sans-serif', margin: 0, padding: '2rem', background: C.surface, color: C.ink }}>
+        <div style={{ maxWidth: '32rem', margin: '4rem auto', background: C.card, border: `1px solid ${C.line}`, borderRadius: '8px', padding: '1.5rem' }}>
           <h1 style={{ fontSize: '1.25rem', margin: 0 }}>{t.title}</h1>
-          <p style={{ fontSize: '0.875rem', color: '#666', marginTop: '0.5rem' }}>{t.body}</p>
+          <p style={{ fontSize: '0.875rem', color: C.muted, marginTop: '0.5rem' }}>{t.body}</p>
           {(error.message || error.digest) && (
-            <div style={{ marginTop: '1rem', borderTop: '1px solid #e5e5e5', paddingTop: '0.75rem' }}>
-              <p style={{ fontSize: '0.6875rem', color: '#999', textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>
+            <div style={{ marginTop: '1rem', borderTop: `1px solid ${C.line}`, paddingTop: '0.75rem' }}>
+              <p style={{ fontSize: '0.6875rem', color: C.faint, textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>
                 {t.detail}
               </p>
               {error.message && (
-                <p style={{ fontSize: '0.75rem', color: '#666', fontFamily: 'monospace', marginTop: '0.25rem', wordBreak: 'break-word' }}>
+                <p style={{ fontSize: '0.75rem', color: C.muted, fontFamily: 'monospace', marginTop: '0.25rem', wordBreak: 'break-word' }}>
                   {error.message}
                 </p>
               )}
               {error.digest && (
-                <p style={{ fontSize: '0.6875rem', color: '#999', fontFamily: 'monospace', marginTop: '0.25rem' }}>
+                <p style={{ fontSize: '0.6875rem', color: C.faint, fontFamily: 'monospace', marginTop: '0.25rem' }}>
                   kód: {error.digest}
                 </p>
               )}
@@ -73,7 +89,7 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
           )}
           <button
             onClick={() => reset()}
-            style={{ marginTop: '1rem', padding: '0.5rem 1rem', border: '1px solid #111', background: '#111', color: '#fff', cursor: 'pointer' }}
+            style={{ marginTop: '1rem', padding: '0.5rem 1rem', border: 'none', borderRadius: '8px', background: C.accent, color: C.accentInk, fontWeight: 600, cursor: 'pointer' }}
           >
             {t.retry}
           </button>

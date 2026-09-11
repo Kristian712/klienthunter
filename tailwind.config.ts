@@ -1,15 +1,16 @@
 import type { Config } from 'tailwindcss';
 
 /**
- * White, black, grey — and one accent.
+ * Tmavý podklad, světlý text, jeden akcent.
  *
- * `brand` keeps its name and its 50–950 shape so existing markup keeps compiling, but every
- * step is now the vermilion ramp. Anything that used to be brand-purple is therefore on the
- * new accent automatically; `accent` is the alias to reach for in new code.
+ * Každá barva jde přes CSS proměnnou z `globals.css`. Dřív tu linky a akcent byly natvrdo
+ * (`rgba(16,16,17,.10)`, `#e63900`), takže se jako jediné neotáčely s tématem — na tmavém
+ * podkladu by všechny okraje zmizely a akcent by měl jiný odstín než `--accent`. Hodnoty
+ * i naměřený kontrast jsou u proměnných v `globals.css`.
  *
- * `darkMode: 'class'` stays even though the app no longer has a dark theme. Tailwind's default
- * is `media`, so removing this line would make any leftover `dark:` utility fire on a machine
- * set to dark — the class simply never gets added now.
+ * `darkMode: 'class'` zůstává, i když se žádná třída nepřidává: web je tmavý pro všechny
+ * a přepínač neexistuje. Výchozí `media` by jinak rozsvítilo každý zapomenutý `dark:`
+ * podle nastavení systému.
  */
 const config: Config = {
   darkMode: 'class',
@@ -21,33 +22,35 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        /**
+         * Stará oranžová řada. Používá ji už jen admin a zmizí, jakmile se přepíše na `accent`.
+         * Kroky ukazují na tentýž akcent, aby do té doby nebyly na webu dvě různé oranžové.
+         */
         brand: {
-          50:  '#fff1ec',
-          100: '#ffdfd3',
-          200: '#ffc0ab',
-          300: '#ff9573',
-          400: '#ff6233',
-          500: '#f5450d',
-          600: '#e63900',
-          700: '#bf2e00',
-          800: '#991f00',
-          900: '#7a1c03',
-          950: '#420e03',
+          400: 'rgb(var(--accent) / <alpha-value>)',
+          500: 'rgb(var(--accent) / <alpha-value>)',
+          600: 'rgb(var(--accent) / <alpha-value>)',
         },
         accent: {
-          DEFAULT: '#e63900',
-          soft:    '#fff1ec',
-          ink:     '#bf2e00',
+          DEFAULT: 'rgb(var(--accent) / <alpha-value>)',
+          /** Hover akcentového tlačítka. O stupeň světlejší, text na něm je pořád tmavý. */
+          hover:   'rgb(var(--accent-hover) / <alpha-value>)',
+          /** Text na akcentové ploše. Bílý text na oranžové nesplní kontrast v žádném odstínu. */
+          ink:     'rgb(var(--accent-ink) / <alpha-value>)',
+          soft:    'rgb(var(--accent) / 0.12)',
         },
         /**
-         * Jediná barva linek v aplikaci. Hairline nahrazuje karty a stíny.
+         * Linky. Poloprůhledná bílá, ne plná šedá: na kartě i na stránce pak mají stejný
+         * vztah k podkladu a nemusí se ladit zvlášť pro každou plochu.
          *
-         * Je poloprůhledná, ne plná šedá: na teplém podkladu `#f6f5f2` vypadá plná `#e5e5e5`
-         * studeně a vystupuje víc než text, který ohraničuje.
+         *  - `line`   dekorativní oddělení (1,26 : 1 — schválně tiché, nenese informaci)
+         *  - `line-strong`  okraj, který drží hierarchii (menu, odznaky, chipy)
+         *  - `field`  hranice formulářového pole a obrysového tlačítka: 3,3 : 1 vůči kartě
+         *             i stránce, tedy nad 3 : 1, které WCAG 1.4.11 chce u ovládacích prvků
          */
-        line: 'rgba(16, 16, 17, 0.10)',
-        /** Silnější varianta pro místa, kde linka nese hierarchii, ne jen oddělení. */
-        'line-strong': 'rgba(16, 16, 17, 0.18)',
+        line: 'rgb(var(--line) / 0.10)',
+        'line-strong': 'rgb(var(--line) / 0.20)',
+        field: 'rgb(var(--line) / 0.36)',
         surface: {
           DEFAULT: 'rgb(var(--surface) / <alpha-value>)',
           subtle:  'rgb(var(--surface-subtle) / <alpha-value>)',
@@ -58,6 +61,20 @@ const config: Config = {
           muted:   'rgb(var(--ink-muted) / <alpha-value>)',
           faint:   'rgb(var(--ink-faint) / <alpha-value>)',
         },
+      },
+      /**
+       * Výchozí barvy, které Tailwind jinak bere ze světlého světa: preflight dává každému
+       * `border` šedou #e5e7eb (na tmavém ostrá čára), ring je modrý a mezera kolem focus
+       * ringu bílá — na tmavém by kolem každého fokusovaného tlačítka svítil bílý proužek.
+       */
+      borderColor: {
+        DEFAULT: 'rgb(var(--line) / 0.10)',
+      },
+      ringColor: {
+        DEFAULT: 'rgb(var(--accent))',
+      },
+      ringOffsetColor: {
+        DEFAULT: 'rgb(var(--surface))',
       },
       fontFamily: {
         sans:    ['var(--font-inter)', 'Inter', 'system-ui', 'sans-serif'],

@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Bricolage_Grotesque, Inter, JetBrains_Mono } from 'next/font/google';
 import { NextIntlClientProvider, useMessages } from 'next-intl';
 import { Navbar } from '@/components/Navbar';
@@ -51,13 +51,25 @@ const META = {
     sk: 'KlientHunter – Nájdi firmy, ktoré môžu byť tvoji klienti',
     en: 'KlientHunter – Find businesses that could be your clients',
   },
-  // Popisek slibuje jen to, co dostane každý: export do Excelu je za plánem PRO, který se
-  // zatím koupit nedá, takže by to byl slib do prázdna — stejná chyba jako na ceníku a v FAQ.
+  // Popisek slibuje jen to, co dostane každý účet, i ten zdarma. Export do Excelu patří
+  // placeným tarifům, takže by v obecném popisu byl slib, který většina čtenářů nedostane.
   description: {
     cs: 'Firmy z veřejných rejstříků a map, seřazené podle tvých vlastních kritérií. Data z ARESu a OpenStreetMap, výsledky ke stažení v CSV.',
     sk: 'Firmy z verejných registrov a máp, zoradené podľa tvojich vlastných kritérií. Dáta z ARESu a OpenStreetMap, výsledky na stiahnutie v CSV.',
     en: 'Businesses from public registers and maps, ranked by criteria you choose. Data from ARES and OpenStreetMap, results downloadable as CSV.',
   },
+};
+
+/**
+ * Tmavé téma i pro prohlížeč samotný.
+ *
+ * `themeColor` obarví lištu mobilního Safari a Chrome, `colorScheme` řekne prohlížeči ještě
+ * před načtením CSS, že stránka je tmavá — jinak by na okamžik bliklo bílé plátno a lišta by
+ * zůstala světlá nad tmavým webem. V Next 14 patří obojí do `viewport`, ne do `metadata`.
+ */
+export const viewport: Viewport = {
+  themeColor: '#0A0A0B',
+  colorScheme: 'dark',
 };
 
 export function generateMetadata({ params: { locale } }: { params: { locale: string } }): Metadata {
@@ -84,12 +96,13 @@ export default function RootLayout({
           <main className="min-h-screen">{children}</main>
           <Footer locale={locale} />
           {/*
-            Cookie banner deliberately removed. The app sets exactly one cookie — the `auth-token`
-            that keeps you signed in — and a cookie strictly necessary for a service the user asked
-            for needs no consent under § 89 odst. 3 zákona č. 127/2005 Sb. The banner also claimed
-            we analyse traffic, which we do not: there is no analytics script anywhere in the app,
-            and neither of its buttons gated anything. Asking for consent you do not need, to do
-            something you do not do, is worse than not asking.
+            Cookie banner deliberately removed. The app sets two cookies: `auth-token`, which keeps
+            you signed in, and `NEXT_LOCALE`, which is written only when you click the language
+            switcher. Both serve a function the user asked for, so neither needs consent under
+            § 89 odst. 3 zákona č. 127/2005 Sb. There is no analytics or advertising script
+            anywhere in the app. Asking for consent you do not need, to do something you do not
+            do, is worse than not asking. The privacy policy lists both cookies and the browser
+            storage keys.
           */}
         </NextIntlClientProvider>
       </body>
