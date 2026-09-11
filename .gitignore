@@ -33,3 +33,6 @@ npm-debug.log*
 
 # Build artifact – mění se každým buildem, do gitu nepatří
 tsconfig.tsbuildinfo
+
+# Výstupy měřicích skriptů — obsahují jména živnostníků, repozitář je veřejný
+/scripts/.out/
