@@ -30,6 +30,15 @@ export interface NicheQuery {
    * porozumění dotazu jsou cenná: kdo napíše „kadeřnice", musí skončit u kadeřnictví.
    */
   aliases?: string[];
+  /**
+   * Slova, podle kterých se obor pozná na webu firmy — jen pro ověřování webu, do ARESu nejdou.
+   *
+   * Na stránce podniku stojí jiná slova než v jeho obchodním jméně: web „Starobrněnského šenku"
+   * slovo „restaurace" nemá, a protože se obor na stránce ověřuje, aplikace jeho vlastní doménu
+   * zahodila a napsala „web nemá". Změřeno na vzorku 100 firem 11. 9. 2026. Záměrně bez obecných
+   * slov („menu", „servis", „salon"), která stojí na polovině všech webů.
+   */
+  pageWords?: string[];
   /** OpenStreetMap tag filters, as `key=value`. */
   osm: string[];
   /** Jak často u tohohle oboru najdeme web. Viz `YIELD` níž. */
@@ -71,25 +80,25 @@ export const NICHE_MAP: Record<string, NicheQuery> = {
   // (ostatní specializované stavební práce) rozšíří záběr; obor stejně stojí hlavně na názvu.
   'roofer':               { nace: ['43910', '43990'],  keywords: ['pokrývačství', 'střechy'], aliases: ['pokrývač'], osm: ['craft=roofer'], yield: 'unknown' },
   'landscaper':           { nace: ['81300'],           keywords: ['zahradnictví', 'zahradní'], osm: ['craft=gardener', 'shop=garden_centre'], yield: 'high' },
-  'restaurant':           { nace: ['56300'],           keywords: ['restaurace', 'hostinec'], osm: ['amenity=restaurant'], yield: 'high' },
+  'restaurant':           { nace: ['56300'],           keywords: ['restaurace', 'hostinec'], pageWords: ['hospoda', 'šenk', 'bistro', 'pivnice', 'jídelna', 'pizzerie', 'kuchyně'], osm: ['amenity=restaurant'], yield: 'high' },
   'cafe':                 { nace: ['56300'],           keywords: ['kavárna', 'café'], osm: ['amenity=cafe'], yield: 'high' },
   'bakery':               { nace: ['10710', '47240'],  keywords: ['pekárna', 'pekařství'], osm: ['shop=bakery'], yield: 'mid' },
   'butcher shop':         { nace: ['47220', '10110'],  keywords: ['řeznictví', 'masna'], osm: ['shop=butcher'], yield: 'mid' },
-  'hair salon':           { nace: ['96210'],           keywords: ['kadeřnictví', 'kadeřník'], aliases: ['kadeřnic'], osm: ['shop=hairdresser'], yield: 'measured-low' },
+  'hair salon':           { nace: ['96210'],           keywords: ['kadeřnictví', 'kadeřník'], aliases: ['kadeřnic'], pageWords: ['kadeřnice', 'barbershop', 'barber', 'holičství', 'střih'], osm: ['shop=hairdresser'], yield: 'measured-low' },
   'beauty salon':         { nace: ['96210', '96230'],  keywords: ['kosmetika', 'kosmetický'], osm: ['shop=beauty'], yield: 'low' },
   'nail studio':          { nace: ['96210'],           keywords: ['nehty', 'nehtová', 'manikúra'], aliases: ['nehtové studio'], osm: ['shop=beauty'], yield: 'low' },
   'massage':              { nace: ['96230'],           keywords: ['masáže', 'masér'], aliases: ['masážní'], osm: ['shop=massage'], yield: 'low' },
-  'car repair':           { nace: ['95310'],           keywords: ['autoservis', 'autodílna'], aliases: ['automobilový servis'], osm: ['shop=car_repair'], yield: 'mid' },
+  'car repair':           { nace: ['95310'],           keywords: ['autoservis', 'autodílna'], aliases: ['automobilový servis'], pageWords: ['pneuservis', 'opravy vozidel', 'oprava vozidel', 'servis vozidel', 'diagnostika vozidel'], osm: ['shop=car_repair'], yield: 'mid' },
   'tire shop':            { nace: ['95310'],           keywords: ['pneuservis', 'pneu'], osm: ['shop=tyres'], yield: 'mid' },
   'accountant':           { nace: ['69200'],           keywords: ['účetnictví', 'účetní'], osm: ['office=accountant'], yield: 'low' },
   'photographer':         { nace: ['74200'],           keywords: ['fotograf', 'fotoateliér'], osm: ['craft=photographer'], yield: 'low' },
   'cleaning service':     { nace: ['81210', '81220'],  keywords: ['úklid', 'úklidové'], osm: ['shop=laundry'], yield: 'mid' },
   'veterinarian':         { nace: ['75000'],           keywords: ['veterinární', 'veterina'], osm: ['amenity=veterinary'], yield: 'high' },
   'general practitioner': { nace: ['86210'],           keywords: ['praktický lékař', 'ordinace'], osm: ['amenity=doctors'], yield: 'high' },
-  'dentist':              { nace: ['86230'],           keywords: ['zubní', 'stomatolog', 'dentál'], osm: ['amenity=dentist'], yield: 'measured-high' },
+  'dentist':              { nace: ['86230'],           keywords: ['zubní', 'stomatolog', 'dentál'], pageWords: ['stomatologie', 'zubař', 'ortodoncie', 'dentální hygiena'], osm: ['amenity=dentist'], yield: 'measured-high' },
   'physiotherapist':      { nace: ['96230'],           keywords: ['fyzioterapie', 'rehabilitace'], osm: ['healthcare=physiotherapist'], yield: 'low' },
   'pharmacy':             { nace: ['47730'],           keywords: ['lékárna'], osm: ['amenity=pharmacy'], yield: 'high' },
-  'optician':             { nace: ['47780'],           keywords: ['optika', 'oční optika'], osm: ['shop=optician'], yield: 'high' },
+  'optician':             { nace: ['47780'],           keywords: ['optika', 'oční optika'], pageWords: ['brýle', 'oční', 'kontaktní čočky', 'optometrist'], osm: ['shop=optician'], yield: 'high' },
   'lawyer':               { nace: ['69100'],           keywords: ['advokát', 'advokátní'], osm: ['office=lawyer'], yield: 'high' },
   'real estate agency':   { nace: ['68310'],           keywords: ['reality', 'realitní'], osm: ['office=estate_agent'], yield: 'mid' },
   'driving school':       { nace: ['85530'],           keywords: ['autoškola'], osm: ['amenity=driving_school'], yield: 'mid' },

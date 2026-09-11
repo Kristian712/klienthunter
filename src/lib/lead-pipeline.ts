@@ -1,7 +1,16 @@
 import { createRobotsCache } from './robots';
 import { ENRICHMENT_SOURCES, contactPageUrl, extractContacts, type RawLead } from './sources';
 import { resolveNiche } from './nace-map';
-import { buildNameIndex, discoverWebsite, probeOnce, tldForRegion } from './website-discovery';
+import {
+  addressParts,
+  buildNameIndex,
+  claimedPageBelongs,
+  discoverWebsite,
+  looksLikePerson,
+  probeOnce,
+  tldForRegion,
+  type NameIndex,
+} from './website-discovery';
 import {
   classify,
   createProbeCache,
@@ -10,6 +19,7 @@ import {
   runPool,
   significantTokens,
   siteFromEmail,
+  type ProbeResult,
   type WebsiteSignals,
   type WebsiteVerdict,
 } from './website-status';
@@ -239,10 +249,162 @@ function timedOutVerdict(c: Candidate): WebsiteVerdict {
     : v;
 }
 
-/** Město z regionu tak, jak ho zadal uživatel: „Zlín, Zlínský kraj" → „Zlín". */
+/** Město z regionu tak, jak ho zadal uživatel: „Zlín, Zlínský kraj" → „Zlín". „Celá ČR" město není. */
 function cityOfRegion(region: string): string | undefined {
   const mesto = region.split(',')[0].trim();
+  if (/^cel[áa]\s+(čr|cr|česká republika|slovensko)$/i.test(mesto)) return undefined;
   return mesto.length >= 2 ? mesto : undefined;
+}
+
+/**
+ * Obec, která jde do tvarů domén (`autoservis-zlin.cz`).
+ *
+ * Bere se z adresy firmy, ne z regionu hledání: u „Celá ČR" vznikaly domény jako
+ * `olgafedunovacelacr.cz`, a firma z Otrokovic hledaná pod „Zlín" má web s Otrokovicemi.
+ */
+export function domainCityFor(address: string | undefined, region: string): string | undefined {
+  return addressParts(address).city ?? cityOfRegion(region);
+}
+
+/**
+ * Slova oboru pro dohledávání webu. Česká slova první — první z nich jde do tvarů domén
+ * a do dotazu vyhledávače.
+ *
+ * Dřív stál první anglický klíč z formuláře, takže se zkoušely domény jako
+ * `hairsalonnemcova.cz` a `dentistkunert.cz`, které nikdo nemá, a `zubniduskova.cz` se nezkusila
+ * nikdy. Změřeno na vzorku 100 firem (11. 9. 2026): dva přehlédnuté weby právě kvůli tomu.
+ */
+export function tradeWordsFor(industry: string): string[] {
+  const niche = resolveNiche(industry);
+  return Array.from(new Set([...niche.keywords, ...(niche.pageWords ?? []), industry]))
+    .map(w => w.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim())
+    .filter(w => w.length >= 4);
+}
+
+/** Co potřebuje rozhodnutí o webu jedné firmy. Viz `verifyWebsite`. */
+export interface WebsiteCheck {
+  /** Index slov z celého výsledku hledání — rozhoduje, co je v názvu obecné slovo. */
+  nameIndex: NameIndex;
+  tld: string;
+  region: string;
+  tradeWords: readonly string[];
+  probe: (url: string, mode?: 'all' | 'first-only') => Promise<ProbeResult>;
+  deadlineAt: number;
+  /** `false` = žádná HTTP sonda, verdikt jen z toho, co řekly zdroje. */
+  probeNetwork: boolean;
+  /** Smí se firma dohledávat i přes vyhledávač (stojí dotaz). */
+  search: boolean;
+}
+
+/**
+ * Verdikt o webu jedné firmy.
+ *
+ * Jediné místo, kde se o tom rozhoduje. Volá ho hledání (`enrichAndVerify`) i měřicí skript
+ * `scripts/verify-website-flags.ts` — dřív si skript rozhodování kopíroval, a každá oprava by
+ * pak měřila kopii místo kódu, který běží v aplikaci.
+ */
+export async function verifyWebsite(
+  c: Pick<Candidate, 'name' | 'ico' | 'phone' | 'email' | 'address' | 'legalForm' | 'signals'>,
+  ctx: WebsiteCheck,
+): Promise<{ verdict: WebsiteVerdict; searched: boolean }> {
+  /**
+   * The e-mail domain is resolved here rather than in `toCandidate` because `absorb` can still
+   * add an e-mail from a second source after the candidate was created. Reading it at the last
+   * moment means the merge order cannot decide whether we look.
+   */
+  const signals: WebsiteSignals = { ...c.signals, emailDomainUrl: siteFromEmail(c.email) };
+  if (!ctx.probeNetwork) return { verdict: classify(signals), searched: false };
+
+  const facts = { name: c.name, ico: c.ico, phone: c.phone, address: c.address };
+  // A URL a source actually stated outranks a domain we derived.
+  const claimed = isRealWebsite(signals.claimedUrl) ? signals.claimedUrl : undefined;
+  const target = claimed ?? signals.emailDomainUrl;
+  let verdict = classify(signals, target ? await ctx.probe(target) : undefined);
+
+  /**
+   * Web ze zdroje musí firmu doložit — viz `claimedPageBelongs`. Když ne, nejde o „má web",
+   * ale ani o „nemá": zdroj něco tvrdil a my to nepotvrdili. Adresa zůstane v evidenci a firma se
+   * ještě zkusí dohledat podle názvu. Stránka, kterou jsme přečíst nesměli (robots.txt, 403), se
+   * posoudit nedá a verdikt ze zdroje platí dál.
+   */
+  if (verdict.status === 'HAS' && claimed && verdict.html && verdict.url && !claimedPageBelongs(verdict.html, verdict.url, facts)) {
+    verdict = {
+      status: 'UNKNOWN',
+      evidence: `zdroj uvádí web ${claimed}, ale ta stránka firmu nedokládá — je na cizí doméně nebo firmu nezmiňuje`,
+    };
+  } else if (verdict.status === 'HAS') {
+    return { verdict, searched: false };
+  }
+
+  /**
+   * Nothing the sources gave us led to a website — which is the normal case, not the
+   * exception: ARES has no website column at all. Rather than leave the row blank, look the
+   * firm up under the domains its own name suggests. `discoverWebsite` only reports a hit the
+   * fetched page proves, so this can add websites but never invent one.
+   */
+  const found = await discoverWebsite(
+    // Telefon a adresa jdou do dohledávání jako důkaz: doména se hádá z názvu, takže shoda
+    // názvu na stránce je kruh. Teprve číslo nebo adresa z registru oddělí web téhle firmy
+    // od webu jmenovce — a mají je i firmy, které IČO na web nedají (většina, viz měření).
+    facts,
+    ctx.nameIndex,
+    {
+      tld: ctx.tld,
+      deadlineAt: ctx.deadlineAt,
+      probe: ctx.probe,
+      tradeWords: ctx.tradeWords,
+      city: domainCityFor(c.address, ctx.region),
+      person: looksLikePerson(c.name, c.legalForm),
+      search: ctx.search,
+    },
+  );
+  const searched = found.searched;
+  if (found.site) {
+    return {
+      verdict: { status: 'HAS', url: found.site.url, evidence: found.site.evidence, html: found.site.html },
+      searched,
+    };
+  }
+
+  /**
+   * „Web nemá" jen s důkazem — tohle je jádro celé aplikace.
+   *
+   * Dřív stačilo, že žádná doména odvozená z názvu nesedí. Na vzorku 100 firem (11.–12. 9. 2026)
+   * to bylo špatně ve 35–38 % případů: firmy mají web pod značkou, kterou z obchodního jména nikdo
+   * neuhodne („Adam Beneš" → kings-barbers.cz, „SHARI CZ" → continentalpizza.cz). Uživatel pak volá
+   * firmě, která web má, a aplikace pro něj přestane být důvěryhodná.
+   *
+   * Proto **NONE** jen tehdy, když se kromě domén z názvu zeptal i vyhledávač, odpověděl a žádný
+   * z jeho výsledků nebyl web té firmy. Bez vyhledávače (chybí klíč nebo vypínač, došel strop
+   * dotazů, vyhledávač neodpověděl) je to **UNKNOWN** a evidence říká proč.
+   */
+  if (signals.claimedUrl) return { verdict, searched };
+  if (found.ranOut) {
+    return { verdict: { status: 'UNKNOWN', evidence: 'nestihli jsme web ověřit — hledání došel čas' }, searched };
+  }
+  if (found.inconclusive) {
+    return {
+      verdict: { status: 'UNKNOWN', evidence: 'doména odvozená z názvu firmy existuje, ale neodpověděla — web ani vyloučit nejde' },
+      searched,
+    };
+  }
+  const zNazvu = found.noCandidates
+    ? 'z názvu firmy nejde odvodit doména'
+    : `prověřeno ${found.checked} ${domainWord(found.checked)} z názvu firmy`;
+  const zEmailu = signals.emailDomainUrl ? ' i doména z e-mailu' : '';
+  if (found.searched && found.searchAnswered) {
+    return {
+      verdict: { status: 'NONE', evidence: `${zNazvu}${zEmailu} i výsledky vyhledávače — žádný web firmy jsme nenašli` },
+      searched,
+    };
+  }
+  return {
+    verdict: {
+      status: 'UNKNOWN',
+      evidence: `nedoloženo: ${zNazvu}${zEmailu}, ${found.searched ? 'vyhledávač neodpověděl' : 'vyhledávače jsme se neptali'} — to nestačí na tvrzení, že firma web nemá`,
+    },
+    searched,
+  };
 }
 
 export interface VerifiedCandidate {
@@ -294,11 +456,8 @@ export async function enrichAndVerify(
   const nameIndex = buildNameIndex(candidates.map(c => c.name));
   const tld = tldForRegion(region);
   const discoveryDeadline = deadlineAt - DISCOVERY_HEADROOM_MS;
-  // The trade the user searched for, as words a Czech page would actually contain. Used as the
-  // second fact a guessed domain has to satisfy — see `verifyPage`.
-  const tradeWords = Array.from(new Set([industry, ...resolveNiche(industry).keywords]))
-    .map(w => w.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim())
-    .filter(w => w.length >= 4);
+  // Obor tak, jak ho píše česká stránka — viz `tradeWordsFor`.
+  const tradeWords = tradeWordsFor(industry);
 
   const enrichOne = async (c: Candidate) => {
     const lead: RawLead = {
@@ -322,85 +481,22 @@ export async function enrichAndVerify(
     }
   };
 
-  /**
-   * The e-mail domain is resolved here rather than in `toCandidate` because `absorb` can still
-   * add an e-mail from a second source after the candidate was created. Reading it at the last
-   * moment means the merge order cannot decide whether we look.
-   */
+  // Rozhodnutí o webu je ve `verifyWebsite`; tady se jen hlídá strop placených dotazů do vyhledávače.
   const verify = async (c: Candidate): Promise<WebsiteVerdict> => {
-    const signals: WebsiteSignals = { ...c.signals, emailDomainUrl: siteFromEmail(c.email) };
-    if (!probeNetwork) return classify(signals);
-
-    // A URL a source actually stated outranks a domain we derived.
-    const target = isRealWebsite(signals.claimedUrl) ? signals.claimedUrl : signals.emailDomainUrl;
-    const verdict = classify(signals, target ? await probe(target) : undefined);
-    if (verdict.status === 'HAS') return verdict;
-
-    /**
-     * Nothing the sources gave us led to a website — which is the normal case, not the
-     * exception: ARES has no website column at all. Rather than leave the row blank, look the
-     * firm up under the domains its own name suggests. `discoverWebsite` only reports a hit the
-     * fetched page proves, so this can add websites but never invent one.
-     */
-    const found = await discoverWebsite(
-      // Telefon a adresa jdou do dohledávání jako důkaz: doména se hádá z názvu, takže shoda
-      // názvu na stránce je kruh. Teprve číslo nebo adresa z registru oddělí web téhle firmy
-      // od webu jmenovce — a mají je i firmy, které IČO na web nedají (většina, viz měření).
-      { name: c.name, ico: c.ico, phone: c.phone, address: c.address },
+    const { verdict, searched } = await verifyWebsite(c, {
       nameIndex,
-      {
-        tld,
-        deadlineAt: discoveryDeadline,
-        probe,
-        tradeWords,
-        city: cityOfRegion(region),
-        // Dotaz do vyhledávače stojí peníze nebo kvótu, takže má strop na jedno hledání.
-        // Dojde-li, verdikt „web nemá" pořád stojí na prověřených doménách — jen bez té
-        // poslední pojistky, což se do evidence napíše.
-        search: searchesLeft > 0,
-      },
-    );
-    if (found.searched) searchesLeft--;
-    if (found.site) {
-      return {
-        status: 'HAS',
-        url: found.site.url,
-        evidence: found.site.evidence,
-        html: found.site.html,
-      };
-    }
-
-    /**
-     * Ticho se musí umět rozlišit — tohle je jádro celé aplikace.
-     *
-     * Dokud tady stálo `return verdict`, skončila každá firma bez webu jako UNKNOWN, protože
-     * ARES web needviduje a OpenStreetMap ho tagne u menšiny. Aplikace pak psala „web jsme
-     * nenašli" u firmy, o které se nikdy nic nezjišťovalo, i u firmy, u které se prověřilo
-     * všechno. To jsou dvě různá tvrzení a uživatel podle nich dělá různá rozhodnutí.
-     *
-     * Teď platí: prošly-li se všechny domény, které z názvu plynou, a nic nesedělo, je to
-     * **NONE** — a evidence říká, co se prověřovalo. Když došel čas, nešla z názvu odvodit
-     * doména nebo zdroj web uváděl a ten neodpověděl, zůstává **UNKNOWN**, a to se i napíše.
-     */
-    if (signals.claimedUrl) return verdict;
-    if (found.ranOut) {
-      return { status: 'UNKNOWN', evidence: 'nestihli jsme web ověřit — hledání došel čas' };
-    }
-    if (found.noCandidates) {
-      return { status: 'UNKNOWN', evidence: 'z názvu firmy nejde odvodit doména, kterou by šlo ověřit' };
-    }
-    if (found.inconclusive) {
-      return {
-        status: 'UNKNOWN',
-        evidence: 'doména odvozená z názvu firmy existuje, ale neodpověděla — web ani vyloučit nejde',
-      };
-    }
-    return {
-      status: 'NONE',
-      evidence: `prověřeno ${found.checked} ${domainWord(found.checked)} z názvu firmy${
-        signals.emailDomainUrl ? ' i doména z e-mailu' : ''
-      }${found.searched ? ' i odkazy z vyhledávače' : ''} — žádný web firmy jsme nenašli`,
-    };
+      tld,
+      region,
+      tradeWords,
+      probe,
+      deadlineAt: discoveryDeadline,
+      probeNetwork,
+      // Dotaz do vyhledávače stojí peníze, takže má strop na jedno hledání. Dojde-li, verdikt
+      // pořád stojí na prověřených doménách — jen bez té poslední pojistky.
+      search: searchesLeft > 0,
+    });
+    if (searched) searchesLeft--;
+    return verdict;
   };
 
   /**

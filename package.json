@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && (prisma db push --accept-data-loss --skip-generate || prisma db push --accept-data-loss --skip-generate || echo 'DB push skipped') && next build",
+    "build": "prisma generate && (prisma db push --accept-data-loss --skip-generate || prisma db push --accept-data-loss --skip-generate || echo 'DB push skipped') && (npx --yes tsx scripts/fix-website-none.ts --apply || echo 'website-none fix skipped') && next build",
     "start": "next start",
     "lint": "next lint",
     "postinstall": "prisma generate",
@@ -13,7 +13,9 @@
     "db:studio": "prisma studio",
     "db:generate": "prisma generate",
     "db:deploy": "prisma migrate deploy",
-    "verify:sources": "npx --yes tsx scripts/verify-sources.ts"
+    "verify:sources": "npx --yes tsx scripts/verify-sources.ts",
+    "verify:website": "npx --yes tsx scripts/verify-website-flags.ts",
+    "verify:web-search": "npx --yes tsx scripts/verify-web-search.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.10.0",

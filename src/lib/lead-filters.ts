@@ -260,14 +260,11 @@ export const LEAD_FILTERS: LeadFilter[] = [
     id: 'no_website',
     group: 'web',
     /**
-     * „Web nemá" je od téhle vlny tvrzení, které se dá obhájit: znamená, že se prošly všechny
-     * domény, které z názvu firmy plynou, e-mailová doména i to, co uvedly zdroje — a nic
-     * z toho web firmy nebyl. Neznamená to „nedívali jsme se"; na to je `web_unknown` níž.
-     *
-     * Dřív sem padalo všechno neověřené, takže filtr sliboval seznam firem bez webu a vracel
-     * seznam firem, o kterých se nic neví. Změřeno na šedesáti firmách, o kterých víme, že web
-     * mají: staré dohledávání jich našlo 15, nové 48 — těch zbylých 33 aplikace do té doby
-     * ukazovala právě pod tímhle filtrem.
+     * „Web nemá" znamená doložené tvrzení: prošly se domény z názvu firmy, e-mailová doména, to,
+     * co uvedly zdroje, **a zeptal se i vyhledávač** — a nic z toho web firmy nebyl (viz
+     * `verifyWebsite`). Samotné neúspěšné hádání domén z názvu sem nepatří: na vzorku 100 firem
+     * (11.–12. 9. 2026) bylo takové „nemá" špatně zhruba v každém třetím případě, protože firmy
+     * mají web pod značkou, která z obchodního jména nevyplývá. To je teď `web_unknown`.
      */
     label: { cs: 'Web nemá', sk: 'Web nemá', en: 'Has no website' },
     where: { websiteStatus: 'NONE' },

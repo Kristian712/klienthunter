@@ -395,7 +395,9 @@ export function ResultsMap({ leads, total, locale, onSetStatus, hideDone, hidden
      */
     const pulsing = new Set(
       placeable
-        .filter(l => !l.hasWebsite && !isTagged(l.status))
+        // Jen ověřené „nemá web". Firma, o které nevíme, není příležitost, ale otázka — dřív
+        // pulzovala taky, protože test stál na `hasWebsite`, které je u „nevíme" stejně false.
+        .filter(l => webStateOf(l) === 'NONE' && !isTagged(l.status))
         .sort((a, b) => b.leadScore - a.leadScore)
         .slice(0, MAX_PULSING)
         .map(l => l.id),

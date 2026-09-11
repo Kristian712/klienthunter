@@ -106,6 +106,18 @@ function isDistinctive(token: string, index: NameIndex): boolean {
 }
 
 /**
+ * Je to člověk, ne firma se jménem?
+ *
+ * Rozhoduje právní forma z ARESu (10x = fyzická osoba podnikající), a když ji nemáme, titul
+ * v názvu. U člověka se samotné křestní jméno ani příjmení za doménu nezkouší — viz
+ * `domainCandidates`.
+ */
+export function looksLikePerson(name: string, legalForm?: string | null): boolean {
+  if (legalForm) return /^10\d$/.test(legalForm);
+  return new RegExp(TITLES.source).test(normalizeName(name));
+}
+
+/**
  * Slova, kterými se firma odlišuje od ostatních ve svém oboru.
  *
  * Obecná slova oboru se na stránce vyžadovat nedají: česká ordinace se anglicky „clinic"
@@ -123,7 +135,12 @@ export function identifyingTokens(name: string): string[] {
 
 const MIN_SLUG = 4;
 const MAX_SLUG = 40;
-export const MAX_DOMAINS_PER_FIRM = 10;
+/**
+ * Kolik domén se u jedné firmy vůbec zkusí. DNS dotaz je levný; drahé je stažení stránky a to
+ * hlídá `MAX_PROBES_PER_FIRM`. Bylo 10 — nové tvary („salon" + jméno, „u" + název, .com) se do
+ * deseti nevešly a odřízly by se dřív, než je kdo zkusil.
+ */
+export const MAX_DOMAINS_PER_FIRM = 14;
 
 /** Kolik domén jedné firmy smí dojít až ke stažení stránky. DNS je levné, HTTP ne. */
 const MAX_PROBES_PER_FIRM = 5;
@@ -145,8 +162,10 @@ const MAX_PROBES_PER_FIRM = 5;
 export interface DomainHints {
   /** Slova oboru, jak je zná `nace-map` — `kadernictvi`, `autoservis`. */
   tradeWords?: readonly string[];
-  /** Město, ve kterém se hledá. */
+  /** Obec firmy — z její adresy, ne z regionu hledání („Celá ČR" není město). */
   city?: string;
+  /** Firma je člověk (živnostník, lékař). Viz `looksLikePerson`. */
+  person?: boolean;
 }
 
 export function domainCandidates(
@@ -179,6 +198,14 @@ export function domainCandidates(
   push(tokens.join(''));
   if (tokens.length > 1) push(tokens.join('-'));
   /**
+   * Předložka „U" je součást jména podniku. „U Sedlerů" má web na `usedleru.cz`, jenže
+   * `nameTokens` jednopísmenná slova zahazuje, takže tahle doména se nikdy nezkusila.
+   */
+  if (/^u\s/.test(normalizeName(name)) && tokens.length > 0) {
+    push(`u${tokens.join('')}`);
+    push(`u-${tokens.join('-')}`);
+  }
+  /**
    * Název bez obecných slov: „Dentdelion – zubní ordinace" má web na `dentdelion.cz`, ne na
    * `dentdelionzubniordinace.cz`. Firmy si do domény obor obvykle nedávají, i když ho mají
    * v obchodním jménu.
@@ -193,7 +220,15 @@ export function domainCandidates(
     push(tokens.slice(0, 2).join(''));
     push(tokens.slice(0, 2).join('-'));
   }
-  for (const token of distinctive) if (token.length >= 5) push(token);
+  /**
+   * Jedno výrazné slovo jako celá doména — ale ne u člověka.
+   *
+   * Z „Radek Chlud" vznikalo `radek.cz`, z „Veronika Lieskovská" `veronika.cz`. Takové domény
+   * patří někomu jinému, často mlčí a každá zabrala až 18 s (tři podoby adresy po 6 s). Na
+   * vzorku 100 firem kvůli nim 9 firem nestihlo ověření a skončilo jako „nevíme". Web člověka
+   * na samotném jménu nebo příjmení v tom vzorku nebyl ani jeden.
+   */
+  if (!hints.person) for (const token of distinctive) if (token.length >= 5) push(token);
 
   /**
    * Kombinace se slovem oboru a s městem.
@@ -203,7 +238,8 @@ export function domainCandidates(
    * kdy zkusila. Přidávají se až na konec, takže pořadí nejlepších hypotéz zůstává stejné.
    */
   const trade = (hints.tradeWords ?? []).map(w => normalizeName(w).replace(/\s+/g, '')).filter(w => w.length >= 4)[0];
-  const city = hints.city ? normalizeName(hints.city).replace(/\s+/g, '') : undefined;
+  // „Praha 9" → „praha": číslo obvodu do domény nikdo nedává.
+  const city = hints.city ? normalizeName(hints.city).replace(/\s*\d+$/, '').replace(/\s+/g, '') : undefined;
   const jadro = identifyingTokens(name);
   const posledni = jadro[jadro.length - 1];
 
@@ -217,7 +253,29 @@ export function domainCandidates(
     push(`${jadro.join('')}-${city}`);
   }
 
-  return slugs.slice(0, MAX_DOMAINS_PER_FIRM).map(s => `${s}.${tld}`);
+  /**
+   * Obecné slovo z názvu ve dvojici s tím, čím se firma odlišuje.
+   *
+   * „Kadeřnický salon Terry" má web na `salonterry.cz`. Samotné „salon" doménou být nesmí, ale
+   * dvojice „salon" + „terry" je hypotéza, kterou z názvu vyčte každý — a ověření na stránce
+   * (telefon firmy) ji pak potvrdí, nebo zahodí.
+   */
+  const typove = tokens.filter(t => GENERIC_WORDS.has(t));
+  if (typove.length > 0 && posledni && !typove.includes(posledni)) {
+    push(`${typove[0]}${posledni}`);
+    push(`${typove[0]}-${posledni}`);
+  }
+
+  const domains = slugs.slice(0, MAX_DOMAINS_PER_FIRM).map(s => `${s}.${tld}`);
+  /**
+   * Celý název i pod .com a .eu. „Art de Suisse" má `artdesuisse.com`. Jen pro delší celý název:
+   * krátké slovo pod .com skoro jistě patří někomu jinému.
+   */
+  const cely = tokens.join('');
+  if (tld === 'cz' && cely.length >= 8 && slugs.includes(cely)) {
+    domains.push(`${cely}.com`, `${cely}.eu`);
+  }
+  return domains;
 }
 
 /** Cheap filter: an unregistered domain costs one UDP round trip instead of a five-second probe. */
@@ -421,6 +479,69 @@ export function pageEvidence(
   return null;
 }
 
+/**
+ * Patří stránka z výsledků vyhledávače téhle firmě?
+ *
+ * Mírnější než `pageEvidence` v jediném bodě: doména nemusí nést název firmy. Přesně to totiž
+ * značkové weby nedělají — „Adam Beneš" má `kings-barbers.cz`, „SHARI CZ s.r.o." `continentalpizza.cz`.
+ * Hypotézu tu nedodal název firmy, ale vyhledávač, který na dotaz s jejím jménem odpověděl, takže
+ * kruh „doménu jsme si vymysleli z názvu a název je na stránce" tu nehrozí. Důkaz zůstává: IČO,
+ * telefon nebo adresa z registru, anebo všechna odlišující slova názvu + obec + obor najednou.
+ */
+export function searchPageEvidence(
+  html: string,
+  firm: FirmFacts,
+  city: string | undefined,
+  tradeWords: readonly string[],
+): string | null {
+  const text = pageText(html);
+  if (PARKED.test(text)) return null;
+
+  const facts = factsOnPage(text, firm);
+  if (facts.strong) return facts.strong;
+
+  const identifying = identifyingTokens(firm.name);
+  const obec = city ? normalizeName(city).replace(/\s*\d+$/, '').trim() : '';
+  if (
+    identifying.length > 0 &&
+    identifying.every(t => hasWord(text, t)) &&
+    obec.length >= 2 && hasWord(text, obec) &&
+    tradeWords.some(w => text.includes(w))
+  ) {
+    return 'na stránce je celý název firmy, její obec i obor';
+  }
+  return null;
+}
+
+/**
+ * Patří stránka, kterou uvedl zdroj (OSM), opravdu té firmě?
+ *
+ * Dřív stačilo, že adresa odpověděla. Na vzorku 100 firem (11. 9. 2026) tak aplikace u zubaře
+ * napsala „má web" kvůli podstránce polikliniky, ve které si pronajímá ordinaci — seznamu
+ * nájemníků na cizí doméně. Pravidlo je záměrně mírnější než u uhodnutých domén: adresu tu
+ * uvedl člověk, který firmu zná, takže stačí, aby ji stránka zmiňovala. Neprojde jen stránka,
+ * která firmu nedokládá vůbec, a hluboká podstránka domény, jejíž jméno s firmou nemá nic
+ * společného — tam je firma jen položkou cizího webu.
+ */
+export function claimedPageBelongs(html: string, url: string, firm: FirmFacts): boolean {
+  const text = pageText(html);
+  if (factsOnPage(text, firm).strong) return true;
+
+  const identifying = identifyingTokens(firm.name);
+  const label = domainLabel(url);
+  const labelNesesNazev = identifying.some(t => label.includes(t));
+
+  let hloubka = 0;
+  try {
+    hloubka = new URL(url).pathname.split('/').filter(Boolean).length;
+  } catch {
+    /* neplatná adresa — posoudí se jen podle obsahu */
+  }
+  if (!labelNesesNazev && hloubka >= 2) return false;
+
+  return labelNesesNazev || (identifying.length > 0 && identifying.every(t => hasWord(text, t)));
+}
+
 /** Stránky, kde firmy nejčastěji uvádějí IČO, telefon a adresu, když je nemají na titulní. */
 const KONTAKTNI_CESTY = ['/kontakt', '/kontakty', '/contact'];
 
@@ -448,6 +569,11 @@ export interface DiscoveryOutcome {
   /** Ptali jsme se i vyhledávače? Volající podle toho počítá placené dotazy. */
   searched: boolean;
   /**
+   * Vyhledávač odpověděl a žádný z jeho výsledků nebyl web firmy. Jen tohle smí vést na „web
+   * nemá" — viz `verifyWebsite`.
+   */
+  searchAnswered: boolean;
+  /**
    * Některá doména z názvu firmy existuje, ale neodpověděla.
    *
    * Pak nejde říct „firma web nemá": server mohl být na pár vteřin mimo a doména je zaregistrovaná
@@ -466,8 +592,10 @@ export async function discoverWebsite(
     probe: (url: string, mode?: 'all' | 'first-only') => Promise<ProbeResult>;
     /** Words of the searched trade; a page that mentions none of them is somebody else's. */
     tradeWords?: readonly string[];
-    /** Město hledání — jde do tvarů domén jako `kadernictvi-zlin.cz`. */
+    /** Obec firmy — jde do tvarů domén jako `kadernictvi-zlin.cz`. */
     city?: string;
+    /** Firma je člověk — viz `looksLikePerson`. */
+    person?: boolean;
     /**
      * Smí se firma dohledávat i přes vyhledávač? Volající tím drží počet placených dotazů:
      * pouští se to jen na firmy, u kterých by jinak padl verdikt „web nemá".
@@ -478,8 +606,13 @@ export async function discoverWebsite(
   const domains = domainCandidates(firm.name, index, opts.tld, {
     tradeWords: opts.tradeWords,
     city: opts.city,
+    person: opts.person,
   });
-  if (domains.length === 0) return { site: null, checked: 0, ranOut: false, noCandidates: true, searched: false, inconclusive: false };
+  /**
+   * Z názvu nejde odvodit žádná doména. Dřív tu hledání končilo; teď se firma pořád může zeptat
+   * vyhledávače — „G A Dent s.r.o." doménu z názvu nemá, ale web mít může.
+   */
+  const noCandidates = domains.length === 0;
 
   // One batch of DNS lookups for the whole firm: they are cheap, independent, and knowing which
   // domains exist at all decides how many expensive probes are left to run.
@@ -510,7 +643,7 @@ export async function discoverWebsite(
     // Checked before every probe, not once: four dead hosts at five seconds each would otherwise
     // eat the budget the rest of the search needs.
     if (Date.now() >= opts.deadlineAt) {
-      return { site: null, checked: checked - 1, ranOut: true, noCandidates: false, searched: false, inconclusive };
+      return { site: null, checked: checked - 1, ranOut: true, noCandidates, searched: false, searchAnswered: false, inconclusive };
     }
 
     // Zkouší se `https://`, `https://www.` i `http://`: profservis.cz servíruje web výhradně
@@ -559,13 +692,25 @@ export async function discoverWebsite(
       }
     }
 
+    /**
+     * Doména mimo zemi hledání (.com, .eu) potřebuje tvrdý důkaz — IČO, telefon nebo adresu.
+     *
+     * Shoda celého názvu a oboru tady nestačí: „PANADENT s.r.o." z Ostravy tak na vzorku 100 firem
+     * (12. 9. 2026) dostala `panadent.com`, web americké firmy se stejným jménem a stejným oborem.
+     * Pod .cz jsou jmenovci ve stejném oboru vzácní, pod .com ne.
+     */
+    if (why && !domain.endsWith(`.${opts.tld}`) && !why.startsWith('doména nese název firmy a na stránce')) {
+      why = null;
+    }
+
     if (why) {
       return {
         site: { url, html: result.html, evidence: `web dohledán podle názvu, ${why}` },
         checked,
         ranOut: false,
-        noCandidates: false,
+        noCandidates,
         searched: false,
+        searchAnswered: false,
         inconclusive,
       };
     }
@@ -580,33 +725,39 @@ export async function discoverWebsite(
    * doména: vyhledávač dodává adresu, ne pravdu.
    */
   let searched = false;
+  let searchAnswered = false;
   if (opts.search && webSearchEnabled() && Date.now() < opts.deadlineAt) {
     searched = true;
     const dotaz = [`"${firm.name}"`, opts.city, opts.tradeWords?.[0]].filter(Boolean).join(' ');
-    for (const host of await searchDomains(dotaz, 3)) {
+    const odpoved = await searchDomains(dotaz, 3);
+    searchAnswered = odpoved.ok;
+    for (const host of odpoved.hosts) {
       if (Date.now() >= opts.deadlineAt) {
-        return { site: null, checked, ranOut: true, noCandidates: false, searched, inconclusive };
+        return { site: null, checked, ranOut: true, noCandidates, searched, searchAnswered: false, inconclusive };
       }
       checked++;
       const res = await opts.probe(`https://${host}`, 'all');
       if (!res.alive || !res.html) continue;
 
       const adresa = res.finalUrl ?? `https://${host}`;
-      const proc = pageEvidence(res.html, firm, adresa, index, opts.tradeWords ?? []);
+      // Nejdřív přísné pravidlo; značkový web (doména bez názvu firmy) projde až tím pro vyhledávač.
+      const proc = pageEvidence(res.html, firm, adresa, index, opts.tradeWords ?? [])
+        ?? searchPageEvidence(res.html, firm, opts.city, opts.tradeWords ?? []);
       if (proc) {
         return {
           site: { url: adresa, html: res.html, evidence: `web z vyhledávače, ${proc}` },
           checked,
           ranOut: false,
-          noCandidates: false,
+          noCandidates,
           searched,
+          searchAnswered,
           inconclusive,
         };
       }
     }
   }
 
-  return { site: null, checked, ranOut: false, noCandidates: false, searched, inconclusive };
+  return { site: null, checked, ranOut: false, noCandidates, searched, searchAnswered, inconclusive };
 }
 
 /** Exported for the pipeline, which needs a probe that is not memoised per host. */
