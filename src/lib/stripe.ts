@@ -40,6 +40,25 @@ export function stripe(): Stripe {
   return client;
 }
 
+/**
+ * Zkušební období u obou placených tarifů, ve dnech.
+ *
+ * Stripe ho z ceny v dashboardu do Checkoutu nepřevezme — jde jen parametrem při zakládání
+ * session, proto žije tady. Karta se zadává hned, strhává se až po skončení zkušební doby.
+ */
+export const TRIAL_DAYS = 7;
+
+/**
+ * Kolik dní zkušebního období dostane uživatel, který právě kupuje. `undefined` = žádné.
+ *
+ * Jen poprvé. `subscriptionStatus` je `none` jedině u účtu, který předplatné nikdy neměl —
+ * po zrušení zůstane `canceled`. Bez téhle podmínky by stačilo každý týden zrušit a koupit
+ * znovu a PRO by bylo navždy zadarmo.
+ */
+export function trialDaysFor(subscriptionStatus: string | null | undefined): number | undefined {
+  return !subscriptionStatus || subscriptionStatus === 'none' ? TRIAL_DAYS : undefined;
+}
+
 /** Tarify, které se dají koupit. FREE nemá cenu, takže tu schválně chybí. */
 export type PaidPlan = Extract<Plan, 'PRO' | 'BUSINESS'>;
 

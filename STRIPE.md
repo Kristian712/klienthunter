@@ -87,11 +87,12 @@ stripe trigger customer.subscription.updated
 1. **Produkty.** Product catalog → dva produkty, každý s měsíční cenou v CZK:
    Pro 499 Kč, Business 1 499 Kč.
 
-   **Zkušební období aplikace nenabízí.** Checkout ho z ceny nepřevezme — zkušební doba
-   nastavená u ceny v dashboardu se u Checkout Session ignoruje a jde jen parametrem
-   `subscription_data.trial_period_days` při zakládání session. Kdyby se mělo zapnout, je to
-   jeden řádek v `src/app/api/stripe/checkout/route.ts`; webhook i UI (`trialing`, odpočet dní)
-   už s ním počítají.
+   **Zkušební období 7 dní u obou tarifů** nastavuje aplikace, ne cena v dashboardu —
+   Checkout trial z ceny nepřevezme, zná jen `subscription_data.trial_period_days` při zakládání
+   session. Délka je `TRIAL_DAYS` v `src/lib/stripe.ts`. Dostane ho jen účet, který předplatné
+   ještě nikdy neměl (`subscriptionStatus = none`); kdo zrušil a kupuje znovu, platí hned.
+   Karta se zadává při nákupu, strhává se až po skončení zkušební doby. U ceny v dashboardu
+   trial **nenastavuj**, nic by neudělal a jen by mátl.
 2. **Webhook.** Developers → Webhooks → Add endpoint:
    - URL `https://klienthunter.vercel.app/api/stripe/webhook`
    - události: `checkout.session.completed`, `customer.subscription.created`,
@@ -115,8 +116,10 @@ Datum expirace libovolné budoucí, CVC libovolné tři číslice.
 
 - [ ] **Nákup.** Ceník → Koupit → testovací karta. Do pár vteřin se na ceníku ukáže „Váš tarif".
       V databázi má uživatel `plan`, `stripeSubscriptionId` a `subscriptionStatus`.
-- [ ] **Zkušební období** (jen pokud se v Checkoutu zapne `trial_period_days`). Po nákupu je
-      stav `trialing` a na ceníku i v profilu se ukazuje, kolik dní zbývá.
+- [ ] **Zkušební období.** Checkout ukazuje „7 dní zdarma". Po nákupu je stav `trialing`,
+      tarif platí hned a na ceníku i v profilu se ukazuje, kolik dní zbývá.
+- [ ] **Trial jen jednou.** Zrušit předplatné v portálu a koupit znovu — Checkout už zkušební
+      období nenabídne a strhne platbu hned.
 - [ ] **Konec zkušebního období.** Ve Stripe u předplatného Actions → *End trial now*.
       Stav přeskočí na `active`, tarif zůstává.
 - [ ] **Neúspěšná platba.** `stripe trigger invoice.payment_failed`, nebo karta `…0341` a počkat

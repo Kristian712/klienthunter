@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { sessionFrom } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { appUrl, priceIdFor, stripe } from '@/lib/stripe';
+import { appUrl, priceIdFor, stripe, trialDaysFor } from '@/lib/stripe';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,7 +28,10 @@ export async function POST(req: NextRequest) {
 
     const user = await prisma.user.findUnique({
       where: { id: session.userId },
-      select: { id: true, email: true, name: true, plan: true, stripeCustomerId: true, stripeSubscriptionId: true },
+      select: {
+        id: true, email: true, name: true, plan: true,
+        stripeCustomerId: true, stripeSubscriptionId: true, subscriptionStatus: true,
+      },
     });
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
@@ -63,7 +66,12 @@ export async function POST(req: NextRequest) {
       line_items: [{ price: priceIdFor(plan), quantity: 1 }],
       client_reference_id: user.id,
       metadata: { userId: user.id, plan },
-      subscription_data: { metadata: { userId: user.id, plan } },
+      subscription_data: {
+        metadata: { userId: user.id, plan },
+        // Zkušební období jen napoprvé (viz `trialDaysFor`). Checkout ho zákazníkovi ukáže sám:
+        // „7 dní zdarma, pak 499 Kč měsíčně" — i s tím, kdy se karta poprvé strhne.
+        trial_period_days: trialDaysFor(user.subscriptionStatus),
+      },
       locale,
       allow_promotion_codes: true,
       // Adresy nesou jazyk, ve kterém uživatel klikl — jinak by po platbě přistál v češtině.
