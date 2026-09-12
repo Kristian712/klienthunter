@@ -2,7 +2,8 @@
 
 import { ChevronDown } from 'lucide-react';
 import { GROUP_LABELS, GROUP_ORDER, LEAD_FILTERS, localized } from '@/lib/lead-filters';
-import { PROFESSIONS, professionById, type UserProfile } from '@/lib/profile';
+import { PROFESSIONS, presetFiltersFor, professionById, type UserProfile } from '@/lib/profile';
+import { ChevronRight } from 'lucide-react';
 import { INDUSTRIES, POPULAR_CHIPS, REGIONS } from '@/lib/search-options';
 
 /**
@@ -18,6 +19,8 @@ const CUSTOM = '__custom__';
 export interface ProfileDraft {
   profession: string;
   professionText: string;
+  /** Answer to the profile's follow-up question; '' when unanswered or not asked. */
+  clientType: string;
   /** A value from INDUSTRIES, or CUSTOM when the user typed their own. */
   industry: string;
   customIndustry: string;
@@ -41,6 +44,7 @@ export function toDraft(profile: UserProfile): ProfileDraft {
   return {
     profession: profile.profession ?? '',
     professionText: profile.professionText ?? '',
+    clientType: profile.clientType ?? '',
     industry: industryKnown ? industry : industry ? CUSTOM : '',
     customIndustry: industryKnown ? '' : industry,
     region: regionKnown ? region : region ? CUSTOM : '',
@@ -56,6 +60,9 @@ export function draftToPayload(draft: ProfileDraft) {
   return {
     profession: draft.profession || null,
     professionText: draft.profession === 'other' ? text(draft.professionText) : null,
+    // Jen když ji vybraný profil vůbec pokládá — jinak by v databázi zůstala odpověď na otázku,
+    // kterou už nikdo nevidí.
+    clientType: professionById(draft.profession)?.followUp ? text(draft.clientType) : null,
     targetIndustry: draft.industry === CUSTOM ? text(draft.customIndustry) : text(draft.industry),
     targetRegion: draft.region === CUSTOM ? text(draft.customRegion) : text(draft.region),
     targetCity: text(draft.city),
@@ -64,7 +71,7 @@ export function draftToPayload(draft: ProfileDraft) {
 }
 
 export const EMPTY_DRAFT: ProfileDraft = {
-  profession: '', professionText: '', industry: '', customIndustry: '',
+  profession: '', professionText: '', clientType: '', industry: '', customIndustry: '',
   region: '', customRegion: '', city: '', criteria: [],
 };
 
@@ -77,10 +84,11 @@ interface FieldProps {
 }
 
 const T = {
-  professionQ:  { cs: 'Co nabízíte?',                sk: 'Čo ponúkate?',                 en: 'What do you offer?' },
-  professionHint:{ cs: 'Podle toho vám předvyplníme, co u firem sledovat. Můžete to kdykoli změnit.',
-                  sk: 'Podľa toho vám predvyplníme, čo u firiem sledovať. Môžete to kedykoľvek zmeniť.',
-                  en: 'We use this to pre-tick what to look for. You can change it any time.' },
+  professionQ:  { cs: 'Čím se zabýváte?',            sk: 'Čím sa zaoberáte?',            en: 'What do you do?' },
+  professionHint:{ cs: 'Podle oboru vám přednastavíme pár filtrů, abyste nemuseli hledat od nuly. Všechno jde kdykoli změnit.',
+                  sk: 'Podľa odboru vám prednastavíme pár filtrov, aby ste nemuseli hľadať od nuly. Všetko sa dá kedykoľvek zmeniť.',
+                  en: 'Based on your trade we pre-set a few filters so you do not start from scratch. Everything can be changed any time.' },
+  presetsLabel: { cs: 'Přednastavené filtry:', sk: 'Prednastavené filtre:', en: 'Preset filters:' },
   professionOwn:{ cs: 'Napište, co nabízíte…',       sk: 'Napíšte, čo ponúkate…',        en: 'Describe what you offer…' },
   industryQ:    { cs: 'Komu to nabízíte?',           sk: 'Komu to ponúkate?',            en: 'Who do you offer it to?' },
   industryHint: { cs: 'Obor firem, které chcete oslovit.', sk: 'Odbor firiem, ktoré chcete osloviť.', en: 'The trade of the firms you want to reach.' },
@@ -123,6 +131,8 @@ export function ProfessionField({ draft, patch, locale }: FieldProps) {
                 (previous && sameSet(draft.criteria, previous.suggests));
               patch({
                 profession: p.id,
+                // Odpověď na druhou otázku patří k jinému profilu — s ním odchází.
+                clientType: p.id === draft.profession ? draft.clientType : '',
                 criteria: untouched ? p.suggests : draft.criteria,
               });
             }}
@@ -132,6 +142,8 @@ export function ProfessionField({ draft, patch, locale }: FieldProps) {
           </button>
         ))}
       </div>
+
+      <PresetSummary draft={draft} locale={locale} />
 
       {draft.profession === 'other' && (
         <input
@@ -143,6 +155,59 @@ export function ProfessionField({ draft, patch, locale }: FieldProps) {
           autoFocus
         />
       )}
+    </div>
+  );
+}
+
+/**
+ * Co profil přednastaví, vypsané pod výběrem. Bez toho člověk kliká naslepo a filtry, které se
+ * mu pak objeví v hledání, vypadají jako něco, co si nevybral.
+ */
+export function PresetSummary({ draft, locale }: { draft: ProfileDraft; locale: string }) {
+  const p = professionById(draft.profession);
+  if (!p) return null;
+  const preset = presetFiltersFor({ profession: draft.profession, clientType: draft.clientType || null });
+  const names = preset
+    .map(id => LEAD_FILTERS.find(f => f.id === id))
+    .filter((f): f is NonNullable<typeof f> => Boolean(f))
+    .map(f => localized(f.label, locale));
+  return (
+    <div className="mt-3 text-xs text-ink-faint leading-relaxed">
+      {names.length > 0 && (
+        <p>
+          <span className="text-ink-muted">{localized(T.presetsLabel, locale)}</span> {names.join(' · ')}
+        </p>
+      )}
+      {p.note && <p className="mt-1">{localized(p.note, locale)}</p>}
+    </div>
+  );
+}
+
+/**
+ * Druhá otázka dotazníku. Existuje jen u profilů, kde odpověď opravdu změní přednastavení
+ * (tvorba webů, finance); jinde by byla balast.
+ */
+export function FollowUpField({ draft, patch, locale }: FieldProps) {
+  const p = professionById(draft.profession);
+  if (!p?.followUp) return null;
+  return (
+    <div>
+      <p className="font-semibold flex items-center gap-1.5">
+        <ChevronRight size={14} className="text-ink-faint" />
+        {localized(p.followUp.question, locale)}
+      </p>
+      <div className="flex flex-wrap gap-2 mt-3">
+        {p.followUp.options.map(o => (
+          <button
+            key={o.id}
+            type="button"
+            onClick={() => patch({ clientType: draft.clientType === o.id ? '' : o.id })}
+            className={draft.clientType === o.id ? 'chip-active' : 'chip'}
+          >
+            {localized(o.label, locale)}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

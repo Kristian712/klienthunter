@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { sessionFrom, hashPassword, comparePassword } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { LEAD_FILTERS } from '@/lib/lead-filters';
-import { PROFESSIONS } from '@/lib/profile';
+import { LEGACY_PROFESSION, PROFESSIONS, professionById } from '@/lib/profile';
 
 const PROFESSION_IDS = PROFESSIONS.map(p => p.id);
 const FILTER_IDS = new Set(LEAD_FILTERS.map(f => f.id));
@@ -32,6 +32,8 @@ const UpdateSchema = z.object({
   // this one endpoint and send only what they changed.
   profession:     z.enum(PROFESSION_IDS as [string, ...string[]]).nullish(),
   professionText: nullableText(120),
+  /** Odpověď na druhou otázku dotazníku; musí patřit k vybranému profilu (kontrola níž). */
+  clientType:     nullableText(40),
   targetIndustry: nullableText(120),
   targetRegion:   nullableText(120),
   targetCity:     nullableText(120),
@@ -46,9 +48,25 @@ const UpdateSchema = z.object({
 });
 
 const PROFILE_SELECT = {
-  profession: true, professionText: true, targetIndustry: true,
+  profession: true, professionRaw: true, professionText: true, clientType: true, targetIndustry: true,
   targetRegion: true, targetCity: true, targetFilters: true, onboardedAt: true,
 } as const;
+
+/**
+ * Sloučení profesí do šesti profilů (12. 9. 2026), dotaženo při prvním čtení účtu.
+ *
+ * Staré id (`accounting`, `legal`, …) se přepíše na nový profil a původní hodnota zůstane
+ * v `professionRaw` — informace, kdo si vybral účetnictví a kdo právo, se nesmí ztratit.
+ * Děje se to tady, ne v build skriptu: dotkne se jen účtů, které se ještě přihlásí.
+ */
+async function migrateLegacyProfession(userId: string, profession: string | null, raw: string | null) {
+  if (!profession || !(profession in LEGACY_PROFESSION)) return null;
+  return prisma.user.update({
+    where: { id: userId },
+    data: { profession: LEGACY_PROFESSION[profession], professionRaw: raw ?? profession },
+    select: PROFILE_SELECT,
+  });
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -68,6 +86,9 @@ export async function GET(req: NextRequest) {
       },
     });
     if (!user) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+    const migrated = await migrateLegacyProfession(user.id, user.profession, user.professionRaw);
+    if (migrated) Object.assign(user, migrated);
 
     const searches = await prisma.search.findMany({
       where: { userId: payload.userId },
@@ -98,8 +119,24 @@ export async function PATCH(req: NextRequest) {
     const user = await prisma.user.findUnique({ where: { id: payload.userId } });
     if (!user) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
+    // Druhá otázka existuje jen u některých profilů a její volby jsou pevně dané; cizí hodnota
+    // by v profilu lhala o tom, podle čeho se předvyplňuje.
+    if (profile.clientType) {
+      const target = professionById(profile.profession ?? user.profession);
+      if (!target?.followUp?.options.some(o => o.id === profile.clientType)) {
+        return NextResponse.json({ error: 'Unknown clientType for this profession' }, { status: 422 });
+      }
+    }
+
     const updateData: Record<string, unknown> = {};
     if (name) updateData.name = name;
+    // První zaznamenaná odpověď se schovává napořád — u nového účtu je to tentýž profil, u starého
+    // ji už doplnila migrace při čtení. Změna profilu ji nepřepisuje.
+    if (profile.profession && !user.professionRaw) updateData.professionRaw = profile.profession;
+    // Změna profilu zahazuje odpověď na druhou otázku — patří k jinému profilu.
+    if (profile.profession && profile.profession !== user.profession && profile.clientType === undefined) {
+      updateData.clientType = null;
+    }
 
     // `undefined` means the caller did not touch the field; `null` means they cleared it. Only
     // the first is skipped.

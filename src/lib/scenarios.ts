@@ -98,13 +98,8 @@ export function scenarioLabel(id: string | null | undefined, locale: string): st
 export const SCENARIO_BY_PROFESSION: Record<string, string> = {
   web: 'no_web',
   marketing: 'old_web',
-  accounting: 'new',
   finance: 'new',
-  legal: 'new',
-  photo: 'all',
-  realestate: 'all',
-  cleaning: 'all',
-  it: 'old_web',
-  consulting: 'all',
+  legal: 'all',
+  b2b: 'all',
   other: 'all',
 };

@@ -14,7 +14,7 @@ import { reachHint, reachScore } from '@/lib/reach-score';
 import { scoreBreakdown } from '@/lib/lead-score';
 import { YIELD_NOTE, yieldFor } from '@/lib/nace-map';
 import { SCENARIOS, SCENARIO_BY_PROFESSION, scenarioById } from '@/lib/scenarios';
-import { EMPTY_PROFILE, type UserProfile } from '@/lib/profile';
+import { EMPTY_PROFILE, presetFiltersFor, type UserProfile } from '@/lib/profile';
 import { REGIONS, INDUSTRIES, POPULAR_CHIPS } from '@/lib/search-options';
 import { LeadScore, GOOD_LEAD } from '@/components/LeadScore';
 import { ResultsMap, type MapLead } from '@/components/ResultsMap';
@@ -457,6 +457,16 @@ const S = {
   errPollLost:{ cs: 'Ztratili jsme spojení s hledáním. Co se stihlo najít, zůstalo uložené — obnovte stránku.',
                 sk: 'Stratili sme spojenie s hľadaním. Čo sa stihlo nájsť, zostalo uložené — obnovte stránku.',
                 en: 'Lost contact with the search. Whatever was found is saved — reload the page.' },
+  presetNote:  { cs: 'Pár filtrů jsme přednastavili podle vašeho oboru.',
+                 sk: 'Pár filtrov sme prednastavili podľa vášho odboru.',
+                 en: 'We pre-set a few filters based on your trade.' },
+  presetClear: { cs: 'Zrušit přednastavení', sk: 'Zrušiť prednastavenie', en: 'Remove presets' },
+  presetTag:   { cs: 'profil', sk: 'profil', en: 'profile' },
+  nudge:       { cs: 'Řekněte nám, čím se zabýváte, a předvyplníme vám filtry.',
+                 sk: 'Povedzte nám, čím sa zaoberáte, a predvyplníme vám filtre.',
+                 en: 'Tell us what you do and we will pre-fill the filters for you.' },
+  nudgeGo:     { cs: 'Nastavit', sk: 'Nastaviť', en: 'Set up' },
+  nudgeClose:  { cs: 'Zavřít, už se neptat', sk: 'Zavrieť, už sa nepýtať', en: 'Close, do not ask again' },
   emptyTitle: { cs: 'V tomhle kraji jsme v daném oboru nenašli žádnou firmu.',
                 sk: 'V tomto kraji sme v danom odbore nenašli žiadnu firmu.',
                 en: 'We found no business in this trade and region.' },
@@ -739,12 +749,34 @@ export default function SearchPage() {
   // ── Profile ───────────────────────────────────────────────────────────────
   // The profile decides two things: what the form starts out as, and how the results are
   // ranked. Both are just defaults — everything stays editable in place.
+  /**
+   * Filtr „Jen fungující podniky" startuje zapnutý.
+   *
+   * Bez něj je v každém výsledku zhruba třetina lidí, kteří mají živnost, ale žádnou aktivní
+   * provozovnu — na mapě se přes ně nedá klikat a v seznamu se v nich nedá číst. Vypnout ho jde
+   * jedním kliknutím na tentýž chip, takže výchozí zapnutí nic neschovává natrvalo.
+   */
+  const [active, setActive]               = useState<Set<string>>(new Set(['working']));
   const [profile, setProfile] = useState<UserProfile>(EMPTY_PROFILE);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  /**
+   * Nenásilná nabídka dotazníku pro účty, které ho nikdy nedostaly. Dřív se jim otevřel blokující
+   * modál jako po registraci; teď je to lišta nad formulářem, která hledání nijak nebrání.
+   */
+  const [showNudge, setShowNudge] = useState(false);
+  /**
+   * Filtry, které zapnul profil. Drží se zvlášť od `active`, aby se v UI daly označit a jedním
+   * tlačítkem vypnout — uživatel nesmí vidět „308 z 500 firem" a nevědět proč.
+   */
+  const [presetsOn, setPresetsOn] = useState(true);
+  const presetIds = presetFiltersFor(profile);
 
   /** Fill in only what the user has not already typed, so a reload never eats their input. */
   function applyProfile(p: UserProfile) {
     setProfile(p);
+    // Přednastavené chipy se k aktivním přidají, nikdy nenahradí, co si uživatel zapnul sám.
+    const preset = presetFiltersFor(p);
+    if (preset.length > 0 && presetsOn) setActive(prev => new Set([...Array.from(prev), ...preset]));
     if (p.targetRegion)   setRegion(r => r || p.targetRegion!);
     if (p.targetIndustry) {
       setIndustry(i => i || p.targetIndustry!);
@@ -768,7 +800,8 @@ export default function SearchPage() {
         // `?welcome=1` comes from the registration redirect; `onboardedAt` covers everyone who
         // arrived some other way and has never been asked.
         const welcomed = new URLSearchParams(window.location.search).has('welcome');
-        if (welcomed || !d.user.onboardedAt) setShowOnboarding(true);
+        if (welcomed) setShowOnboarding(true);
+        else if (!d.user.onboardedAt) setShowNudge(true);
       })
       .catch(() => {});
     return () => { cancelled = true; };
@@ -776,20 +809,13 @@ export default function SearchPage() {
 
   function closeOnboarding(saved: UserProfile | null) {
     setShowOnboarding(false);
+    setShowNudge(false);
     if (saved) applyProfile(saved);
     else setProfile(p => ({ ...p, onboardedAt: new Date().toISOString() }));
     // Drop `?welcome=1` so a refresh does not reopen the modal.
     window.history.replaceState({}, '', window.location.pathname);
   }
 
-  /**
-   * Filtr „Jen fungující podniky" startuje zapnutý.
-   *
-   * Bez něj je v každém výsledku zhruba třetina lidí, kteří mají živnost, ale žádnou aktivní
-   * provozovnu — na mapě se přes ně nedá klikat a v seznamu se v nich nedá číst. Vypnout ho jde
-   * jedním kliknutím na tentýž chip, takže výchozí zapnutí nic neschovává natrvalo.
-   */
-  const [active, setActive]               = useState<Set<string>>(new Set(['working']));
   const [results, setResults]             = useState<BusinessResult[]>([]);
   const [searchId, setSearchId]           = useState<string | null>(null);
   /** Výsledky pocházejí z ukázky pro nepřihlášené: pět řádků, kontakty server vůbec neposlal. */
@@ -1161,7 +1187,7 @@ export default function SearchPage() {
 
       // Scénář se promítne hned, jako předem zapnuté filtry. Uživatel je pak vidí mezi
       // ostatními chipy a může je vypnout — nic se před ním neschovává.
-      setActive(new Set(scenarioById(scenario).filters));
+      setActive(new Set([...scenarioById(scenario).filters, ...(presetsOn ? presetIds : [])]));
 
       // Ukázka pro nepřihlášené doběhne rovnou v odpovědi — pět řádků, není co sledovat.
       if (data.demo) {
@@ -1216,6 +1242,31 @@ export default function SearchPage() {
       </div>
 
       <div className="max-w-6xl mx-auto px-4 py-6">
+
+        {/* Nabídka dotazníku pro účty z doby před ním. Lišta, ne modál: hledání pod ní funguje,
+            křížek ji zavře napořád (zapíše `onboardedAt` stejně jako přeskočení dotazníku). */}
+        {showNudge && !showOnboarding && (
+          <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-line-strong bg-surface-subtle px-4 py-3 text-sm">
+            <span className="text-ink-muted">{localized(S.nudge, locale)}</span>
+            <button onClick={() => setShowOnboarding(true)} className="btn-primary btn-sm">
+              {localized(S.nudgeGo, locale)}
+            </button>
+            <button
+              onClick={() => {
+                setShowNudge(false);
+                fetch('/api/profile', {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ onboarded: true }),
+                }).catch(err => console.error('onboarding/nudge:', err));
+              }}
+              aria-label={localized(S.nudgeClose, locale)}
+              title={localized(S.nudgeClose, locale)}
+              className="ml-auto p-2 -m-2 text-ink-faint hover:text-ink transition-colors">
+              <X size={14} />
+            </button>
+          </div>
+        )}
 
         {/* ── Search form ── */}
         <form onSubmit={handleSearch} className="card mb-6">
@@ -1566,7 +1617,7 @@ export default function SearchPage() {
                     ))}
                   </div>
                   {active.size > 0 && (
-                    <button onClick={() => setActive(new Set())}
+                    <button onClick={() => { setActive(new Set()); setPresetsOn(false); }}
                       className="flex items-center gap-1 text-xs text-ink-muted hover:text-ink transition-colors">
                       <X size={12} />{isCs ? 'Zrušit filtry' : 'Clear filters'}
                     </button>
@@ -1594,6 +1645,20 @@ export default function SearchPage() {
                 </div>
               </div>
 
+              {presetsOn && presetIds.some(id => active.has(id)) && (
+                <p className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-muted">
+                  <span>{localized(S.presetNote, locale)}</span>
+                  <button
+                    onClick={() => {
+                      setPresetsOn(false);
+                      setActive(prev => new Set(Array.from(prev).filter(id => !presetIds.includes(id))));
+                    }}
+                    className="text-accent hover:underline underline-offset-2">
+                    {localized(S.presetClear, locale)}
+                  </button>
+                </p>
+              )}
+
               <div className="space-y-2.5">
                 {GROUP_ORDER.map(group => {
                   const items = LEAD_FILTERS.filter(f => f.group === group);
@@ -1616,6 +1681,13 @@ export default function SearchPage() {
                           >
                             {localized(f.label, locale)}
                             <span className={`tnum ${on ? 'text-accent-ink/70' : 'text-ink-faint'}`}>{n}</span>
+                            {/* Štítek na chipu, který zapnul profil. Odstín sám by na akcentu nešel
+                                rozeznat; slovo řekne, odkud se filtr vzal. */}
+                            {on && presetsOn && presetIds.includes(f.id) && (
+                              <span className="ml-0.5 rounded border border-accent-ink/40 px-1 text-[9px] font-semibold uppercase tracking-wider text-accent-ink/80">
+                                {localized(S.presetTag, locale)}
+                              </span>
+                            )}
                           </button>
                         );
                       })}

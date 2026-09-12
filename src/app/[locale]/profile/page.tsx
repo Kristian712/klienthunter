@@ -8,7 +8,7 @@ import { clearUser } from '@/lib/client-auth';
 import { localized } from '@/lib/lead-filters';
 import { EMPTY_PROFILE, type UserProfile } from '@/lib/profile';
 import {
-  CriteriaField, IndustryField, ProfessionField, RegionField,
+  CriteriaField, FollowUpField, IndustryField, ProfessionField, RegionField,
   EMPTY_DRAFT, draftToPayload, toDraft, type ProfileDraft,
 } from '@/components/ProfileFields';
 import { industryLabel } from '@/lib/search-options';
@@ -364,6 +364,7 @@ export default function ProfilePage() {
 
           <div className="space-y-6">
             <ProfessionField draft={draft} patch={patch} locale={locale} />
+            <FollowUpField   draft={draft} patch={patch} locale={locale} />
             <IndustryField   draft={draft} patch={patch} locale={locale} />
             <RegionField     draft={draft} patch={patch} locale={locale} />
             <CriteriaField   draft={draft} patch={patch} locale={locale} />

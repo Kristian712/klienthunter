@@ -4,9 +4,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { localized } from '@/lib/lead-filters';
 import { INDUSTRIES } from '@/lib/search-options';
-import { PROFESSIONS, professionById, type UserProfile } from '@/lib/profile';
+import { PROFESSIONS, industriesFor, presetFiltersFor, professionById, type UserProfile } from '@/lib/profile';
 import { SCENARIO_BY_PROFESSION, scenarioById } from '@/lib/scenarios';
-import { draftToPayload, toDraft, type ProfileDraft } from './ProfileFields';
+import { FollowUpField, draftToPayload, toDraft, type ProfileDraft } from './ProfileFields';
+import { LEAD_FILTERS, localized as loc } from '@/lib/lead-filters';
 
 /**
  * Jedna otázka, hned po registraci: čím se živíte.
@@ -24,11 +25,12 @@ import { draftToPayload, toDraft, type ProfileDraft } from './ProfileFields';
  */
 
 const T = {
-  title:   { cs: 'Čím se živíte?', sk: 'Čím sa živíte?', en: 'What do you do?' },
-  lead:    { cs: 'Jedna odpověď a hledání bude předvyplněné. Kdykoli to změníte v účtu.',
-             sk: 'Jedna odpoveď a hľadanie bude predvyplnené. Kedykoľvek to zmeníte v účte.',
-             en: 'One answer and your search arrives pre-filled. Change it any time in your account.' },
-  skip:    { cs: 'Přeskočit', sk: 'Preskočiť', en: 'Skip' },
+  title:   { cs: 'Čím se zabýváte?', sk: 'Čím sa zaoberáte?', en: 'What do you do?' },
+  lead:    { cs: 'Podle oboru vám přednastavíme pár filtrů, abyste nemuseli hledat od nuly. Všechno jde kdykoli změnit — tady i v Profilu.',
+             sk: 'Podľa odboru vám prednastavíme pár filtrov, aby ste nemuseli hľadať od nuly. Všetko sa dá kedykoľvek zmeniť — tu aj v Profile.',
+             en: 'Based on your trade we pre-set a few filters so you do not start from scratch. Everything can be changed any time — here and in your profile.' },
+  skip:    { cs: 'Vyberu si sám', sk: 'Vyberiem si sám', en: 'I will pick myself' },
+  presets: { cs: 'Přednastavené filtry:', sk: 'Prednastavené filtre:', en: 'Preset filters:' },
   pick:    { cs: 'Co budete hledat', sk: 'Čo budete hľadať', en: 'What you will look for' },
   scenario:{ cs: 'Výchozí scénář:', sk: 'Východiskový scenár:', en: 'Default scenario:' },
   finish:  { cs: 'Hotovo, hledat', sk: 'Hotovo, hľadať', en: 'Done, search' },
@@ -87,7 +89,8 @@ export function OnboardingModal({ locale, initial, onDone }: Props) {
    */
   function choose(id: string) {
     const p = professionById(id);
-    patch({ profession: id, criteria: p ? [...p.suggests] : [] });
+    // Odpověď na druhou otázku patří k profilu, se kterým vznikla.
+    patch({ profession: id, clientType: id === draft.profession ? draft.clientType : '', criteria: p ? [...p.suggests] : [] });
   }
 
   async function finish() {
@@ -111,6 +114,11 @@ export function OnboardingModal({ locale, initial, onDone }: Props) {
 
   const chosen = professionById(draft.profession);
   const scenario = scenarioById(draft.profession ? SCENARIO_BY_PROFESSION[draft.profession] : 'all');
+  const answer = { profession: draft.profession, clientType: draft.clientType || null };
+  const presetNames = presetFiltersFor(answer)
+    .map(id => LEAD_FILTERS.find(f => f.id === id))
+    .filter((f): f is NonNullable<typeof f> => Boolean(f))
+    .map(f => loc(f.label, locale));
 
   /**
    * Fokus uvnitř dialogu.
@@ -196,13 +204,20 @@ export function OnboardingModal({ locale, initial, onDone }: Props) {
             </div>
           )}
 
+          {/* Druhá otázka — jen u profilů, kde odpověď opravdu mění přednastavení. */}
+          {chosen?.followUp && (
+            <div className="mt-6 border-t border-line pt-5">
+              <FollowUpField draft={draft} patch={patch} locale={locale} />
+            </div>
+          )}
+
           {chosen && (
             <div className="mt-6 border-t border-line pt-5">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint mb-3">
                 {localized(T.pick, locale)}
               </p>
               <div className="flex flex-wrap gap-2">
-                {chosen.industries.map(value => (
+                {industriesFor(answer).map(value => (
                   <button
                     key={value}
                     onClick={() => patch({ industry: value })}
@@ -212,7 +227,14 @@ export function OnboardingModal({ locale, initial, onDone }: Props) {
                   </button>
                 ))}
               </div>
-              <p className="text-xs text-ink-faint mt-3">
+              {/* Co se v hledání zapne — vypsané předem, ne až jako překvapení nad výsledky. */}
+              {presetNames.length > 0 && (
+                <p className="text-xs text-ink-faint mt-3">
+                  <span className="text-ink-muted">{localized(T.presets, locale)}</span> {presetNames.join(' · ')}
+                </p>
+              )}
+              {chosen.note && <p className="text-xs text-ink-faint mt-1">{localized(chosen.note, locale)}</p>}
+              <p className="text-xs text-ink-faint mt-1">
                 {localized(T.scenario, locale)} {localized(scenario.label, locale)}
               </p>
             </div>

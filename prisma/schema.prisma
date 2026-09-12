@@ -41,6 +41,12 @@ model User {
   //
   // An id from PROFESSIONS in src/lib/profile.ts, or 'other'.
   profession       String?
+  /// Původní odpověď před sloučením profesí do šesti profilů (12. 9. 2026): `accounting`,
+  /// `legal`, `photo`, … Zůstává, aby se dalo dohledat, kdo si vybral účetnictví a kdo právo,
+  /// i když oba dnes spadají do jednoho profilu. Nový účet sem dostane totéž, co do `profession`.
+  professionRaw    String?
+  /// Druhá otázka dotazníku (jen u profilů, které ji mají): id volby z `followUp` v profile.ts.
+  clientType       String?
   // Free text, the only thing we have when profession is 'other'.
   professionText   String?
   // The trade of the firms they are looking for — feeds the search query.
