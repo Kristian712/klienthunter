@@ -93,6 +93,9 @@ interface JobState {
 /** Kde si pamatujeme, jestli má mapa skrývat vyřízené firmy. */
 const HIDE_DONE_KEY = 'kh-hide-done';
 
+/** Kolik marných dotazů na průběh snese hledání, než se ho přestaneme ptát (5 × 2 s = 10 s). */
+const MAX_POLL_FAILURES = 5;
+
 type WebStatus = 'HAS' | 'NONE' | 'UNKNOWN';
 
 /** Results saved before three-state classification have no status; their `false` proved nothing. */
@@ -445,6 +448,18 @@ const S = {
   // se všechny slily do jedné hlášky (nebo do žádné), nedalo se z ní poznat, jestli má počkat,
   // přihlásit se znovu, nebo zúžit dotaz.
   errLogin:   { cs: 'Přihlaste se prosím znovu.', sk: 'Prihláste sa prosím znova.', en: 'Please sign in again.' },
+  errGone:    { cs: 'Tohle hledání už neexistuje — možná jste ho smazali.',
+                sk: 'Toto hľadanie už neexistuje — možno ste ho zmazali.',
+                en: 'This search no longer exists — you may have deleted it.' },
+  errPollLost:{ cs: 'Ztratili jsme spojení s hledáním. Co se stihlo najít, zůstalo uložené — obnovte stránku.',
+                sk: 'Stratili sme spojenie s hľadaním. Čo sa stihlo nájsť, zostalo uložené — obnovte stránku.',
+                en: 'Lost contact with the search. Whatever was found is saved — reload the page.' },
+  emptyTitle: { cs: 'V tomhle kraji jsme v daném oboru nenašli žádnou firmu.',
+                sk: 'V tomto kraji sme v danom odbore nenašli žiadnu firmu.',
+                en: 'We found no business in this trade and region.' },
+  emptyHint:  { cs: 'Zkuste jiný kraj, širší obor, nebo obor napsaný vlastními slovy.',
+                sk: 'Skúste iný kraj, širší odbor, alebo odbor napísaný vlastnými slovami.',
+                en: 'Try another region, a broader trade, or type the trade in your own words.' },
   errDemoUsed:{ cs: 'Ukázkové hledání jste už využili. Zaregistrujte se zdarma a hledejte dál — registrace je bez platební karty.',
                 sk: 'Ukážkové hľadanie ste už využili. Zaregistrujte sa zadarmo a hľadajte ďalej — registrácia je bez platobnej karty.',
                 en: 'You have used the demo search. Register for free to keep going — no card required.' },
@@ -887,22 +902,47 @@ export default function SearchPage() {
   };
 
   useEffect(() => {
-    const id = new URLSearchParams(window.location.search).get('job');
-    if (!id) return;
+    const params = new URLSearchParams(window.location.search);
+    const jobId = params.get('job');
+    const savedId = params.get('search');
+    if (!jobId && !savedId) return;
     setHasSearched(true);
     setLoading(true);
-    fetch(`/api/jobs/${id}`)
-      .then(r => (r.ok ? r.json() : null))
-      .then(d => {
-        if (!d) return;
-        resultsRef.current = d.results.length;
-        setResults(d.results);
-        setSearchId(d.job.searchId);
-        setJob(d.job);
+
+    /**
+     * Chyba se tu nesmí spolknout. Dřív `r.ok ? r.json() : null` a prázdný `.catch()` znamenaly,
+     * že odkaz na vypršelou relaci nebo na smazané hledání skončil prázdnou plochou — a vypadalo
+     * to, že aplikace zapomněla, co uživatel hledal.
+     */
+    const explain = (status: number) =>
+      setError(localized(status === 401 ? S.errLogin : status === 404 ? S.errGone : S.errServer, locale));
+
+    // `?job=` je běžící nebo doběhlé hledání i s průběhem; `?search=` je uložené hledání, které
+    // job nemá — typicky import CSV nebo běh starší, než kam sahá seznam jobů.
+    const load = jobId
+      ? fetch(`/api/jobs/${jobId}`).then(async res => {
+          if (!res.ok) return explain(res.status);
+          const d = await res.json();
+          resultsRef.current = d.results.length;
+          setResults(d.results);
+          setSearchId(d.job.searchId);
+          setJob(d.job);
+        })
+      : fetch(`/api/searches/${savedId}/results`).then(async res => {
+          if (!res.ok) return explain(res.status);
+          const d = await res.json();
+          resultsRef.current = d.results.length;
+          setResults(d.results);
+          setSearchId(savedId);
+        });
+
+    load
+      .catch(err => {
+        console.error('search/resume:', err);
+        setError(localized(S.errNetwork, locale));
       })
-      .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, [locale]);
 
   /**
    * Dotazování na běžící job.
@@ -912,11 +952,22 @@ export default function SearchPage() {
    * hotový nebo spadlý, i když uživatel mezitím odejde na jinou stránku.
    *
    * Když se dotaz nepovede, nic se nemaže: rozpracované výsledky na obrazovce zůstanou a další
-   * kolo to zkusí znovu. Jediná chyba sítě nemá zahodit práci, která už je v databázi.
+   * kolo to zkusí znovu. Jediná chyba sítě nemá zahodit práci, která už je v databázi. Po pěti
+   * marných kolech se ale ptát přestaneme a řekneme to — nekonečně točící se pruh je horší
+   * než chybová hláška.
    */
   useEffect(() => {
     if (!job || job.status === 'done' || job.status === 'failed') return;
     let stopped = false;
+    let failures = 0;
+    let timer: ReturnType<typeof setInterval> | undefined;
+
+    const giveUp = (message: { cs: string; sk: string; en: string }) => {
+      stopped = true;
+      if (timer) clearInterval(timer);
+      setError(localized(message, locale));
+      setJob(j => (j ? { ...j, status: 'failed' } : j));
+    };
 
     // Když jedno kolo trvá dýl než dvě sekundy, druhé se nespustí. Bez tohohle by si obě
     // vyzvedla řádky od stejného offsetu a v seznamu by byly dvakrát.
@@ -927,7 +978,18 @@ export default function SearchPage() {
       running = true;
       try {
         const res = await fetch(`/api/jobs/${job.id}?from=${resultsRef.current}`);
-        if (!res.ok) return;
+        if (!res.ok) {
+          // 401 a 404 se opakováním nespraví: relace vypršela, nebo hledání mezitím zmizelo.
+          // Dřív se ptalo dál každé dvě sekundy a panel navždy hlásil „Hledám na pozadí".
+          if (res.status === 401 || res.status === 404) {
+            giveUp(res.status === 401 ? S.errLogin : S.errGone);
+            return;
+          }
+          // Výpadek serveru bývá chvilkový, ale ne nekonečný.
+          if (++failures >= MAX_POLL_FAILURES) giveUp(S.errPollLost);
+          return;
+        }
+        failures = 0;
         const data = await res.json();
         if (stopped) return;
         if (data.results?.length) {
@@ -944,15 +1006,16 @@ export default function SearchPage() {
         }
         setJob(j => (j ? { ...j, ...data.job } : j));
       } catch {
-        /* síť vypadla — zkusíme to za dvě sekundy znovu */
+        /* síť vypadla — zkusíme to za dvě sekundy znovu, ale ne donekonečna */
+        if (++failures >= MAX_POLL_FAILURES) giveUp(S.errPollLost);
       } finally {
         running = false;
       }
     };
 
     void tick();
-    const timer = setInterval(tick, 2000);
-    return () => { stopped = true; clearInterval(timer); };
+    timer = setInterval(tick, 2000);
+    return () => { stopped = true; if (timer) clearInterval(timer); };
   }, [job?.id, job?.status]);
 
   /**
@@ -1365,6 +1428,16 @@ export default function SearchPage() {
           </div>
         )}
 
+        {/* Hledání doběhlo a nenašlo nic. Bez tohohle bloku zmizel úvodní text i panel průběhu
+            a pod formulářem nezůstalo vůbec nic — vypadalo to, že se hledání nespustilo. */}
+        {hasSearched && !loading && !error && results.length === 0
+          && (!job || job.status === 'done') && (
+          <div className="text-center py-16 text-ink-faint">
+            <p className="mb-2 text-ink-muted">{localized(S.emptyTitle, locale)}</p>
+            <p className="text-sm">{localized(S.emptyHint, locale)}</p>
+          </div>
+        )}
+
         {results.length > 0 && (
           <>
             {/* ── Filters ──────────────────────────────────────────────────────────
@@ -1420,7 +1493,7 @@ export default function SearchPage() {
                   {searchId && (
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => window.open(`/api/export/${searchId}?format=csv`, '_blank')}
+                        onClick={() => window.open(`/api/export/${searchId}?format=csv&locale=${locale}`, '_blank')}
                         className="btn-outline btn-sm gap-1.5"
                         title={isCs ? 'Exportovat do CSV (pro CRM)' : 'Export to CSV (for CRM)'}
                       >
@@ -1428,7 +1501,7 @@ export default function SearchPage() {
                       </button>
                       {isPro && (
                         <button
-                          onClick={() => window.open(`/api/export/${searchId}`, '_blank')}
+                          onClick={() => window.open(`/api/export/${searchId}?locale=${locale}`, '_blank')}
                           className="btn-outline btn-sm gap-1.5"
                           title={isCs ? 'Exportovat do Excelu' : 'Export to Excel'}
                         >

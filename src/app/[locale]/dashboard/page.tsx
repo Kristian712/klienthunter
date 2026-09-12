@@ -175,8 +175,12 @@ export default function DashboardPage() {
               <div key={s.id} className="flex items-center justify-between py-3 gap-3">
                 <div className="min-w-0">
                   {/* Odkaz otevře hledání znovu — i to, které ještě běží. Průběh se dopočítá
-                      ze serveru, takže se uživatel může vrátit ke kterémukoli běhu. */}
-                  <Link href={`/${locale}/search?job=${job?.id ?? ''}`} className="font-medium hover:text-accent transition-colors">
+                      ze serveru, takže se uživatel může vrátit ke kterémukoli běhu.
+                      Import CSV a hledání starší, než kam sahá seznam jobů, žádný job nemají;
+                      ty se otevřou přes `?search=`, které načte řádky rovnou z databáze. Dřív
+                      z toho bylo prázdné `?job=` a odkaz vedl na čistý formulář. */}
+                  <Link href={job ? `/${locale}/search?job=${job.id}` : `/${locale}/search?search=${s.id}`}
+                        className="font-medium hover:text-accent transition-colors">
                     {industryLabel(s.query, locale)}
                   </Link>
                   <span className="text-ink-faint mx-2">·</span>
