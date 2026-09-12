@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { cookies } from 'next/headers';
+import { prisma } from './db';
 
 /**
  * No fallback, on purpose.
@@ -71,9 +72,10 @@ export async function getCurrentUser(): Promise<JWTPayload | null> {
  * signed in" apart from "something went wrong", and `verifyToken` throws for both a forged
  * signature and an expired one. Routes that require a user keep their own explicit 401.
  *
- * The existing 18 routes were left alone — they already read the cookie and check ownership with
- * `findFirst({ where: { id, userId } })`. Rewriting working authorisation code to funnel through
- * a helper is regression risk for no gain, so this is for new code only.
+ * Every route that needs a user now goes through this. Calling `verifyToken` directly inside a
+ * `try` block meant an expired cookie fell into the route's catch and came back as
+ * 500 "Internal server error" — the browser then had no way to tell "your session ran out" from
+ * "the server is broken", and the pages showed an empty account instead of a login prompt.
  */
 export function sessionFrom(req: { cookies: { get(name: string): { value: string } | undefined } }): JWTPayload | null {
   try {
@@ -83,6 +85,30 @@ export function sessionFrom(req: { cookies: { get(name: string): { value: string
   } catch {
     return null;
   }
+}
+
+export interface LiveAccount {
+  plan: string;
+  isAdmin: boolean;
+  isVip: boolean;
+}
+
+/**
+ * Účet tak, jak vypadá v databázi teď — nebo `null`, když neexistuje nebo mu byl přístup odebrán.
+ *
+ * Token nese stav z okamžiku přihlášení a platí sedm dní. Sám o sobě tedy znamená, že blokace
+ * účtu, odebrání práv admina ani vypršení pozvánky se neprojeví, dokud se uživatel neodhlásí.
+ * Proto se u kroků, které něco stojí nebo vydávají data, ptáme databáze. Je to jeden dotaz navíc
+ * a `/api/search` ho stejně dělal kvůli tarifu.
+ */
+export async function activeAccount(userId: string): Promise<LiveAccount | null> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { plan: true, isAdmin: true, isVip: true, accessExpiresAt: true },
+  });
+  if (!user) return null;
+  if (user.accessExpiresAt && user.accessExpiresAt < new Date()) return null;
+  return { plan: user.plan, isAdmin: user.isAdmin, isVip: user.isVip };
 }
 
 // Limity tarifů se přestěhovaly do `plans.ts`, aby je mohl číst i ceník v prohlížeči.

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyToken } from '@/lib/auth';
+import { sessionFrom } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { cityOf, resolveFilters } from '@/lib/lead-filters';
 
@@ -20,10 +20,8 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const token = req.cookies.get('auth-token')?.value;
-    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    const payload = verifyToken(token);
+    const payload = sessionFrom(req);
+    if (!payload) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const search = await prisma.search.findFirst({
       where: { id: params.id, userId: payload.userId },
     });

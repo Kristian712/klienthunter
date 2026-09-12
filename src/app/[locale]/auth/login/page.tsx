@@ -22,6 +22,9 @@ const ERR = {
   network:     { cs: 'Nepodařilo se spojit se serverem. Zkontrolujte připojení a zkuste to znovu.',
                  sk: 'Nepodarilo sa spojiť so serverom. Skontrolujte pripojenie a skúste to znova.',
                  en: 'Could not reach the server. Check your connection and try again.' },
+  revoked:     { cs: 'Tento účet už nemá přístup. Napište nám, pokud je to omyl.',
+                 sk: 'Tento účet už nemá prístup. Napíšte nám, ak je to omyl.',
+                 en: 'This account no longer has access. Write to us if that is a mistake.' },
 };
 
 const UI = {
@@ -70,8 +73,10 @@ export default function LoginPage() {
         body: JSON.stringify(form),
       });
       if (!res.ok) {
-        // 401 znamená „tyhle údaje nesedí". Cokoliv jiného je naše chyba, ne uživatelova.
-        setError(localized(res.status === 401 ? ERR.credentials : ERR.server, locale));
+        // 401 znamená „tyhle údaje nesedí", 403 „účet je zablokovaný nebo pozvánka propadla".
+        // Cokoliv jiného je naše chyba, ne uživatelova.
+        const which = res.status === 401 ? ERR.credentials : res.status === 403 ? ERR.revoked : ERR.server;
+        setError(localized(which, locale));
         return;
       }
       // `res.json()` vyhodí výjimku, kdykoli odpověď není JSON — třeba když se mezi prohlížeč

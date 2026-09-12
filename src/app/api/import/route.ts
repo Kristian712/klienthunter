@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { verifyToken, getPlanLimits } from '@/lib/auth';
+import { activeAccount, sessionFrom, getPlanLimits } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { persistResults } from '@/lib/lead-persist';
 import { enrichAndVerify, mergeLeads } from '@/lib/lead-pipeline';
@@ -42,19 +42,14 @@ function clean(value?: string): string | undefined {
 
 export async function POST(req: NextRequest) {
   try {
-    const token = req.cookies.get('auth-token')?.value;
-    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    const payload = verifyToken(token);
+    const payload = sessionFrom(req);
+    if (!payload) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const body = await req.json();
     const { filename, rows } = ImportSchema.parse(body);
 
     // Tarif z databáze, ne z tokenu — stejný důvod jako v `/api/search`: po zaplacení má
     // vyšší limit platit hned, ne až po dalším přihlášení.
-    const account = await prisma.user.findUnique({
-      where: { id: payload.userId },
-      select: { plan: true, isVip: true, isAdmin: true },
-    });
+    const account = await activeAccount(payload.userId);
     if (!account) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const limits = getPlanLimits(account.plan, account.isVip, account.isAdmin);
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyToken } from '@/lib/auth';
+import { sessionFrom } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 
 /**
@@ -15,10 +15,8 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const token = req.cookies.get('auth-token')?.value;
-    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    const payload = verifyToken(token);
+    const payload = sessionFrom(req);
+    if (!payload) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     // Scoped by userId on purpose: a stranger's id must look missing, not forbidden.
     const search = await prisma.search.findFirst({

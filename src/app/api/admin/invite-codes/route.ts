@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyToken } from '@/lib/auth';
+import { activeAccount, sessionFrom } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 
 function generateCode(): string {
@@ -11,10 +11,10 @@ function generateCode(): string {
 // GET  – list all invite codes
 export async function GET(req: NextRequest) {
   try {
-    const token = req.cookies.get('auth-token')?.value;
-    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    const payload = verifyToken(token);
-    if (!payload.isAdmin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    const payload = sessionFrom(req);
+    if (!payload) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const me = await activeAccount(payload.userId);
+    if (!me?.isAdmin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
     const codes = await prisma.inviteCode.findMany({
       orderBy: { createdAt: 'desc' },
@@ -34,10 +34,10 @@ export async function GET(req: NextRequest) {
 // POST – generate new invite code(s)
 export async function POST(req: NextRequest) {
   try {
-    const token = req.cookies.get('auth-token')?.value;
-    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    const payload = verifyToken(token);
-    if (!payload.isAdmin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    const payload = sessionFrom(req);
+    if (!payload) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const me = await activeAccount(payload.userId);
+    if (!me?.isAdmin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
     const body = await req.json().catch(() => ({}));
     const count                 = Math.min(Number(body.count) || 1, 50);

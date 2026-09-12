@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getPlanLimits, sessionFrom } from '@/lib/auth';
+import { activeAccount, getPlanLimits, sessionFrom } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { leadScore } from '@/lib/lead-score';
 import { enrichAndVerify, mergeLeads, type VerifiedCandidate } from '@/lib/lead-pipeline';
@@ -184,10 +184,7 @@ export async function POST(req: NextRequest) {
      * PRO do databáze, kde ho nikdo nečetl. Jeden dotaz navíc na začátku hledání je levnější
      * než ta reklamace.
      */
-    const account = await prisma.user.findUnique({
-      where: { id: payload.userId },
-      select: { plan: true, isVip: true, isAdmin: true },
-    });
+    const account = await activeAccount(payload.userId);
     if (!account) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const limits = getPlanLimits(account.plan, account.isVip, account.isAdmin);
 

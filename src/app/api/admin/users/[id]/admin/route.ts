@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyToken } from '@/lib/auth';
+import { activeAccount, sessionFrom } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 
 export async function PATCH(
@@ -7,11 +7,10 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
-    const token = req.cookies.get('auth-token')?.value;
-    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    const payload = verifyToken(token);
-    if (!payload.isAdmin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    const payload = sessionFrom(req);
+    if (!payload) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const me = await activeAccount(payload.userId);
+    if (!me?.isAdmin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     // Prevent self-demotion
     if (params.id === payload.userId) {
       return NextResponse.json({ error: 'Cannot change your own admin status' }, { status: 400 });

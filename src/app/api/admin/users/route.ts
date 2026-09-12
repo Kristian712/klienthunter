@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyToken } from '@/lib/auth';
+import { activeAccount, sessionFrom } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 
 /** Čte cookie, takže staticky se vykreslit nedá — viz `/api/searches`. */
@@ -7,11 +7,11 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   try {
-    const token = req.cookies.get('auth-token')?.value;
-    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    const payload = verifyToken(token);
-    if (!payload.isAdmin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    const payload = sessionFrom(req);
+    if (!payload) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Práva se čtou z databáze, ne z tokenu: odebraný admin by je jinak měl ještě sedm dní.
+    const me = await activeAccount(payload.userId);
+    if (!me?.isAdmin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
     const users = await prisma.user.findMany({
       select: {

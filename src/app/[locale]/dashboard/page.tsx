@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
 import Link from 'next/link';
 import { Search, ArrowRight, Crown, Clock, BarChart3, Upload, Trash2 } from 'lucide-react';
+import { clearUser } from '@/lib/client-auth';
 import { industryLabel } from '@/lib/search-options';
 
 interface Search {
@@ -38,6 +39,7 @@ export default function DashboardPage() {
   const [searches, setSearches] = useState<Search[]>([]);
   const [jobs, setJobs] = useState<Record<string, Job>>({});
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
 
   /**
@@ -56,14 +58,27 @@ export default function DashboardPage() {
   };
 
   useEffect(() => {
+    // Propadlá session vypadala jako prázdný účet: 401 se uložilo jako „žádná hledání" a uživatel
+    // si myslel, že o data přišel. Jméno v `localStorage` ho navíc dál ukazovalo přihlášeného.
     fetch('/api/profile', { credentials: 'include' })
-      .then(r => r.json())
-      .then(d => {
+      .then(async res => {
+        if (res.status === 401) {
+          clearUser();
+          window.location.href = `/${locale}/auth/login`;
+          return;
+        }
+        if (!res.ok) throw new Error(`profile ${res.status}`);
+        const d = await res.json();
         setUser(d.user);
         setSearches(d.searches ?? []);
         setLoading(false);
+      })
+      .catch(err => {
+        console.error('dashboard/profile:', err);
+        setLoadError(true);
+        setLoading(false);
       });
-  }, []);
+  }, [locale]);
 
   /**
    * Stavy hledání. Načítají se zvlášť, protože `/api/profile` o jobech nic neví — a hlavně
@@ -82,6 +97,19 @@ export default function DashboardPage() {
         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
       </svg>
+    </div>
+  );
+
+  // Server neodpověděl. Prázdný přehled by tvrdil, že uživatel nic nemá — to je horší než chyba.
+  if (loadError) return (
+    <div className="min-h-screen pt-16 flex flex-col items-center justify-center gap-3 px-6 text-center">
+      <p className="text-ink-muted">
+        {isCs ? 'Přehled se teď nepodařilo načíst. Vaše hledání se nikam neztratila.'
+              : 'The dashboard could not be loaded right now. Your searches are safe.'}
+      </p>
+      <button className="btn-outline btn-sm" onClick={() => window.location.reload()}>
+        {isCs ? 'Zkusit znovu' : 'Try again'}
+      </button>
     </div>
   );
 

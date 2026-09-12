@@ -23,7 +23,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
 
+    // Zablokovaný účet (admin mu nastavil `accessExpiresAt` do minulosti) i propadlá pozvánka.
+    // Bez téhle kontroly stačilo se znovu přihlásit a blokace byla pryč — nový token o ní nevěděl.
+    if (user.accessExpiresAt && user.accessExpiresAt < new Date()) {
+      return NextResponse.json({ error: 'Access revoked', code: 'ACCESS_REVOKED' }, { status: 403 });
+    }
+
     const token = signToken({
+      // Časově omezený přístup si token nese s sebou, jinak by pozvánka na hodinu platila týden.
+      accessExpiresAt: user.accessExpiresAt?.toISOString(),
       userId: user.id,
       email: user.email,
       plan: user.plan,

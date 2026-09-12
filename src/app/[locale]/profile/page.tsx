@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
 import Link from 'next/link';
 import { Crown, Shield, User, Mail, Calendar, Search, BarChart3, Edit2, Check, X, Lock, Target, CreditCard } from 'lucide-react';
+import { clearUser } from '@/lib/client-auth';
 import { localized } from '@/lib/lead-filters';
 import { EMPTY_PROFILE, type UserProfile } from '@/lib/profile';
 import {
@@ -89,13 +90,26 @@ export default function ProfilePage() {
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
 
   useEffect(() => {
-    fetch('/api/profile').then(r => r.json()).then(d => {
-      setData(d);
-      setNameVal(d.user?.name ?? '');
-      if (d.user) setDraft(toDraft({ ...EMPTY_PROFILE, ...d.user }));
-      setLoading(false);
-    });
-  }, []);
+    // Propadlá session je „přihlaste se znovu", ne „nejste přihlášeni" na slepé stránce.
+    fetch('/api/profile')
+      .then(async res => {
+        if (res.status === 401) {
+          clearUser();
+          window.location.href = `/${locale}/auth/login`;
+          return;
+        }
+        if (!res.ok) throw new Error(`profile ${res.status}`);
+        const d = await res.json();
+        setData(d);
+        setNameVal(d.user?.name ?? '');
+        if (d.user) setDraft(toDraft({ ...EMPTY_PROFILE, ...d.user }));
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error('profile:', err);
+        setLoading(false);
+      });
+  }, [locale]);
 
   const saveName = async () => {
     setSaving(true);
@@ -163,8 +177,11 @@ export default function ProfilePage() {
   );
 
   if (!data?.user) return (
-    <div className="min-h-screen pt-16 flex items-center justify-center text-ink-muted">
+    <div className="min-h-screen pt-16 flex flex-col items-center justify-center gap-3 text-ink-muted">
       {isCs ? 'Nejste přihlášeni.' : 'Not logged in.'}
+      <Link href={`/${locale}/auth/login`} className="btn-outline btn-sm">
+        {isCs ? 'Přihlásit se' : 'Sign in'}
+      </Link>
     </div>
   );
 
