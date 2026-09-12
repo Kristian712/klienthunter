@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { localized } from '@/lib/lead-filters';
 import { INDUSTRIES } from '@/lib/search-options';
@@ -112,17 +112,51 @@ export function OnboardingModal({ locale, initial, onDone }: Props) {
   const chosen = professionById(draft.profession);
   const scenario = scenarioById(draft.profession ? SCENARIO_BY_PROFESSION[draft.profession] : 'all');
 
+  /**
+   * Fokus uvnitř dialogu.
+   *
+   * `aria-modal="true"` slibuje čtečce chování, které tu do teď nebylo: první Tab skočil na
+   * odkazy v liště pod ztmavenou plochou a Escape nedělal nic. Modál vidí každý nový uživatel,
+   * takže je to první obrazovka appky pro toho, kdo na myš nesahá.
+   */
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const opener = document.activeElement as HTMLElement | null;
+    panelRef.current?.focus();
+    return () => opener?.focus?.();
+  }, []);
+
+  const onKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Escape') { e.preventDefault(); void skip(); return; }
+    if (e.key !== 'Tab') return;
+    const focusable = panelRef.current?.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), a[href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+    );
+    if (!focusable?.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    // Bez tohohle Tab z posledního prvku vypadne na stránku pod dialogem a zpátky se dostane
+    // až po projití celé stránky.
+    if (e.shiftKey && (document.activeElement === first || document.activeElement === panelRef.current)) {
+      e.preventDefault(); last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault(); first.focus();
+    }
+  }, []);
+
   return (
     <div
       className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-start md:items-center justify-center overflow-y-auto p-4"
       role="dialog"
       aria-modal="true"
       aria-label={localized(T.title, locale)}
+      onKeyDown={onKeyDown}
     >
       {/* On dark the panel and the dimmed page differ by only about 1.1 : 1. The line-strong
           edge is what separates them; the shadow barely shows on the near-black scrim and only
           helps over brighter content, so the border must stay. */}
-      <div className="bg-surface-subtle border border-line-strong shadow-[0_24px_64px_rgba(0,0,0,.6)] w-full max-w-2xl my-4">
+      <div ref={panelRef} tabIndex={-1} className="bg-surface-subtle border border-line-strong shadow-[0_24px_64px_rgba(0,0,0,.6)] w-full max-w-2xl my-4 outline-none">
 
         <div className="flex items-start justify-between gap-6 px-6 pt-6 pb-4 border-b border-line">
           <div className="min-w-0">
