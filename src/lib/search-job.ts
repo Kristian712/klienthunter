@@ -194,6 +194,7 @@ export async function runSearchJob(jobId: string): Promise<void> {
         : { status: 'paused', processedCount: processed, stageIndex: index, stageLabel: stages[index].label },
     });
   } catch (err) {
+    console.error('search-job:', jobId, err);
     // Co je zapsané, zůstává. Uživatel uvidí částečný výsledek i důvod, proč není celý.
     await prisma.searchJob
       .update({
@@ -201,11 +202,31 @@ export async function runSearchJob(jobId: string): Promise<void> {
         data: {
           status: 'failed',
           finishedAt: new Date(),
-          error: err instanceof Error ? err.message.slice(0, 300) : 'Neznámá chyba',
+          /**
+           * Kód, ne text výjimky.
+           *
+           * Dřív se sem ukládalo `err.message` a stránka ho vypisovala tak, jak přišlo — uživatel
+           * si přečetl `Invalid prisma.businessResult.create() … ETIMEDOUT`. Nic mu to neřeklo
+           * a ven to neslo vnitřnosti aplikace. Podrobnost patří do logu, na obrazovku kód,
+           * který si UI přeloží.
+           */
+          error: errorCode(err),
         },
       })
       .catch(() => undefined);
   }
+}
+
+/**
+ * Z výjimky udělá jedno ze čtyř slov, kterým rozumí UI: `db`, `network`, `timeout`, `unknown`.
+ * Překlad na větu je na straně prohlížeče, aby ji uživatel dostal ve svém jazyce.
+ */
+function errorCode(err: unknown): string {
+  const text = err instanceof Error ? `${err.name} ${err.message}` : String(err ?? '');
+  if (/prisma|database|ECONNREFUSED|connection/i.test(text)) return 'db';
+  if (/ETIMEDOUT|AbortError|timeout|deadline/i.test(text)) return 'timeout';
+  if (/fetch|ENOTFOUND|ECONNRESET|network|socket/i.test(text)) return 'network';
+  return 'unknown';
 }
 
 /**
@@ -227,7 +248,7 @@ export async function sweepStaleJobs(userId: string): Promise<void> {
       data: {
         status: 'failed',
         finishedAt: new Date(),
-        error: 'Hledání se zastavilo dřív, než doběhlo. Co se stihlo najít, zůstalo uložené.',
+        error: 'timeout',
       },
     })
     .catch(() => undefined);

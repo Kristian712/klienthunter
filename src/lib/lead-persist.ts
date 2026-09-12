@@ -58,7 +58,7 @@ export async function persistResults(
       activePremises: c.activePremises,
     };
 
-    return prisma.businessResult.create({
+    const write = () => prisma.businessResult.create({
       data: {
         ...row,
         searchId,
@@ -87,7 +87,25 @@ export async function persistResults(
         category:        c.category,
         source:          c.source,
       },
-    }).catch(() => null);
+    });
+
+    /**
+     * Zápis se jednou zopakuje a jeho selhání se zaloguje.
+     *
+     * Dřív tu bylo `.catch(() => null)`. Neúspěšný zápis tedy zmizel beze stopy: hledání se
+     * tvářilo jako hotové, počítadlo hlásilo, kolik firem prošlo, a v seznamu jich byla část.
+     * Většina takových chyb je chvilkový výpadek spojení do databáze, který druhý pokus přežije.
+     */
+    try {
+      return await write();
+    } catch (first) {
+      try {
+        return await write();
+      } catch (err) {
+        console.error('lead-persist: řádek se nepodařilo uložit:', c.name, err ?? first);
+        return null;
+      }
+    }
   };
 
   return (await Promise.all(verified.map(persist))).filter(Boolean);

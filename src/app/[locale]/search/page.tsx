@@ -550,6 +550,31 @@ const S = {
 };
 
 /**
+ * Proč hledání spadlo, česky. Server ukládá jen kód (`db`, `network`, `timeout`, `unknown`) —
+ * dřív tam byla celá výjimka z Node a uživatel četl `Invalid prisma.businessResult.create() …`.
+ * Starší joby mají v tom poli ještě větu, tak se vypíše tak, jak je.
+ */
+const JOB_ERRORS: Record<string, { cs: string; sk: string; en: string }> = {
+  db:      { cs: 'Nepodařilo se uložit část výsledků — chyba databáze.',
+             sk: 'Nepodarilo sa uložiť časť výsledkov — chyba databázy.',
+             en: 'Some results could not be saved — a database error.' },
+  network: { cs: 'Některý zdroj dat neodpověděl.',
+             sk: 'Niektorý zdroj dát neodpovedal.',
+             en: 'One of the data sources did not answer.' },
+  timeout: { cs: 'Hledání se zastavilo dřív, než doběhlo.',
+             sk: 'Hľadanie sa zastavilo skôr, než dobehlo.',
+             en: 'The search stopped before it finished.' },
+  unknown: { cs: 'Hledání se nepovedlo dokončit.',
+             sk: 'Hľadanie sa nepodarilo dokončiť.',
+             en: 'The search could not be completed.' },
+};
+
+function jobErrorText(code: string | null, locale: string): string {
+  if (!code) return '';
+  return JOB_ERRORS[code] ? localized(JOB_ERRORS[code], locale) : code;
+}
+
+/**
  * Same rule as the website badge. Social profiles are only ever read off the firm's own
  * homepage, so on a row where no page was found all three flags are false because nobody
  * looked — and "Bez soc. sítí" was the app saying so out loud. `socialsChecked` records
@@ -1162,6 +1187,8 @@ export default function SearchPage() {
 
   const popularChips = POPULAR_CHIPS[locale] ?? POPULAR_CHIPS.en;
   const isPro = userPlan === 'PRO' || userPlan === 'BUSINESS';
+  /** Job běží dál i po tom, co odpověď na POST dorazila — `loading` o tom nic neví. */
+  const jobRunning = Boolean(job && job.status !== 'done' && job.status !== 'failed');
 
   return (
     <div className="min-h-screen bg-surface pt-16">
@@ -1334,9 +1361,14 @@ export default function SearchPage() {
 
             {/* Odsazení o výšku popisku: sloupec s tlačítkem žádný nemá, a bez toho by tlačítko
                 v mřížce zarovnané nahoru sedělo nad poli místo vedle nich. */}
-            <button type="submit" disabled={loading || !effectiveRegion || !effectiveIndustry}
+            {/* Tlačítko zůstává zamčené, dokud běžící hledání neskončí. `loading` se vypne hned
+                po odpovědi POST, ale job běží ještě minuty — a druhé hledání spuštěné mezitím
+                utrácí dotazy do vyhledávače z téhož měsíčního stropu, o kterém uživatel na
+                obrazovce už neví. */}
+            <button type="submit"
+              disabled={loading || jobRunning || !effectiveRegion || !effectiveIndustry}
               className="btn-primary h-[42px] md:mt-[23px]">
-              {loading ? (
+              {loading || jobRunning ? (
                 <span className="flex items-center gap-2">
                   <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -1421,7 +1453,7 @@ export default function SearchPage() {
 
             {job.status === 'failed' && (
               <>
-                <p className="text-sm text-ink-muted mt-2">{job.error}</p>
+                <p className="text-sm text-ink-muted mt-2">{jobErrorText(job.error, locale)}</p>
                 <p className="text-xs text-ink-faint mt-2">{localized(S.jobPartial, locale)}</p>
               </>
             )}
@@ -1651,6 +1683,14 @@ export default function SearchPage() {
                           schovává, takže na telefonu by ji jinak nikdo nikdy neviděl — a je to
                           ta jediná věta, kvůli které má řádek smysl číst. */}
                       <p className="lg:hidden text-xs text-ink-muted leading-relaxed mt-3">{reason}</p>
+
+                      {/* Důkaz k příznaku webu se dosud předával jen jako `title`, tedy bublina
+                          myši — na telefonu ho nikdo nikdy neviděl. Přitom je to jediné, co
+                          odlišuje doložené „web nemá" od domněnky, a kvůli tomu se celá detekce
+                          přepisovala. Na úzkých obrazovkách proto stojí v textu. */}
+                      {b.websiteEvidence && (
+                        <p className="lg:hidden text-[11px] text-ink-faint leading-relaxed mt-1">{b.websiteEvidence}</p>
+                      )}
                     </div>
 
                     {/* Why this score (desktop) */}
