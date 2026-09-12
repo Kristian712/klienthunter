@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { localized } from '@/lib/lead-filters';
+import { LANGUAGES, switchLocale } from '@/lib/locale-switch';
 import { OSM_ATTRIBUTION_L } from '@/lib/attribution';
 import { OPERATOR } from '@/lib/legal';
 
@@ -38,6 +39,7 @@ const T = {
 export function Footer({ locale }: { locale: string }) {
   const pathname = usePathname();
   const t = (x: { cs: string; sk?: string; en: string }) => localized(x, locale);
+  const chooseLocale = (next: string) => switchLocale(pathname, next);
 
   // Přihlášení a registrace jsou celoobrazovkové a mají vlastní patičku s uvedením zdrojů.
   // Další zápatí pod nimi by byl jen šum na stránce, která má vést k jedinému tlačítku.
@@ -68,9 +70,16 @@ export function Footer({ locale }: { locale: string }) {
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-ink-faint mb-3">{t(T.language)}</p>
             <div className="space-y-2">
-              <Link href="/cs" className="block text-sm text-ink-muted hover:text-ink">Čeština</Link>
-              <Link href="/sk" className="block text-sm text-ink-muted hover:text-ink">Slovenčina</Link>
-              <Link href="/en" className="block text-sm text-ink-muted hover:text-ink">English</Link>
+              {/* Tlačítka, ne odkazy na /cs, /sk, /en. Ty vedly vždycky na úvodní stránku a hlavně
+                  nezapisovaly cookii `NEXT_LOCALE`, kterou middleware bere jako jedinou volbu
+                  jazyka — uživatel tedy přišel o stránku, na které byl, a při příštím otevření
+                  holé domény ho to stejně vrátilo do češtiny. Lišta to dělá správně, patička teď taky. */}
+              {LANGUAGES.map(l => (
+                <button key={l.code} onClick={() => chooseLocale(l.code)}
+                  className={`block text-sm text-left hover:text-ink ${l.code === locale ? 'text-accent font-semibold' : 'text-ink-muted'}`}>
+                  {l.label}
+                </button>
+              ))}
             </div>
           </div>
         </div>

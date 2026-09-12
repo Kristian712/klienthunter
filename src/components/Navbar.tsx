@@ -7,6 +7,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Check, Menu, X } from 'lucide-react';
 import { loadUser, clearUser, type StoredUser } from '@/lib/client-auth';
 import { localized } from '@/lib/lead-filters';
+import { LANGUAGES, switchLocale } from '@/lib/locale-switch';
 
 type UserType = StoredUser;
 
@@ -18,12 +19,6 @@ const T = {
   menu:      { cs: 'Menu', sk: 'Menu', en: 'Menu' },
   menuClose: { cs: 'Zavřít menu', sk: 'Zavrieť menu', en: 'Close menu' },
 };
-
-const LANGUAGES = [
-  { code: 'cs', label: 'Čeština' },
-  { code: 'sk', label: 'Slovenčina' },
-  { code: 'en', label: 'English' },
-];
 
 /**
  * Dark bar, one hairline underneath, light type. The only colour is the light-blue accent: the
@@ -84,15 +79,9 @@ export function Navbar() {
    * jedině tímhle kliknutím (middleware ji už nepíše sám).
    */
   const chooseLocale = (next: string) => {
-    document.cookie = `NEXT_LOCALE=${next}; Path=/; Max-Age=31536000; SameSite=Lax`;
     setLangOpen(false);
     setMobile(false);
-    // Cesta se skládá po segmentech a query i kotva se berou s sebou. `usePathname()` je nenese,
-    // takže z `/cs/search?job=abc` bylo `/en/search` a rozdělané hledání zmizelo z obrazovky;
-    // stejně mizelo `?checkout=success` na ceníku, tedy potvrzení o zaplacení.
-    const parts = pathname.split('/');
-    parts[1] = next;
-    window.location.href = parts.join('/') + window.location.search + window.location.hash;
+    switchLocale(pathname, next);
   };
 
   const links = [
