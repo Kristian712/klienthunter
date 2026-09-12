@@ -436,4 +436,7 @@
   /* Pozadí se bez tohohle netiskne a bílý text tlačítka by vyšel bílý na bílé. */
   .btn-primary, .chip-active { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   header, footer, .kh-map-frame { display: none !important; }
+  /* Bloky s `.reveal` čekají na scroll, aby se objevily. Kdo stránku vytiskne bez proscrollování,
+     dostal nadpisy a pod nimi prázdno. Na papíře žádná animace nedává smysl. */
+  .reveal { opacity: 1 !important; transform: none !important; }
 }
