@@ -363,6 +363,12 @@ export function ResultsMap({ leads, total, locale, onSetStatus, hideDone, hidden
       pitchWithRotate: true,
       dragRotate: true,
       maxPitch: 60,
+      /**
+       * Na dotykovém displeji mapa jinak ukradne rolování stránky: rám má přes 400 px, tedy víc
+       * než polovinu telefonu, a prst, který chtěl posunout stránku, posune výřez. S tímhle
+       * jedním prstem roluje stránka a mapa se posouvá dvěma (na desktopu se nic nemění).
+       */
+      cooperativeGestures: typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches,
     });
     m.addControl(new NavigationControl({ visualizePitch: true }), 'top-right');
     m.on('style.load', () => { tintVanek(m); setStyleReady(true); });
@@ -683,7 +689,10 @@ export function ResultsMap({ leads, total, locale, onSetStatus, hideDone, hidden
                 <button
                   onClick={() => setSelected(null)}
                   aria-label={localized(T.close, locale)}
-                  className="text-ink-faint hover:text-ink text-lg leading-none shrink-0 -mt-1"
+                  /* `p-2 -m-2` zvětší dotykový cíl z ~10×18 px na 44 px, aniž by se hnula
+                     sazba: záporný margin ubere přesně to, co přidal padding. Na mobilu je karta
+                     spodní pruh přes třetinu obrazovky a zavřít ji jde jedině tímhle křížkem. */
+                  className="text-ink-faint hover:text-ink text-lg leading-none shrink-0 -mt-1 p-2 -m-2"
                 >
                   ×
                 </button>
@@ -744,7 +753,7 @@ export function ResultsMap({ leads, total, locale, onSetStatus, hideDone, hidden
                         setSelected({ ...selected, status: dalsi });
                       }}
                       className={`flex items-center justify-center md:justify-start gap-1 md:gap-1.5
-                        text-[10px] md:text-[11px] px-1 md:px-2 py-1 md:py-1.5 rounded-md border transition-colors ${
+                        text-[10px] md:text-[11px] px-1 md:px-2 py-2 md:py-1.5 min-h-[36px] md:min-h-0 rounded-md border transition-colors ${
                         zapnuto
                           ? 'border-ink bg-ink text-surface'
                           : 'border-line-strong text-ink-muted hover:border-ink hover:text-ink'

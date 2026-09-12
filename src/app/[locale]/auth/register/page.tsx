@@ -151,7 +151,7 @@ export default function RegisterPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Invite code – first and prominent */}
             <div>
-              <label className="label flex items-center gap-1">
+              <label className="label flex items-center gap-1" htmlFor="kh-reg-code">
                 <Ticket size={13} />
                 {localized(UI.codeLabel, locale)}
                 <span className="text-ink-faint ml-1 font-normal normal-case tracking-normal">
@@ -159,6 +159,7 @@ export default function RegisterPage() {
                 </span>
               </label>
               <input
+                id="kh-reg-code"
                 type="text"
                 className="input font-mono tracking-widest uppercase"
                 placeholder="XXXXX-XXXXX"
@@ -172,26 +173,26 @@ export default function RegisterPage() {
 
             <div className="border-t border-line pt-4">
               <div>
-                <label className="label">{t('name_label')}</label>
+                <label className="label" htmlFor="kh-reg-name">{t('name_label')}</label>
                 <div className="relative">
                   <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-faint" />
-                  <input type="text" className="input pl-9" placeholder={t('name_placeholder')}
+                  <input id="kh-reg-name" type="text" autoComplete="name" className="input pl-9" placeholder={t('name_placeholder')}
                     value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
                 </div>
               </div>
               <div className="mt-4">
-                <label className="label">{t('email_label')}</label>
+                <label className="label" htmlFor="kh-reg-email">{t('email_label')}</label>
                 <div className="relative">
                   <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-faint" />
-                  <input type="email" className="input pl-9" placeholder={t('email_placeholder')}
+                  <input id="kh-reg-email" type="email" autoComplete="email" className="input pl-9" placeholder={t('email_placeholder')}
                     value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} required />
                 </div>
               </div>
               <div className="mt-4">
-                <label className="label">{t('password_label')}</label>
+                <label className="label" htmlFor="kh-reg-password">{t('password_label')}</label>
                 <div className="relative">
                   <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-faint" />
-                  <input type="password" className="input pl-9"
+                  <input id="kh-reg-password" type="password" autoComplete="new-password" className="input pl-9"
                     placeholder={localized(UI.pwHint, locale)}
                     value={form.password} onChange={e => setForm({ ...form, password: e.target.value })}
                     required minLength={8} />

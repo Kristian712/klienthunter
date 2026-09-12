@@ -288,6 +288,21 @@
 }
 .kh-pin:hover .kh-pin__hit,
 .kh-pin:focus-visible .kh-pin__hit { transform: scale(1.45); }
+
+/* Na dotyk je bod velký 11–19 px podle skóre, takže ve městě uživatel buď netrefí nic, nebo
+   otevře kartu sousední firmy. Neviditelná plocha 44 × 44 px kolem bodu to spraví, aniž by se
+   cokoli hnulo vizuálně — kroužek i záře mají `pointer-events: none`, takže zásah nerozšíří. */
+@media (pointer: coarse) {
+  .kh-pin__hit::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 44px;
+    height: 44px;
+    transform: translate(-50%, -50%);
+  }
+}
 .kh-pin[data-selected='true'] .kh-pin__hit { transform: scale(1.5); }
 
 /* Samotný puntík. Tmavá mezera ho oddělí od podkladu a od sousedů, tenký světlý obrys ho

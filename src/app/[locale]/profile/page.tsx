@@ -13,6 +13,7 @@ import {
 } from '@/components/ProfileFields';
 import { industryLabel } from '@/lib/search-options';
 import { hasActiveSubscription, paymentFailing, trialDaysLeft } from '@/lib/subscription';
+import { formatDate, formatTime } from '@/lib/format-date';
 
 interface ProfileData {
   user: UserProfile & {
@@ -211,17 +212,26 @@ export default function ProfilePage() {
                   <div className="flex items-center gap-2">
                     <input className="input py-1 text-lg font-bold w-48" value={nameVal}
                       onChange={e => setNameVal(e.target.value)} autoFocus />
-                    <button onClick={saveName} disabled={saving} className="p-1.5 rounded-lg bg-accent text-accent-ink hover:bg-accent-hover transition-colors">
+                    {/* Ikonová tlačítka bez textu potřebují `aria-label` — lucide ikona žádný
+                        `<title>` nenese, takže čtečka hlásila jen „tlačítko". Padding zvětšuje
+                        dotykový cíl z 21 px na 40+. */}
+                    <button onClick={saveName} disabled={saving}
+                      aria-label={isCs ? 'Uložit jméno' : 'Save name'}
+                      className="p-2.5 rounded-lg bg-accent text-accent-ink hover:bg-accent-hover transition-colors">
                       <Check size={15} />
                     </button>
-                    <button onClick={() => setEditName(false)} className="p-1.5 rounded-lg bg-ink/5 text-ink-faint hover:bg-ink/10">
+                    <button onClick={() => setEditName(false)}
+                      aria-label={isCs ? 'Zrušit úpravu' : 'Cancel editing'}
+                      className="p-2.5 rounded-lg bg-ink/5 text-ink-faint hover:bg-ink/10">
                       <X size={15} />
                     </button>
                   </div>
                 ) : (
                   <>
                     <h1 className="text-xl font-bold text-ink">{user.name || (isCs ? 'Bez jména' : 'No name')}</h1>
-                    <button onClick={() => setEditName(true)} className="p-1 rounded text-ink-faint hover:text-ink">
+                    <button onClick={() => setEditName(true)}
+                      aria-label={isCs ? 'Upravit jméno' : 'Edit name'}
+                      className="p-2.5 rounded text-ink-faint hover:text-ink">
                       <Edit2 size={13} />
                     </button>
                   </>
@@ -250,7 +260,7 @@ export default function ProfilePage() {
                 )}
                 <span className="flex items-center gap-1 text-xs text-ink-faint">
                   <Calendar size={11} />
-                  {isCs ? 'Člen od' : 'Member since'} {new Date(user.createdAt).toLocaleDateString(isCs ? 'cs-CZ' : 'en-US')}
+                  {isCs ? 'Člen od' : 'Member since'} {formatDate(user.createdAt, locale)}
                 </span>
               </div>
             </div>
@@ -258,7 +268,9 @@ export default function ProfilePage() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-4">
+        {/* Na 375 px zbývalo na obsah karty ~54 px, takže „Vyhledávání" i hodnota „Business"
+            přetékaly z rámečku. Pod `sm` jsou karty pod sebou. */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {[
             { label: isCs ? 'Vyhledávání' : 'Searches',  value: user._count.searches, icon: <Search size={18} /> },
             { label: isCs ? 'Firem nalezeno' : 'Businesses found', value: totalResults, icon: <BarChart3 size={18} /> },
@@ -307,13 +319,13 @@ export default function ProfilePage() {
               {trialDays !== null && user.trialEndsAt ? (
                 <p className="mt-3 text-sm text-ink-muted tnum">
                   {isCs ? 'Zkušební období do ' : 'Trial until '}
-                  {new Date(user.trialEndsAt).toLocaleDateString(isCs ? 'cs-CZ' : 'en-US')}
+                  {formatDate(user.trialEndsAt, locale)}
                   {', '}{daysLeftText(trialDays, isCs)}.
                 </p>
               ) : user.currentPeriodEnd && (
                 <p className="mt-3 text-sm text-ink-muted tnum">
                   {isCs ? 'Zaplaceno do ' : 'Paid until '}
-                  {new Date(user.currentPeriodEnd).toLocaleDateString(isCs ? 'cs-CZ' : 'en-US')}
+                  {formatDate(user.currentPeriodEnd, locale)}
                 </p>
               )}
               <button
@@ -380,13 +392,15 @@ export default function ProfilePage() {
           {changePw && (
             <form onSubmit={savePassword} className="space-y-3 max-w-sm">
               <div>
-                <label className="label">{isCs ? 'Současné heslo' : 'Current password'}</label>
-                <input type="password" className="input" value={pwForm.current}
+                {/* Bez `htmlFor`/`id` byl přístupný název tohohle pole prázdný — čtečka ohlásila
+                    jen „editační pole". */}
+                <label className="label" htmlFor="kh-pw-current">{isCs ? 'Současné heslo' : 'Current password'}</label>
+                <input id="kh-pw-current" type="password" autoComplete="current-password" className="input" value={pwForm.current}
                   onChange={e => setPwForm(p => ({ ...p, current: e.target.value }))} required />
               </div>
               <div>
-                <label className="label">{isCs ? 'Nové heslo' : 'New password'}</label>
-                <input type="password" className="input" minLength={8}
+                <label className="label" htmlFor="kh-pw-next">{isCs ? 'Nové heslo' : 'New password'}</label>
+                <input id="kh-pw-next" type="password" autoComplete="new-password" className="input" minLength={8}
                   placeholder={isCs ? 'Alespoň 8 znaků' : 'At least 8 characters'}
                   value={pwForm.next}
                   onChange={e => setPwForm(p => ({ ...p, next: e.target.value }))} required />
@@ -450,9 +464,9 @@ export default function ProfilePage() {
                       <span className="badge-green text-xs">{s._count.results}</span>
                     </td>
                     <td className="text-ink-faint text-xs">
-                      {new Date(s.createdAt).toLocaleDateString(isCs ? 'cs-CZ' : 'en-US')}
+                      {formatDate(s.createdAt, locale)}
                       {' '}
-                      {new Date(s.createdAt).toLocaleTimeString(isCs ? 'cs-CZ' : 'en-US', { hour: '2-digit', minute: '2-digit' })}
+                      {formatTime(s.createdAt, locale)}
                     </td>
                   </tr>
                 ))}

@@ -8,6 +8,7 @@ import { localized } from '@/lib/lead-filters';
 import { OPERATOR } from '@/lib/legal';
 import { PLAN_LIMITS, PLAN_PRICES_CZK, TRIAL_DAYS, trialDaysFor } from '@/lib/plans';
 import { paymentFailing, trialDaysLeft } from '@/lib/subscription';
+import { formatDate as sharedFormatDate } from '@/lib/format-date';
 
 /**
  * Ceník se třemi tarify a tlačítky, která vedou do Stripe Checkoutu.
@@ -248,7 +249,9 @@ function dimUnless(working: boolean): string {
 export default function PricingPage() {
   const locale = useLocale();
   const t = (x: { cs: string; sk?: string; en: string }) => localized(x, locale);
-  const formatDate = (iso: string) => new Date(iso).toLocaleDateString(locale === 'en' ? 'en-GB' : 'cs-CZ');
+  // Formát data je společný pro celou aplikaci (viz lib/format-date.ts) — dřív si ho psala
+  // každá stránka sama a ceník s profilem ukazovaly totéž datum jinak.
+  const formatDate = (iso: string) => sharedFormatDate(iso, locale);
 
   const [me, setMe] = useState<Me | null | undefined>(undefined); // undefined = ještě nevíme
   const [busy, setBusy] = useState<PaidPlan | 'portal' | null>(null);

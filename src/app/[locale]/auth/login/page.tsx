@@ -115,18 +115,20 @@ export default function LoginPage() {
           </div>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="label">{t('email_label')}</label>
+              {/* `htmlFor` + `id`: bez nich čtečka u pole hesla nemá z čeho postavit název —
+                  placeholder jsou jen tečky — a klepnutí na popisek nepřesune fokus do pole. */}
+              <label className="label" htmlFor="kh-login-email">{t('email_label')}</label>
               <div className="relative">
                 <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-faint" />
-                <input type="email" className="input pl-9" placeholder={t('email_placeholder')}
+                <input id="kh-login-email" type="email" autoComplete="email" className="input pl-9" placeholder={t('email_placeholder')}
                   value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} required />
               </div>
             </div>
             <div>
-              <label className="label">{t('password_label')}</label>
+              <label className="label" htmlFor="kh-login-password">{t('password_label')}</label>
               <div className="relative">
                 <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-faint" />
-                <input type="password" className="input pl-9" placeholder="••••••••"
+                <input id="kh-login-password" type="password" autoComplete="current-password" className="input pl-9" placeholder="••••••••"
                   value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} required />
               </div>
             </div>

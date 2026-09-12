@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Search, ArrowRight, Crown, Clock, BarChart3, Upload, Trash2 } from 'lucide-react';
 import { clearUser } from '@/lib/client-auth';
 import { industryLabel } from '@/lib/search-options';
+import { formatDate } from '@/lib/format-date';
 
 interface Search {
   id: string; query: string; region: string; createdAt: string;
@@ -198,7 +199,7 @@ export default function DashboardPage() {
                   <span className="text-sm text-ink-faint tnum">{s._count.results} {isCs ? 'firem' : 'businesses'}</span>
                   <span className="flex items-center gap-1 text-xs text-ink-faint tnum">
                     <Clock size={11} />
-                    {new Date(s.createdAt).toLocaleDateString(isCs ? 'cs-CZ' : 'en-US')}
+                    {formatDate(s.createdAt, locale)}
                   </span>
                   <button
                     onClick={() => remove(s.id)}

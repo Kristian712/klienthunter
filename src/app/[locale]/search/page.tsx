@@ -727,6 +727,8 @@ export default function SearchPage() {
   /** Text v našeptávači oborů. Prázdný, dokud uživatel nezačne psát. */
   const [industryQuery, setIndustryQuery] = useState('');
   const [industryOpen, setIndustryOpen]   = useState(false);
+  /** Zvýrazněná položka našeptávače pro ovládání šipkami; -1 = žádná. */
+  const [industryActive, setIndustryActive] = useState(-1);
   /** Id ze SCENARIOS. Předvyplní se podle profese z onboardingu, uživatel ho může přepnout. */
   const [scenario, setScenario]           = useState('all');
 
@@ -1259,11 +1261,12 @@ export default function SearchPage() {
 
             {/* Region select */}
             <div className="md:col-span-2">
-              <label className="label">
+              <label className="label" htmlFor="kh-region">
                 {t('region_label')}
               </label>
               <div className="relative">
                 <select
+                  id="kh-region"
                   className="input appearance-none pr-9 cursor-pointer"
                   value={region}
                   onChange={e => setRegion(e.target.value)}
@@ -1299,43 +1302,85 @@ export default function SearchPage() {
                 v seznamu není, musel napřed pochopit, že si má rozkliknout poslední položku.
                 Psaní zvládne obojí naráz: filtruje seznam a zároveň je to ten volný text. */}
             <div className="md:col-span-2">
-              <label className="label">
+              <label className="label" htmlFor="kh-industry">
                 {t('industry_label')}
               </label>
 
               <div className="relative">
                 <input
+                  id="kh-industry"
                   className="input pr-9"
                   value={industryQuery}
                   placeholder={isCs ? 'Začněte psát: zubaři, restaurace, autoservis…' : 'Start typing: dentists, restaurants…'}
-                  onChange={e => { setIndustryQuery(e.target.value); setIndustry(''); setIndustryOpen(true); }}
+                  onChange={e => { setIndustryQuery(e.target.value); setIndustry(''); setIndustryOpen(true); setIndustryActive(-1); }}
                   // Text se označí, aby první stisknutá klávesa přepsala vybraný obor a nepsala se
                   // za něj — jinak by z „Kadeřnictví" + „zub" vzniklo „Kadeřnictvízub", což
                   // neodpovídá žádnému oboru. `onMouseUp` musí zabránit výchozímu chování, jinak
                   // by kliknutí myší označení hned zrušilo a postavilo kurzor na konec.
                   onFocus={e => { setIndustryOpen(true); e.currentTarget.select(); }}
                   onMouseUp={e => e.preventDefault()}
-                  // Kliknutí na položku seznamu způsobí blur dřív, než se stihne zpracovat —
-                  // proto se zavírá se zpožděním, ne okamžitě.
-                  onBlur={() => setTimeout(() => setIndustryOpen(false), 150)}
+                  /**
+                   * Zavření podle toho, kam fokus odešel, ne podle časovače.
+                   *
+                   * `setTimeout(…, 150)` odmountoval seznam i s tlačítkem, na kterém fokus zrovna
+                   * byl, takže při ovládání klávesnicí spadl na `<body>` uprostřed formuláře.
+                   * `relatedTarget` řekne, jestli fokus zůstal uvnitř našeptávače.
+                   */
+                  onBlur={e => {
+                    if (!e.currentTarget.parentElement?.contains(e.relatedTarget as Node)) {
+                      setIndustryOpen(false);
+                      setIndustryActive(-1);
+                    }
+                  }}
+                  /** Šipky, Enter a Escape. Do teď nedělaly nic — pole se dalo ovládat jen myší. */
+                  onKeyDown={e => {
+                    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                      e.preventDefault();
+                      if (!industryOpen) { setIndustryOpen(true); return; }
+                      const last = industryMatches.length - 1;
+                      if (last < 0) return;
+                      setIndustryActive(i => (e.key === 'ArrowDown'
+                        ? (i >= last ? 0 : i + 1)
+                        : (i <= 0 ? last : i - 1)));
+                    } else if (e.key === 'Enter' && industryOpen && industryActive >= 0) {
+                      const item = industryMatches[industryActive];
+                      if (item) {
+                        e.preventDefault();
+                        setIndustry(item.value);
+                        setIndustryQuery(item.label);
+                        setIndustryOpen(false);
+                        setIndustryActive(-1);
+                      }
+                    } else if (e.key === 'Escape' && industryOpen) {
+                      e.preventDefault();
+                      setIndustryOpen(false);
+                      setIndustryActive(-1);
+                    }
+                  }}
                   aria-expanded={industryOpen}
                   aria-autocomplete="list"
+                  aria-controls="kh-industry-list"
+                  aria-activedescendant={industryActive >= 0 ? `kh-industry-opt-${industryActive}` : undefined}
                   role="combobox"
                 />
                 {industryOpen && (
                   /* Nabídka plave nad kartou s formulářem a tmavé plochy se od sebe liší jen
                      o chlup — proto o stupeň světlejší plocha, silnější linka a stín. */
-                  <ul className="absolute z-20 left-0 right-0 mt-1 max-h-64 overflow-y-auto bg-surface-muted border border-line-strong shadow-[0_12px_32px_rgba(0,0,0,.6)]">
-                    {industryMatches.map(item => (
-                      <li key={item.value}>
+                  <ul id="kh-industry-list" role="listbox" aria-label={t('industry_label')}
+                      className="absolute z-20 left-0 right-0 mt-1 max-h-64 overflow-y-auto bg-surface-muted border border-line-strong shadow-[0_12px_32px_rgba(0,0,0,.6)]">
+                    {industryMatches.map((item, i) => (
+                      <li key={item.value} role="option" id={`kh-industry-opt-${i}`} aria-selected={i === industryActive}>
                         <button
                           type="button"
-                          className="w-full text-left px-3 py-2 text-sm hover:bg-ink/[0.06] transition-colors"
+                          tabIndex={-1}
+                          className={`w-full text-left px-3 py-2 text-sm transition-colors ${i === industryActive ? 'bg-ink/[0.10]' : 'hover:bg-ink/[0.06]'}`}
                           onMouseDown={e => e.preventDefault()}
+                          onMouseEnter={() => setIndustryActive(i)}
                           onClick={() => {
                             setIndustry(item.value);
                             setIndustryQuery(item.label);
                             setIndustryOpen(false);
+                            setIndustryActive(-1);
                           }}
                         >
                           {item.label}
@@ -1660,7 +1705,10 @@ export default function SearchPage() {
                               value={statusOf(b) ?? 'new'}
                               onChange={e => setLeadStatus(b.id, e.target.value as LeadStatus)}
                               aria-label={localized({ cs: 'Stav', sk: 'Stav', en: 'Status' }, locale)}
-                              className="text-[11px] text-ink border border-field rounded-lg pl-4 pr-1.5 py-0.5 bg-surface-muted cursor-pointer hover:border-ink transition-colors"
+                              /* Nejčastější akce na výsledkové stránce (po telefonátu překliknout
+                                 na „Osloveno") byla vysoká 23 px, takže se palcem trefovala až
+                                 na několikátý pokus. Na mobilu 36 px, na desktopu beze změny. */
+                              className="text-[11px] text-ink border border-field rounded-lg pl-4 pr-1.5 py-1.5 min-h-[36px] sm:py-0.5 sm:min-h-0 bg-surface-muted cursor-pointer hover:border-ink transition-colors"
                             >
                               {LEAD_STATUSES.map(st => (
                                 <option key={st.id} value={st.id}>{localized(st.label, locale)}</option>

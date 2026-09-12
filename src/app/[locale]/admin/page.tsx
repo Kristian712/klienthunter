@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useLocale } from 'next-intl';
 import { Crown, Shield, Users, RefreshCw, Ticket, Plus, Trash2, Copy, Check, Clock, Link2 } from 'lucide-react';
+import { formatDate } from '@/lib/format-date';
 
 interface AdminUser {
   id: string; email: string; name?: string;
@@ -302,7 +303,7 @@ export default function AdminPage() {
                         </td>
                         <td><span className={user.plan === 'PRO' || user.plan === 'BUSINESS' ? BADGE_STRONG : 'badge'}>{user.plan}</span></td>
                         <td className="text-ink-muted">{user._count.searches}</td>
-                        <td className="text-ink-faint text-xs">{new Date(user.createdAt).toLocaleDateString(isCs ? 'cs-CZ' : 'en-US')}</td>
+                        <td className="text-ink-faint text-xs">{formatDate(user.createdAt, locale)}</td>
                         <td>
                           <button onClick={() => toggleVip(user)} disabled={updating === user.id + '-vip'}
                             className={user.isVip ? ROW_BTN_ON : ROW_BTN_OFF}>
@@ -346,24 +347,24 @@ export default function AdminPage() {
               </h2>
               <form onSubmit={generateCodes} className="grid sm:grid-cols-5 gap-3 items-end">
                 <div>
-                  <label className="label">{isCs ? 'Počet kódů' : 'Number of codes'}</label>
-                  <input type="number" className="input" min={1} max={50} value={genCount}
+                  <label className="label" htmlFor="kh-gen-count">{isCs ? 'Počet kódů' : 'Number of codes'}</label>
+                  <input id="kh-gen-count" type="number" className="input" min={1} max={50} value={genCount}
                     onChange={e => setGenCount(Number(e.target.value))} />
                 </div>
                 <div>
-                  <label className="label">{isCs ? 'Poznámka (volitelné)' : 'Note (optional)'}</label>
-                  <input type="text" className="input" placeholder={isCs ? 'např. pro Petra' : 'e.g. for John'}
+                  <label className="label" htmlFor="kh-gen-note">{isCs ? 'Poznámka (volitelné)' : 'Note (optional)'}</label>
+                  <input id="kh-gen-note" type="text" className="input" placeholder={isCs ? 'např. pro Petra' : 'e.g. for John'}
                     value={genNote} onChange={e => setGenNote(e.target.value)} />
                 </div>
                 <div>
-                  <label className="label">{isCs ? 'Přístup (minuty)' : 'Access (minutes)'}</label>
-                  <input type="number" className="input" min={1} placeholder={isCs ? 'např. 30' : 'e.g. 30'}
+                  <label className="label" htmlFor="kh-gen-minutes">{isCs ? 'Přístup (minuty)' : 'Access (minutes)'}</label>
+                  <input id="kh-gen-minutes" type="number" className="input" min={1} placeholder={isCs ? 'např. 30' : 'e.g. 30'}
                     value={genAccessMinutes}
                     onChange={e => setGenAccessMinutes(e.target.value ? Number(e.target.value) : '')} />
                 </div>
                 <div>
-                  <label className="label">{isCs ? 'Platnost do (volitelné)' : 'Expires (optional)'}</label>
-                  <input type="date" className="input" value={genExpiry}
+                  <label className="label" htmlFor="kh-gen-expiry">{isCs ? 'Platnost do (volitelné)' : 'Expires (optional)'}</label>
+                  <input id="kh-gen-expiry" type="date" className="input" value={genExpiry}
                     onChange={e => setGenExpiry(e.target.value)} />
                 </div>
                 <button type="submit" disabled={generating} className="btn-primary h-[42px]">
@@ -435,10 +436,10 @@ export default function AdminPage() {
                                 : <span>∞</span>}
                             </td>
                             <td className="text-ink-faint text-xs">
-                              {c.expiresAt ? new Date(c.expiresAt).toLocaleDateString(isCs ? 'cs-CZ' : 'en-US') : '∞'}
+                              {c.expiresAt ? formatDate(c.expiresAt, locale) : '∞'}
                             </td>
                             <td className="text-ink-faint text-xs">
-                              {new Date(c.createdAt).toLocaleDateString(isCs ? 'cs-CZ' : 'en-US')}
+                              {formatDate(c.createdAt, locale)}
                             </td>
                             <td>
                               <div className="flex items-center gap-1">
