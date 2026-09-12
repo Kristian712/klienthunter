@@ -100,13 +100,25 @@ const T = {
   // Co umí každý účet — bere se z toho, co aplikace opravdu dělá, ne z marketingu.
   common: [
     { cs: 'Všechny filtry a vlastní kritéria',   sk: 'Všetky filtre a vlastné kritériá',   en: 'All filters and your own criteria' },
-    { cs: 'Ověření webu a dohledání kontaktů',   sk: 'Overenie webu a dohľadanie kontaktov', en: 'Website check and contact discovery' },
+    { cs: 'Ověřený web, nebo poctivé „nevíme“',  sk: 'Overený web, alebo poctivé „nevieme“', en: 'A verified website, or an honest “we don’t know”' },
+    { cs: 'Dohledání telefonu a e-mailu z webu firmy', sk: 'Dohľadanie telefónu a e-mailu z webu firmy', en: 'Phone and e-mail found on the firm’s own site' },
     { cs: 'Mapa, značky a historie hledání',     sk: 'Mapa, značky a história hľadaní',    en: 'Map, tags and search history' },
     { cs: 'Import vlastního seznamu z CSV',      sk: 'Import vlastného zoznamu z CSV',     en: 'Import your own list from CSV' },
     { cs: 'Export do CSV',                       sk: 'Export do CSV',                      en: 'CSV export' },
   ],
   // Excel je jediná funkce, kterou API opravdu váže na placený tarif (viz /api/export).
   paidOnly: { cs: 'Export do Excelu', sk: 'Export do Excelu', en: 'Excel export' },
+
+  /**
+   * Co „ověření webu" doopravdy znamená. Bez téhle věty si čtenář ceníku odvodí, že appka
+   * spolehlivě vyjmenuje firmy bez webu — a to je přesně to zklamání, které přijde až po
+   * zaplacení. Trojice ověřený web / nevíme / web nemá je stejná v celé aplikaci.
+   */
+  webNote: {
+    cs: 'Web potvrdíme, jen když se stránka sama přihlásí k firmě — má na sobě její IČO, nebo celý název i obor. Když se to nepovede, napíšeme „nevíme“. Že firma web nemá, tvrdíme jen tam, kde to umíme doložit.',
+    sk: 'Web potvrdíme, len keď sa stránka sama prihlási k firme — má na sebe jej IČO, alebo celý názov aj odbor. Keď sa to nepodarí, napíšeme „nevieme“. Že firma web nemá, tvrdíme len tam, kde to vieme doložiť.',
+    en: 'We confirm a website only when the page itself proves it belongs to the firm — its company number, or its full name together with its trade. When that fails we say “we don’t know”. We claim a firm has no website only where we can back it up.',
+  },
 
   // Kód pozvánky je při registraci nepovinný (viz /api/auth/register), takže ho tu nezmiňujeme.
   freeNote:  { cs: 'Bez platební karty.', sk: 'Bez platobnej karty.', en: 'No card required.' },
@@ -539,6 +551,7 @@ export default function PricingPage() {
                       </li>
                     ))}
                   </ul>
+                  <p className="mt-4 text-xs leading-relaxed text-ink-faint">{t(T.webNote)}</p>
                 </div>
               );
             })}

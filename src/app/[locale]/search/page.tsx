@@ -436,6 +436,9 @@ const S = {
   // není, má vlastní štítek — viz `webUnknown`.
   webNone:     { cs: 'Web nemá',        sk: 'Web nemá',         en: 'No website' },
   webUnknown:  { cs: 'Web neověřen',    sk: 'Web neoverený',    en: 'Website unverified' },
+  webUnknownTip: { cs: 'Web jsme nenašli ani nevyloučili.',
+                   sk: 'Web sme nenašli ani nevylúčili.',
+                   en: 'We neither found a website nor ruled one out.' },
   webUnverifiedTip: { cs: 'Tuhle adresu uvedl zdroj, ale při našem ověření neodpověděla. Web může být dočasně mimo provoz, nebo už nefunguje.',
                       sk: 'Túto adresu uviedol zdroj, ale pri našom overení neodpovedala. Web môže byť dočasne mimo prevádzky, alebo už nefunguje.',
                       en: 'A source gave this address, but it did not answer when we checked. The site may be temporarily down, or gone.' },
@@ -637,7 +640,8 @@ function WebsiteStatusBadge({ b, locale }: { b: BusinessResult; locale: string }
    */
   if (status === 'UNKNOWN') {
     return (
-      <span className="badge text-ink-faint" title={b.websiteEvidence || undefined}>
+      <span className="badge text-ink-faint"
+            title={b.websiteEvidence || localized(S.webUnknownTip, locale)}>
         <Globe size={10} />{localized(S.webUnknown, locale)}
       </span>
     );
@@ -1607,6 +1611,7 @@ export default function SearchPage() {
                             key={f.id}
                             onClick={() => toggle(f.id)}
                             disabled={!on && n === 0}
+                            title={f.hint ? localized(f.hint, locale) : undefined}
                             className={on ? 'chip-active' : 'chip'}
                           >
                             {localized(f.label, locale)}
@@ -1614,6 +1619,20 @@ export default function SearchPage() {
                           </button>
                         );
                       })}
+                      {/* Vysvětlivky ke skupině pod jejími chipy. Bublina myši nestačí: na telefonu
+                          se nikdy neukáže a zrovna u webu je rozdíl mezi „nemá" a „nevíme" to
+                          hlavní, co má uživatel pochopit dřív, než na filtr klikne. */}
+                      {items.some(f => f.hint) && (
+                        <ul className="w-full space-y-0.5 pl-16 text-[11px] leading-snug text-ink-faint">
+                          {items.filter(f => f.hint).map(f => (
+                            <li key={`${f.id}-hint`}>
+                              <span className="text-ink-muted">{localized(f.label, locale)}</span>
+                              {' — '}
+                              {localized(f.hint!, locale)}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                     </div>
                   );
                 })}

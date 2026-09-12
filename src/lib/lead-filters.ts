@@ -93,6 +93,12 @@ export interface LeadFilter {
    * really is the answer.
    */
   unknown?: (b: FilterableLead) => boolean;
+  /**
+   * Věta pod skupinou filtrů a bublina na chipu. Má ji jen to, co samotný popisek řekne
+   * nepřesně — hlavně trojice kolem webu, kde si „Web nemá" každý přečte jako hlavní funkci
+   * aplikace, a přitom je to ten nejvzácnější ze tří stavů.
+   */
+  hint?: { cs: string; sk?: string; en: string };
 }
 
 export const GROUP_LABELS: Record<FilterGroup, { cs: string; sk?: string; en: string }> = {
@@ -257,6 +263,26 @@ export const LEAD_FILTERS: LeadFilter[] = [
     unknown: b => b.activePremises == null && b.vatPayer == null && !b.legalForm && !isMapped(b),
   },
   {
+    /**
+     * Obě odpovědi, ve kterých web neznáme, v jednom chipu.
+     *
+     * Scénáře kombinují filtry přes AND (`matchesAll`), takže „web_unknown + no_website" by
+     * nevrátilo nic — řádek nemůže být obojí. A samotné `no_website` je bez vyhledávače prázdné.
+     * Tenhle filtr je to, co uživatel obvolává: firmy, u kterých web není vidět. Přesnější
+     * rozdělení na „nemá" a „nešlo ověřit" zůstává vedle jako dva samostatné chipy.
+     */
+    id: 'no_web_found',
+    group: 'web',
+    label: { cs: 'Web jsme nenašli', sk: 'Web sme nenašli', en: 'We found no website' },
+    hint: {
+      cs: 'Firmy s ověřeným „web nemá" i ty, u kterých web nešlo ověřit. Že web nemají, tím netvrdíme.',
+      sk: 'Firmy s overeným „web nemá" aj tie, pri ktorých sa web nedal overiť. Že web nemajú, tým netvrdíme.',
+      en: 'Firms with a verified “no website”, plus those we could not verify. Not a claim that they have none.',
+    },
+    where: STATUS_NOT_HAS,
+    test: b => webStatusOf(b) !== 'HAS',
+  },
+  {
     id: 'no_website',
     group: 'web',
     /**
@@ -267,6 +293,11 @@ export const LEAD_FILTERS: LeadFilter[] = [
      * mají web pod značkou, která z obchodního jména nevyplývá. To je teď `web_unknown`.
      */
     label: { cs: 'Web nemá', sk: 'Web nemá', en: 'Has no website' },
+    hint: {
+      cs: 'Prověřili jsme domény z názvu, doménu z e-mailu i vyhledávač a web firmy nikde není. Dokud vyhledávač neběží, zůstává tenhle filtr prázdný.',
+      sk: 'Preverili sme domény z názvu, doménu z e-mailu aj vyhľadávač a web firmy nikde nie je. Kým vyhľadávač nebeží, zostáva tento filter prázdny.',
+      en: 'We checked the domains from the name, the e-mail domain and the search engine, and there is no site. While the search engine is off, this filter stays empty.',
+    },
     where: { websiteStatus: 'NONE' },
     test: b => webStatusOf(b) === 'NONE',
     // Neověřená firma není firma bez webu — do skóre se počítá jako „nevíme", ne jako shoda.
@@ -282,6 +313,11 @@ export const LEAD_FILTERS: LeadFilter[] = [
      * celé předělávalo.
      */
     label: { cs: 'Web se nepodařilo ověřit', sk: 'Web sa nepodarilo overiť', en: 'Could not verify' },
+    hint: {
+      cs: 'Web jsme nenašli, ale netvrdíme, že ho firma nemá. Tady je většina firem — ověřit web nejde vždycky.',
+      sk: 'Web sme nenašli, ale netvrdíme, že ho firma nemá. Tu je väčšina firiem — overiť web sa nedá vždy.',
+      en: 'We found no site, but we are not claiming there is none. Most firms end up here — a website cannot always be verified.',
+    },
     where: { websiteStatus: 'UNKNOWN' },
     test: b => webStatusOf(b) === 'UNKNOWN',
   },
@@ -289,6 +325,11 @@ export const LEAD_FILTERS: LeadFilter[] = [
     id: 'has_website',
     group: 'web',
     label: { cs: 'Má web', sk: 'Má web', en: 'Has website' },
+    hint: {
+      cs: 'Stránka se načetla a doložila, že patří té firmě — má na sobě IČO, nebo celý název i obor.',
+      sk: 'Stránka sa načítala a doložila, že patrí tej firme — má na sebe IČO, alebo celý názov aj odbor.',
+      en: 'The page loaded and proved it belongs to that firm — its company number, or its full name with the trade.',
+    },
     where: STATUS_HAS,
     test: b => webStatusOf(b) === 'HAS',
     // Symmetrically: a row we never resolved is not a firm that demonstrably lacks a website.

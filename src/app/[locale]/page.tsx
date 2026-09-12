@@ -64,9 +64,9 @@ const AUDIENCE: Array<{ who: Text; what: Text }> = [
   },
   {
     who:  { cs: 'Marketér',          sk: 'Marketér',            en: 'Marketer' },
-    what: { cs: 'Firmy bez dohledatelného webu i bez profilů na sociálních sítích.',
-            sk: 'Firmy bez dohľadateľného webu aj bez profilov na sociálnych sieťach.',
-            en: 'Firms with no findable website and no social profiles either.' },
+    what: { cs: 'Firmy, u kterých jsme nenašli web ani profil na sociálních sítích.',
+            sk: 'Firmy, pri ktorých sme nenašli web ani profil na sociálnych sieťach.',
+            en: 'Firms where we found neither a website nor a social profile.' },
   },
   {
     who:  { cs: 'Fotograf',          sk: 'Fotograf',            en: 'Photographer' },
@@ -76,9 +76,9 @@ const AUDIENCE: Array<{ who: Text; what: Text }> = [
   },
   {
     who:  { cs: 'Tvůrce webů',       sk: 'Tvorca webov',        en: 'Web developer' },
-    what: { cs: 'Firmy bez dohledatelného webu, nebo s webem, který se načítá přes dvě a půl sekundy.',
-            sk: 'Firmy bez dohľadateľného webu, alebo s webom, ktorý sa načítava vyše dve a pol sekundy.',
-            en: 'Firms with no findable website, or with one that takes over two and a half seconds to load.' },
+    what: { cs: 'Firmy, u kterých jsme web nenašli, nebo mají web, který se načítá přes dvě a půl sekundy.',
+            sk: 'Firmy, pri ktorých sme web nenašli, alebo majú web, ktorý sa načítava vyše dve a pol sekundy.',
+            en: 'Firms we found no website for, or whose site takes over two and a half seconds to load.' },
   },
 ];
 
@@ -97,9 +97,9 @@ const STEPS: Array<[Text, Text]> = [
   ],
   [
     { cs: 'Ověříme, co je o firmě veřejné', sk: 'Overíme, čo je o firme verejné', en: 'We verify what is public about each firm' },
-    { cs: 'Registrace k DPH a její spolehlivost, dohledatelný web a jak rychle se načítá, sociální sítě. Robots.txt respektujeme.',
-      sk: 'Registrácia k DPH a jej spoľahlivosť, dohľadateľný web a ako rýchlo sa načítava, sociálne siete. Robots.txt rešpektujeme.',
-      en: 'VAT registration and its reliability, a findable website and how fast it loads, social profiles. We respect robots.txt.' },
+    { cs: 'Registrace k DPH a její spolehlivost, ověřený web a jak rychle se načítá, sociální sítě. Robots.txt respektujeme.',
+      sk: 'Registrácia k DPH a jej spoľahlivosť, overený web a ako rýchlo sa načítava, sociálne siete. Robots.txt rešpektujeme.',
+      en: 'VAT registration and its reliability, a verified website and how fast it loads, social profiles. We respect robots.txt.' },
   ],
   [
     { cs: 'Seřadíme podle tvých kritérií', sk: 'Zoradíme podľa tvojich kritérií', en: 'We rank by your criteria' },
@@ -138,10 +138,10 @@ const FAQ: Array<{ q: Text; a: Text }> = [
          en: 'The four opening questions are one click to skip. We then rank by a neutral default — a reachable contact and at least three years of trading — and you can set your own criteria later in settings.' },
   },
   {
-    q: { cs: 'Jak poznáte, že firma nemá web?', sk: 'Ako poznáte, že firma nemá web?', en: 'How do you know a business has no website?' },
-    a: { cs: 'Žádný veřejný rejstřík weby neeviduje, takže je hledáme sami — třemi cestami: adresu, kterou uvádí zdroj, ověříme tím, že se stránka opravdu načte; zkusíme doménu z firemního e-mailu; a zkusíme domény, které dává název firmy. Nalezenou stránku ale uznáme, jen když sama doloží, že patří té firmě — má na sobě její IČO, nebo celý název i obor. Když se to nepovede, u firmy o webu nenapíšeme nic a nabídneme tlačítko, kterým si ji vyhledáte sami. Prázdno je poctivější než tvrzení, které neumíme doložit.',
-         sk: 'Žiadny verejný register weby neeviduje, takže ich hľadáme sami — tromi cestami: adresu, ktorú uvádza zdroj, overíme tým, že sa stránka naozaj načíta; skúsime doménu z firemného e-mailu; a skúsime domény, ktoré dáva názov firmy. Nájdenú stránku ale uznáme, len keď sama doloží, že patrí tej firme — má na sebe jej IČO, alebo celý názov aj odbor. Keď sa to nepodarí, pri firme o webe nenapíšeme nič a ponúkneme tlačidlo, ktorým si ju vyhľadáte sami. Prázdno je poctivejšie než tvrdenie, ktoré nevieme doložiť.',
-         en: 'No public registry records websites, so we go looking ourselves, three ways: we confirm an address a source gave us by loading the page, we try the domain of the firm’s e-mail, and we try the domains its name suggests. A page only counts once it proves it belongs to that firm — its company number is on it, or its full name together with its trade. When none of that works we say nothing about a website and give you a button to look the firm up yourself. Silence is more honest than a claim we cannot back up.' },
+    q: { cs: 'Jak zjišťujete, jestli firma má web?', sk: 'Ako zisťujete, či firma má web?', en: 'How do you work out whether a firm has a website?' },
+    a: { cs: 'Žádný veřejný rejstřík weby neeviduje, takže je hledáme sami — třemi cestami: adresu, kterou uvádí zdroj, ověříme tím, že se stránka opravdu načte; zkusíme doménu z firemního e-mailu; a zkusíme domény, které dává název firmy. Nalezenou stránku uznáme, jen když sama doloží, že patří té firmě — má na sobě její IČO, nebo celý název i obor. Výsledek je pak jeden ze tří: ověřený web, nevíme, nebo web nemá. Prostřední stav je zdaleka nejčastější a je to záměr: firmy mívají web pod značkou, kterou z obchodního jména nikdo neuhodne, takže tipovat „nemá web“ by znamenalo lhát zhruba u každé třetí. Že firma web nemá, napíšeme jen tam, kde jsme to opravdu prověřili.',
+         sk: 'Žiadny verejný register weby neeviduje, takže ich hľadáme sami — tromi cestami: adresu, ktorú uvádza zdroj, overíme tým, že sa stránka naozaj načíta; skúsime doménu z firemného e-mailu; a skúsime domény, ktoré dáva názov firmy. Nájdenú stránku uznáme, len keď sama doloží, že patrí tej firme — má na sebe jej IČO, alebo celý názov aj odbor. Výsledok je potom jeden z troch: overený web, nevieme, alebo web nemá. Prostredný stav je zďaleka najčastejší a je to zámer: firmy mávajú web pod značkou, ktorú z obchodného mena nikto neuhádne, takže tipovať „nemá web“ by znamenalo klamať zhruba pri každej tretej. Že firma web nemá, napíšeme len tam, kde sme to naozaj preverili.',
+         en: 'No public registry records websites, so we go looking ourselves, three ways: we confirm an address a source gave us by loading the page, we try the domain of the firm’s e-mail, and we try the domains its name suggests. A page only counts once it proves it belongs to that firm — its company number is on it, or its full name together with its trade. The answer is then one of three: a verified website, we don’t know, or no website. The middle one is by far the most common, and that is deliberate: firms often run a site under a brand nobody could guess from the registered name, so guessing “no website” would be a lie about roughly every third one. We say a firm has no website only where we checked properly.' },
   },
   {
     q: { cs: 'Je to zdarma?', sk: 'Je to zadarmo?', en: 'Is it free?' },

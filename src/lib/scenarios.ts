@@ -45,14 +45,19 @@ export const SCENARIOS: Scenario[] = [
      * jako chyba filtru. Teď říkají obě nálepky totéž a v seznamu chipů se rozsvítí ta stejná.
      */
     label: { cs: 'Web jsme nenašli', sk: 'Web sme nenašli', en: 'We found no website' },
+    /**
+     * Scénář pouští oba stavy, ve kterých web neznáme.
+     *
+     * Do teď zapínal jen `no_website`, tedy doložené „web nemá" — a to aplikace bez vyhledávače
+     * neřekne u nikoho, takže nejpoužívanější scénář vracel prázdno. Filtry se kombinují přes AND,
+     * takže dvojice „nevíme + nemá" by taky nevrátila nic; obojí naráz umí filtr `no_web_found`.
+     */
     hint: {
-      // Přesně to, co filtr dělá. „Firmy bez webu" je název scénáře, ne tvrzení o firmách:
-      // že jsme web nenašli, neznamená, že žádný nemají — ARES weby needviduje.
-      cs: 'Zůstanou firmy, u kterých jsme žádný web nedohledali. Že ho nemají, tím neříkáme — jen že jsme ho nenašli.',
-      sk: 'Zostanú firmy, pri ktorých sme žiadny web nedohľadali. Že ho nemajú, tým nehovoríme — len že sme ho nenašli.',
-      en: 'Keeps the firms we found no website for. That is not a claim they have none — only that we did not find one.',
+      cs: 'Zůstanou firmy, u kterých web neznáme — buď jsme ho nenašli, nebo ho nešlo ověřit. Že ho nemají, tím neříkáme.',
+      sk: 'Zostanú firmy, pri ktorých web nepoznáme — buď sme ho nenašli, alebo sa nedal overiť. Že ho nemajú, tým nehovoríme.',
+      en: 'Keeps the firms whose website we do not know — either we found none, or it could not be verified. That is not a claim they have none.',
     },
-    filters: ['no_website'],
+    filters: ['no_web_found'],
   },
   {
     id: 'old_web',
