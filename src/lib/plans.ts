@@ -22,6 +22,16 @@ export const PLAN_LIMITS = {
  */
 export const PLAN_PRICES_CZK = { PRO: 499, BUSINESS: 1499 } as const;
 
+/**
+ * Kolik řádků z importovaného CSV se vůbec zpracuje.
+ *
+ * Čte to server (`/api/import`) i stránka importu, a to schválně ze stejného místa: prohlížeč
+ * dřív posílal všechny naparsované řádky, takže u velkého souboru přeteklo tělo požadavku,
+ * Vercel ho odmítl a uživatel dostal jen „Import se nepovedl". Teď se ořízne už v prohlížeči
+ * a je u toho napsáno, kolik řádků se zpracuje.
+ */
+export const MAX_IMPORT_ROWS = 2000;
+
 export function getPlanLimits(plan: string, isVip: boolean, isAdmin: boolean = false) {
   if (isAdmin || isVip) return PLAN_LIMITS.VIP; // admins + VIP = unlimited
   return PLAN_LIMITS[plan as keyof typeof PLAN_LIMITS] ?? PLAN_LIMITS.FREE;

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { activeAccount, sessionFrom, getPlanLimits } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { persistResults } from '@/lib/lead-persist';
+import { MAX_IMPORT_ROWS } from '@/lib/plans';
 import { enrichAndVerify, mergeLeads } from '@/lib/lead-pipeline';
 import type { RawLead } from '@/lib/sources';
 
@@ -17,7 +18,7 @@ export const maxDuration = 60;
  */
 
 /** Sixty seconds is sixty seconds. Anything past the cap is cut off and reported back. */
-const HARD_ROW_CAP = 2000;
+const HARD_ROW_CAP = MAX_IMPORT_ROWS;
 const NETWORK_BUDGET_MS = 45_000;
 
 const RowSchema = z.object({
