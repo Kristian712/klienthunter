@@ -708,13 +708,17 @@ export function ResultsMap({ leads, total, locale, onSetStatus, hideDone, hidden
                     {selected.email}
                   </a>
                 )}
+{/* Tři stavy, ne dva: bez URL to ještě neznamená „web nemá“ — tvar bodu i legenda vedle
+    mluví o „nevíme“, a karta jim nesmí odporovat. */}
                 {selected.website ? (
                   <a href={selected.website} target="_blank" rel="noopener noreferrer"
                      className="text-ink underline underline-offset-2 decoration-ink/40 hover:decoration-ink transition-colors truncate max-w-[11rem]">
                     {selected.website.replace(/^https?:\/\//, '')}
                   </a>
                 ) : (
-                  <span className="text-ink-muted">{localized(T.webNone, locale)}</span>
+                  <span className="text-ink-muted">
+                    {localized(webStateOf(selected) === 'NONE' ? T.webNone : T.webUnk, locale)}
+                  </span>
                 )}
                 <a href={googleMapsHref(selected)} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer"
                    className="text-ink-muted hover:text-ink hover:underline underline-offset-2 transition-colors">
