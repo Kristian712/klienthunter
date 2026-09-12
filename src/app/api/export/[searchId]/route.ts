@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyToken } from '@/lib/auth';
+import { activeAccount, sessionFrom } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { exportToExcel, WEBSITE_LABEL_CS } from '@/lib/excel-export';
 import { leadReason } from '@/lib/lead-reason';
 import { reachScore } from '@/lib/reach-score';
 import { resolveStatus } from '@/lib/website-status';
+
+/**
+ * Oddělovač sloupců. Excel v českém a slovenském Windows čte CSV podle systémového nastavení,
+ * kde je desetinná čárka a oddělovač středník — s čárkou skončí všech osmnáct sloupců v jednom.
+ */
+const SEP = ';';
 
 function toCsv(
   businesses: Parameters<typeof exportToExcel>[0],
@@ -20,7 +26,7 @@ function toCsv(
 
   const escape = (v: unknown) => {
     const s = v == null ? '' : String(v);
-    if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+    if (s.includes(SEP) || s.includes(',') || s.includes('"') || s.includes('\n')) {
       return `"${s.replace(/"/g, '""')}"`;
     }
     return s;
@@ -54,9 +60,9 @@ function toCsv(
     // Recenze a hodnocení pocházely jen z Google Places, které muselo pryč z licenčních důvodů.
     // Sloupce proto vyvážely samé nuly a prázdno — a nula recenzí je tvrzení, ne mezera.
     b.source,
-  ].map(escape).join(','));
+  ].map(escape).join(SEP));
 
-  return [headers.map(escape).join(','), ...rows].join('\n');
+  return [headers.map(escape).join(SEP), ...rows].join('\r\n');
 }
 
 export async function GET(
@@ -64,19 +70,15 @@ export async function GET(
   { params }: { params: { searchId: string } }
 ) {
   try {
-    const token = req.cookies.get('auth-token')?.value;
-    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    const payload = verifyToken(token);
+    const payload = sessionFrom(req);
+    if (!payload) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const format = req.nextUrl.searchParams.get('format') ?? 'xlsx';
 
     // CSV is free for everyone; Excel requires Pro+
     // Tarif z databáze, ne z tokenu: kdo právě zaplatil, má mít Excel hned, ne po odhlášení.
-    const account = await prisma.user.findUnique({
-      where: { id: payload.userId },
-      select: { plan: true, isVip: true, isAdmin: true },
-    });
-    if (format === 'xlsx' && (account?.plan ?? 'FREE') === 'FREE' && !account?.isVip && !account?.isAdmin) {
+    const account = await activeAccount(payload.userId);
+    if (!account) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (format === 'xlsx' && account.plan === 'FREE' && !account.isVip && !account.isAdmin) {
       return NextResponse.json({ error: 'Excel export requires Pro plan' }, { status: 403 });
     }
 
@@ -111,7 +113,9 @@ export async function GET(
       `filename*=UTF-8''${encodeURIComponent(`klienthunter-${slug}.${ext}`)}`;
 
     if (format === 'csv') {
-      const csv = toCsv(search.results, profile?.targetFilters);
+      // BOM: dvojklik v Excelu hlavičku Content-Type nevidí a bez něj čte soubor jako CP1250,
+      // takže z „Květinářství Růže" je nečitelná změť. Ostatní tabulkové programy BOM snesou.
+      const csv = `\uFEFF${toCsv(search.results, profile?.targetFilters)}`;
       return new NextResponse(csv, {
         headers: {
           'Content-Type': 'text/csv; charset=utf-8',
