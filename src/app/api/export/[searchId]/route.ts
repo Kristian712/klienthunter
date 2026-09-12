@@ -1,66 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { activeAccount, sessionFrom } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { exportToExcel, WEBSITE_LABEL_CS } from '@/lib/excel-export';
-import { leadReason } from '@/lib/lead-reason';
-import { reachScore } from '@/lib/reach-score';
-import { resolveStatus } from '@/lib/website-status';
+import { EXPORT_COLUMNS, exportRow, exportToExcel } from '@/lib/excel-export';
+import { localized } from '@/lib/lead-filters';
 
 /**
  * Oddělovač sloupců. Excel v českém a slovenském Windows čte CSV podle systémového nastavení,
- * kde je desetinná čárka a oddělovač středník — s čárkou skončí všech osmnáct sloupců v jednom.
+ * kde je desetinná čárka a oddělovač středník — s čárkou skončí všech devatenáct sloupců v jednom.
  */
 const SEP = ';';
 
+/**
+ * Excel, LibreOffice i Google Sheets vyhodnotí buňku začínající =, +, - nebo @ jako vzorec.
+ * Názvy firem chodí z OpenStreetMap, kam může zapsat kdokoli cokoli, takže by stačilo pojmenovat
+ * firmu `=HYPERLINK(…)` a každý, kdo si export otevře, by ten vzorec spustil. Apostrof před
+ * hodnotou z ní udělá text; Excel ho v buňce nezobrazuje.
+ */
+function neutralize(value: string): string {
+  return /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+}
+
 function toCsv(
   businesses: Parameters<typeof exportToExcel>[0],
-  criteria?: readonly string[] | null,
+  criteria: readonly string[] | null | undefined,
+  locale: string,
 ): string {
-  const headers = [
-    'Název firmy', 'IČO', 'Telefon', 'Email', 'Adresa', 'Web',
-    'Kontaktní stránka', 'Má web', 'Facebook', 'Instagram', 'LinkedIn', 'Sítě ověřeny',
-    'Plátce DPH', 'Nespolehlivý plátce',
-    'Skóre', 'Dosažitelnost', 'Proč oslovit',
-    'Zdroj',
-  ];
-
   const escape = (v: unknown) => {
-    const s = v == null ? '' : String(v);
+    const s = neutralize(v == null ? '' : String(v));
     if (s.includes(SEP) || s.includes(',') || s.includes('"') || s.includes('\n')) {
       return `"${s.replace(/"/g, '""')}"`;
     }
     return s;
   };
 
-  // NULL means the register was never asked — an empty cell, not a "NE".
-  const vat = (value: boolean | null | undefined) => (value == null ? '' : value ? 'ANO' : 'NE');
-
-  const rows = businesses.map(b => [
-    b.name,
-    b.ico ?? '',
-    b.phone ?? '',
-    b.email ?? '',
-    b.address ?? '',
-    b.website ?? '',
-    b.contactUrl ?? '',
-    WEBSITE_LABEL_CS[resolveStatus(b)],
-    // Odkaz, ne ANO/NE — export se otvírá proto, aby se na profil dalo kliknout.
-    b.facebookUrl ?? '',
-    b.instagramUrl ?? '',
-    b.linkedInUrl ?? '',
-    // Prázdno u odkazu znamená „nemá" i „nedívali jsme se". Tenhle sloupec ty dva stavy oddělí.
-    b.socialsChecked ? 'ANO' : '',
-    vat(b.vatPayer),
-    vat(b.vatUnreliable),
-    b.leadScore,
-    // Druhé číslo vedle skóre: kolik cest k té firmě vlastně máme (viz lib/reach-score.ts).
-    // V tabulce se podle něj dá seřadit a začít od těch, které jde oslovit hned.
-    reachScore(b),
-    leadReason(b, criteria, 'cs'),
-    // Recenze a hodnocení pocházely jen z Google Places, které muselo pryč z licenčních důvodů.
-    // Sloupce proto vyvážely samé nuly a prázdno — a nula recenzí je tvrzení, ne mezera.
-    b.source,
-  ].map(escape).join(SEP));
+  // Sloupce i hodnoty jsou tytez jako v XLSX (`EXPORT_COLUMNS`, `exportRow`), aby se oba exporty
+  // nemohly rozejit v poradi ani v obsahu.
+  const headers = EXPORT_COLUMNS.map(c => localized(c, locale));
+  const rows = businesses.map(b => exportRow(b, criteria, locale).map(escape).join(SEP));
 
   return [headers.map(escape).join(SEP), ...rows].join('\r\n');
 }
@@ -73,6 +49,10 @@ export async function GET(
     const payload = sessionFrom(req);
     if (!payload) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const format = req.nextUrl.searchParams.get('format') ?? 'xlsx';
+    // Jazyk souboru posílá stránka, ze které se kliklo. Bez něj chodil anglickému zákazníkovi
+    // list s českými hlavičkami a českou větou „proč oslovit".
+    const raw = req.nextUrl.searchParams.get('locale');
+    const locale = raw === 'sk' || raw === 'en' ? raw : 'cs';
 
     // CSV is free for everyone; Excel requires Pro+
     // Tarif z databáze, ne z tokenu: kdo právě zaplatil, má mít Excel hned, ne po odhlášení.
@@ -115,7 +95,7 @@ export async function GET(
     if (format === 'csv') {
       // BOM: dvojklik v Excelu hlavičku Content-Type nevidí a bez něj čte soubor jako CP1250,
       // takže z „Květinářství Růže" je nečitelná změť. Ostatní tabulkové programy BOM snesou.
-      const csv = `\uFEFF${toCsv(search.results, profile?.targetFilters)}`;
+      const csv = `\uFEFF${toCsv(search.results, profile?.targetFilters, locale)}`;
       return new NextResponse(csv, {
         headers: {
           'Content-Type': 'text/csv; charset=utf-8',
@@ -124,7 +104,7 @@ export async function GET(
       });
     }
 
-    const buffer = exportToExcel(search.results, 'klienthunter-export', profile?.targetFilters);
+    const buffer = exportToExcel(search.results, 'klienthunter-export', profile?.targetFilters, locale);
     return new NextResponse(buffer as unknown as BodyInit, {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
