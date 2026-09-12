@@ -37,6 +37,8 @@ export default function AdminPage() {
   const [codes, setCodes]             = useState<InviteCode[]>([]);
   const [tab, setTab]                 = useState<'users' | 'codes'>('users');
   const [loadingUsers, setLoadingUsers] = useState(true);
+  /** Načtení selhalo — prázdný panel by tvrdil, že v databázi nikdo není. */
+  const [loadFailed, setLoadFailed]   = useState(false);
   const [loadingCodes, setLoadingCodes] = useState(true);
   const [updating, setUpdating]       = useState<string | null>(null);
   const [toast, setToast]             = useState('');
@@ -52,21 +54,46 @@ export default function AdminPage() {
   const [copiedId, setCopiedId]       = useState<string | null>(null);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
+  const failToast = () => showToast(isCs ? 'Akce se nepovedla. Zkuste to prosím znovu.' : 'That did not work. Please try again.');
 
+  /**
+   * Chyba načtení se musí poznat od prázdné databáze.
+   *
+   * Dřív se odpověď rovnou rozbalila: při 401 nebo 500 z toho vyšlo `d.users ?? []`, tedy panel
+   * bez jediného uživatele — a admin nemá jak poznat, že data prostě nedorazila. Když navíc
+   * odpověď nebyla JSON, `res.json()` vyhodilo výjimku, kterou nikdo nechytal, a kolečko se
+   * točilo napořád.
+   */
   const fetchUsers = useCallback(async () => {
     setLoadingUsers(true);
-    const res = await fetch('/api/admin/users');
-    const d = await res.json();
-    setUsers(d.users ?? []);
-    setLoadingUsers(false);
+    try {
+      const res = await fetch('/api/admin/users');
+      if (!res.ok) throw new Error(`users ${res.status}`);
+      const d = await res.json();
+      setUsers(d.users ?? []);
+      setLoadFailed(false);
+    } catch (err) {
+      console.error('admin/users:', err);
+      setLoadFailed(true);
+    } finally {
+      setLoadingUsers(false);
+    }
   }, []);
 
   const fetchCodes = useCallback(async () => {
     setLoadingCodes(true);
-    const res = await fetch('/api/admin/invite-codes');
-    const d = await res.json();
-    setCodes(d.codes ?? []);
-    setLoadingCodes(false);
+    try {
+      const res = await fetch('/api/admin/invite-codes');
+      if (!res.ok) throw new Error(`invite-codes ${res.status}`);
+      const d = await res.json();
+      setCodes(d.codes ?? []);
+      setLoadFailed(false);
+    } catch (err) {
+      console.error('admin/invite-codes:', err);
+      setLoadFailed(true);
+    } finally {
+      setLoadingCodes(false);
+    }
   }, []);
 
   useEffect(() => { fetchUsers(); fetchCodes(); }, [fetchUsers, fetchCodes]);
@@ -80,6 +107,8 @@ export default function AdminPage() {
     if (res.ok) {
       setUsers(prev => prev.map(u => u.id === user.id ? { ...u, isVip: !u.isVip } : u));
       showToast(`VIP ${!user.isVip ? (isCs ? 'přidáno' : 'granted') : (isCs ? 'odebráno' : 'revoked')}: ${user.email}`);
+    } else {
+      failToast();
     }
     setUpdating(null);
   };
@@ -94,6 +123,8 @@ export default function AdminPage() {
     if (res.ok) {
       setUsers(prev => prev.map(u => u.id === user.id ? { ...u, accessExpiresAt: !isBlocked ? null : '1970-01-01T00:00:00.000Z' } : u));
       showToast(!isBlocked ? (isCs ? `Přístup obnoven: ${user.email}` : `Access restored: ${user.email}`) : (isCs ? `Zablokováno: ${user.email}` : `Blocked: ${user.email}`));
+    } else {
+      failToast();
     }
     setUpdating(null);
   };
@@ -107,6 +138,8 @@ export default function AdminPage() {
     if (res.ok) {
       setUsers(prev => prev.map(u => u.id === user.id ? { ...u, isAdmin: !u.isAdmin } : u));
       showToast(`Admin ${!user.isAdmin ? (isCs ? 'přidán' : 'granted') : (isCs ? 'odebrán' : 'revoked')}: ${user.email}`);
+    } else {
+      failToast();
     }
     setUpdating(null);
   };
@@ -114,17 +147,22 @@ export default function AdminPage() {
   const generateCodes = async (e: React.FormEvent) => {
     e.preventDefault();
     setGenerating(true);
-    const res = await fetch('/api/admin/invite-codes', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ count: genCount, note: genNote || undefined, expiresAt: genExpiry || undefined, accessDurationMinutes: genAccessMinutes || undefined }),
-    });
-    const d = await res.json();
-    if (res.ok) {
+    try {
+      const res = await fetch('/api/admin/invite-codes', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ count: genCount, note: genNote || undefined, expiresAt: genExpiry || undefined, accessDurationMinutes: genAccessMinutes || undefined }),
+      });
+      if (!res.ok) throw new Error(`invite-codes ${res.status}`);
+      const d = await res.json();
       setCodes(prev => [...(d.codes ?? []), ...prev]);
       setGenNote(''); setGenExpiry(''); setGenAccessMinutes('');
       showToast(isCs ? `${d.codes.length} kódů vygenerováno` : `${d.codes.length} codes generated`);
+    } catch (err) {
+      console.error('admin/generate-codes:', err);
+      failToast();
+    } finally {
+      setGenerating(false);
     }
-    setGenerating(false);
   };
 
   const deleteCode = async (id: string) => {
@@ -132,6 +170,8 @@ export default function AdminPage() {
     if (res.ok) {
       setCodes(prev => prev.filter(c => c.id !== id));
       showToast(isCs ? 'Kód smazán' : 'Code deleted');
+    } else {
+      failToast();
     }
   };
 
@@ -176,6 +216,17 @@ export default function AdminPage() {
       </div>
 
       <div className="max-w-6xl mx-auto px-4 py-8">
+
+        {/* Nuly ve statistikách a prázdná tabulka vypadají stejně jako čerstvá databáze, takže
+            když načtení selže, musí to být napsané — jinak admin řeší chybu, která není. */}
+        {loadFailed && (
+          <div className="card mb-6 border-ink text-sm font-medium flex flex-wrap items-center gap-3">
+            <span>{isCs ? 'Data se nepodařilo načíst, čísla níž tedy nic neříkají.' : 'The data could not be loaded, so the numbers below mean nothing.'}</span>
+            <button className="btn-outline btn-sm" onClick={() => { void fetchUsers(); void fetchCodes(); }}>
+              {isCs ? 'Zkusit znovu' : 'Try again'}
+            </button>
+          </div>
+        )}
 
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
