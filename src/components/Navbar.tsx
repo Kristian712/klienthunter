@@ -6,10 +6,19 @@ import { usePathname } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
 import { Check, Menu, X } from 'lucide-react';
 import { loadUser, clearUser, type StoredUser } from '@/lib/client-auth';
+import { localized } from '@/lib/lead-filters';
 
 type UserType = StoredUser;
 
 /** Jazyky psané tak, jak si je čte jejich vlastní mluvčí — ne přeložené do jazyka stránky. */
+/** Položky lišty mimo `messages/*.json`. Slovenština chyběla, takže Slovák dostal angličtinu. */
+const T = {
+  importCsv: { cs: 'Import CSV', sk: 'Import CSV', en: 'CSV import' },
+  profile:   { cs: 'Můj profil', sk: 'Môj profil', en: 'My profile' },
+  menu:      { cs: 'Menu', sk: 'Menu', en: 'Menu' },
+  menuClose: { cs: 'Zavřít menu', sk: 'Zavrieť menu', en: 'Close menu' },
+};
+
 const LANGUAGES = [
   { code: 'cs', label: 'Čeština' },
   { code: 'sk', label: 'Slovenčina' },
@@ -78,14 +87,19 @@ export function Navbar() {
     document.cookie = `NEXT_LOCALE=${next}; Path=/; Max-Age=31536000; SameSite=Lax`;
     setLangOpen(false);
     setMobile(false);
-    window.location.href = pathname.replace(`/${locale}`, `/${next}`);
+    // Cesta se skládá po segmentech a query i kotva se berou s sebou. `usePathname()` je nenese,
+    // takže z `/cs/search?job=abc` bylo `/en/search` a rozdělané hledání zmizelo z obrazovky;
+    // stejně mizelo `?checkout=success` na ceníku, tedy potvrzení o zaplacení.
+    const parts = pathname.split('/');
+    parts[1] = next;
+    window.location.href = parts.join('/') + window.location.search + window.location.hash;
   };
 
   const links = [
     { href: `/${locale}/search`,    label: t('search') },
     { href: `/${locale}/pricing`,   label: t('pricing') },
     ...(user ? [
-      { href: `/${locale}/import`,    label: locale === 'cs' ? 'Import CSV' : 'CSV import' },
+      { href: `/${locale}/import`,    label: localized(T.importCsv, locale) },
       { href: `/${locale}/dashboard`, label: t('dashboard') },
     ] : []),
     ...(user?.isAdmin ? [{ href: `/${locale}/admin`, label: 'Admin' }] : []),
@@ -155,7 +169,7 @@ export function Navbar() {
                 <div className="absolute right-0 top-full mt-2 w-52 bg-surface-muted border border-line-strong rounded-lg py-1 shadow-[0_12px_32px_rgba(0,0,0,.6)] animate-fade-in">
                   <Link href={`/${locale}/profile`} onClick={() => setDropdown(false)}
                     className="block px-4 py-2.5 text-sm text-ink hover:bg-ink/[0.06] transition-colors">
-                    {locale === 'cs' ? 'Můj profil' : 'My profile'}
+                    {localized(T.profile, locale)}
                   </Link>
                   <Link href={`/${locale}/dashboard`} onClick={() => setDropdown(false)}
                     className="block px-4 py-2.5 text-sm text-ink hover:bg-ink/[0.06] transition-colors">
@@ -185,13 +199,15 @@ export function Navbar() {
         </div>
 
         <button className="md:hidden ml-auto p-2 text-ink" onClick={() => setMobile(v => !v)}
-          aria-label="Menu">
+          aria-expanded={mobile}
+          aria-controls="kh-mobile-menu"
+          aria-label={localized(mobile ? T.menuClose : T.menu, locale)}>
           {mobile ? <X size={20} /> : <Menu size={20} />}
         </button>
       </nav>
 
       {mobile && (
-        <div className="md:hidden border-t border-line px-5 py-4 space-y-1 bg-surface shadow-[0_12px_32px_rgba(0,0,0,.6)] animate-fade-in">
+        <div id="kh-mobile-menu" className="md:hidden border-t border-line px-5 py-4 space-y-1 bg-surface shadow-[0_12px_32px_rgba(0,0,0,.6)] animate-fade-in">
           {/* Mobilní menu dřív aktivní stránku nijak neukazovalo. Teď barva i svislá čárka — samotná
               modrá se od světlého textu liší jen 1,45 : 1, tvar to musí nést taky. */}
           {links.map(l => {
@@ -214,7 +230,7 @@ export function Navbar() {
                   : 'font-medium text-ink border-l-2 border-transparent pl-3'
               }`}
               onClick={() => setMobile(false)}>
-              {locale === 'cs' ? 'Můj profil' : 'My profile'}
+              {localized(T.profile, locale)}
             </Link>
           )}
           <div className="pt-3 border-t border-line flex flex-col gap-2">
