@@ -247,6 +247,42 @@ function youngerThan(years: number) {
   };
 }
 
+function foundedDaysAgo(days: number): Date {
+  return new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+}
+function youngerThanDays(days: number) {
+  return (b: FilterableLead) => {
+    const age = yearsSince(b.foundedAt);
+    return age !== null && age * 365.25 < days;
+  };
+}
+
+/**
+ * Filtry podle vzniku hledají jinak než ostatní: přes index z ČSÚ (etapa 3), který umí datum
+ * i celý kraj, a jméno firmy se pak dohledá v ARESu. Jedna věta pod skupinou to říká.
+ */
+const REGISTRY_HINT = {
+  cs: 'Firmy podle data vzniku hledáme v indexu z RES ČSÚ — v celém kraji, ne jen v krajském městě. Jméno a sídlo doplní ARES. Index se obnovuje dvakrát měsíčně.',
+  sk: 'Firmy podľa dátumu vzniku hľadáme v indexe z RES ČSÚ — v celom kraji, nie len v krajskom meste. Meno a sídlo doplní ARES. Index sa obnovuje dvakrát mesačne.',
+  en: 'Firms by founding date come from an index built on the Czech Statistical Office register — the whole region, not just its capital. ARES fills in the name and address. The index refreshes twice a month.',
+};
+
+/**
+ * Jak daleko zpět má index z ČSÚ hledat, když je zapnutý některý z filtrů podle vzniku.
+ * `null` = žádný takový filtr, hledá se po staru přes ARES. U víc filtrů naráz platí nejužší
+ * (filtry se kombinují přes AND, takže užší okno stejně rozhodne).
+ */
+export const NEW_FIRM_WINDOW_DAYS: Record<string, number> = {
+  new_firm_30d: 30,
+  new_firm_90d: 90,
+  new_firm_6m: 183,
+  new_firm: 366,
+};
+export function registryWindowDays(filterIds: readonly string[]): number | null {
+  const days = filterIds.map(id => NEW_FIRM_WINDOW_DAYS[id]).filter((d): d is number => d !== undefined);
+  return days.length ? Math.min(...days) : null;
+}
+
 /** No founding date means no opinion about the firm's age — only ARES ever supplies one. */
 const ageUnknown = (b: FilterableLead) => yearsSince(b.foundedAt) === null;
 
@@ -649,6 +685,28 @@ export const LEAD_FILTERS: LeadFilter[] = [
     evidence: (b, l) => { const d = fmtDate(b.foundedAt, l); return d ? localized({ cs: `vznik ${d} · ARES`, sk: `vznik ${d} · ARES`, en: `founded ${d} · ARES` }, l) : null; },
     where: { foundedAt: { gt: foundedBefore(0.5) } },
     test: youngerThan(0.5),
+    unknown: ageUnknown,
+  },
+  {
+    id: 'new_firm_90d',
+    group: 'event',
+    label: { cs: 'Nová firma (do 90 dnů)', sk: 'Nová firma (do 90 dní)', en: 'New firm (under 90 days)' },
+    hint: REGISTRY_HINT,
+    source: 'ARES',
+    evidence: (b, l) => { const d = fmtDate(b.foundedAt, l); return d ? localized({ cs: `vznik ${d} · ARES`, sk: `vznik ${d} · ARES`, en: `founded ${d} · ARES` }, l) : null; },
+    where: { foundedAt: { gt: foundedDaysAgo(90) } },
+    test: youngerThanDays(90),
+    unknown: ageUnknown,
+  },
+  {
+    id: 'new_firm_30d',
+    group: 'event',
+    label: { cs: 'Nová firma (do 30 dnů)', sk: 'Nová firma (do 30 dní)', en: 'New firm (under 30 days)' },
+    hint: REGISTRY_HINT,
+    source: 'ARES',
+    evidence: (b, l) => { const d = fmtDate(b.foundedAt, l); return d ? localized({ cs: `vznik ${d} · ARES`, sk: `vznik ${d} · ARES`, en: `founded ${d} · ARES` }, l) : null; },
+    where: { foundedAt: { gt: foundedDaysAgo(30) } },
+    test: youngerThanDays(30),
     unknown: ageUnknown,
   },
   {

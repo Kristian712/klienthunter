@@ -743,6 +743,7 @@ function WebsiteStatusBadge({ b, locale }: { b: BusinessResult; locale: string }
  */
 const SOURCE_LABELS: Record<string, string> = {
   ares:   'ARES',
+  res:    'RES ČSÚ + ARES',
   osm:    'OpenStreetMap',
   csv:    'Vlastní import',
   google: 'Google Maps (historické)',
@@ -1324,7 +1325,14 @@ export default function SearchPage() {
       const res = await fetch('/api/search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ region: effectiveRegion, industry: effectiveIndustry }),
+        // Filtry jdou na server hned se startem: filtr podle vzniku rozhoduje, odkud se firmy
+        // berou (index z ČSÚ místo ARESu), a to už při běhu, ne až při ukládání.
+        body: JSON.stringify({
+          region: effectiveRegion,
+          industry: effectiveIndustry,
+          filters: [...scenarioById(scenario).filters, ...(presetsOn ? presetIds : [])],
+          scenario,
+        }),
       });
       if (!res.ok) {
         // Podle stavu, ne podle těla odpovědi: u 504 vrací platforma HTML, ne JSON, takže
@@ -1929,11 +1937,17 @@ export default function SearchPage() {
                           hlavní, co má uživatel pochopit dřív, než na filtr klikne. */}
                       {items.some(f => f.hint) && (
                         <ul className="w-full space-y-0.5 pl-16 text-[11px] leading-snug text-ink-faint">
-                          {items.filter(f => f.hint).map(f => (
-                            <li key={`${f.id}-hint`}>
-                              <span className="text-ink-muted">{localized(f.label, locale)}</span>
+                          {/* Filtry se stejnou vysvětlivkou (dvě okna „nová firma") dostanou jeden řádek —
+                              tatáž věta dvakrát pod sebou vypadá jako chyba. */}
+                          {Array.from(items.filter(f => f.hint).reduce((acc, f) => {
+                            const text = localized(f.hint!, locale);
+                            acc.set(text, [...(acc.get(text) ?? []), localized(f.label, locale)]);
+                            return acc;
+                          }, new Map<string, string[]>())).map(([text, labels]) => (
+                            <li key={text}>
+                              <span className="text-ink-muted">{labels.join(', ')}</span>
                               {' — '}
-                              {localized(f.hint!, locale)}
+                              {text}
                             </li>
                           ))}
                         </ul>

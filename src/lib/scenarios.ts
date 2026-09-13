@@ -73,9 +73,9 @@ export const SCENARIOS: Scenario[] = [
     id: 'new',
     label: { cs: 'Nové firmy', sk: 'Nové firmy', en: 'New firms' },
     hint: {
-      cs: 'Firmy zapsané do rejstříku během posledního půlroku. Datum vzniku je z ARESu, takže je přesné.',
-      sk: 'Firmy zapísané do registra počas posledného polroka. Dátum vzniku je z ARESu, takže je presný.',
-      en: 'Firms entered in the register within the last six months. The date comes from ARES, so it is exact.',
+      cs: 'Firmy zapsané do rejstříku během posledního půlroku, v celém kraji. Vybírají se z indexu RES ČSÚ, jméno a sídlo doplní ARES — datum vzniku je přesné.',
+      sk: 'Firmy zapísané do registra počas posledného polroka, v celom kraji. Vyberajú sa z indexu RES ČSÚ, meno a sídlo doplní ARES — dátum vzniku je presný.',
+      en: 'Firms entered in the register within the last six months, across the whole region. They come from the Czech Statistical Office index; ARES fills in name and address — the date is exact.',
     },
     filters: ['new_firm_6m'],
   },

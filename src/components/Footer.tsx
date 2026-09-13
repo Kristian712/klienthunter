@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { localized } from '@/lib/lead-filters';
 import { LANGUAGES, switchLocale } from '@/lib/locale-switch';
-import { OSM_ATTRIBUTION_L } from '@/lib/attribution';
+import { OSM_ATTRIBUTION_L, RES_ATTRIBUTION_L } from '@/lib/attribution';
 import { OPERATOR } from '@/lib/legal';
 
 /**
@@ -30,10 +30,11 @@ const T = {
   privacy:  { cs: 'Ochrana údajů', sk: 'Ochrana údajov', en: 'Privacy' },
   terms:    { cs: 'Obchodní podmínky', sk: 'Obchodné podmienky', en: 'Terms of Service' },
   language: { cs: 'Jazyk',     sk: 'Jazyk',     en: 'Language' },
+  dataSources: { cs: 'Zdroje dat', sk: 'Zdroje dát', en: 'Data sources' },
   sources: {
-    cs: `Data: ARES a živnostenský rejstřík (MF ČR), registr plátců DPH (FS ČR), ${OSM_ATTRIBUTION_L.cs}`,
-    sk: `Dáta: ARES a živnostenský register (MF ČR), register platiteľov DPH (FS ČR), ${OSM_ATTRIBUTION_L.sk}`,
-    en: `Data: ARES and the Czech trade register, the Czech VAT payer register, ${OSM_ATTRIBUTION_L.en}`,
+    cs: `Data: ARES a živnostenský rejstřík (MF ČR), registr plátců DPH (FS ČR), ${RES_ATTRIBUTION_L.cs}, ${OSM_ATTRIBUTION_L.cs}`,
+    sk: `Dáta: ARES a živnostenský register (MF ČR), register platiteľov DPH (FS ČR), ${RES_ATTRIBUTION_L.sk}, ${OSM_ATTRIBUTION_L.sk}`,
+    en: `Data: ARES and the Czech trade register, the Czech VAT payer register, ${RES_ATTRIBUTION_L.en}, ${OSM_ATTRIBUTION_L.en}`,
   },
 };
 
@@ -55,6 +56,7 @@ export function Footer({ locale }: { locale: string }) {
             <div className="space-y-2">
               <Link href={`/${locale}/search`} className="block text-sm text-ink-muted hover:text-ink">{t(T.search)}</Link>
               <Link href={`/${locale}/pricing`} className="block text-sm text-ink-muted hover:text-ink">{t(T.pricing)}</Link>
+              <Link href={`/${locale}/data-sources`} className="block text-sm text-ink-muted hover:text-ink">{t(T.dataSources)}</Link>
             </div>
           </div>
           <div>

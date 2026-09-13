@@ -16,9 +16,9 @@ import { OPERATOR } from '@/lib/legal';
  */
 const T = {
   title:   { cs: 'Nechci být v seznamu', sk: 'Nechcem byť v zozname', en: 'Remove me from the list' },
-  intro:   { cs: 'KlientHunter zobrazuje podnikatelské subjekty z veřejných rejstříků (ARES, OpenStreetMap). Pokud si nepřejete, aby se váš subjekt v aplikaci zobrazoval, zadejte IČO. Vyřazení platí okamžitě po odeslání a je trvalé.',
-             sk: 'KlientHunter zobrazuje podnikateľské subjekty z verejných registrov (ARES, OpenStreetMap). Ak si neželáte, aby sa váš subjekt v aplikácii zobrazoval, zadajte IČO. Vyradenie platí okamžite po odoslaní a je trvalé.',
-             en: 'KlientHunter shows business entities from public registers (ARES, OpenStreetMap). If you do not want your entity shown in the app, enter its company ID. The removal takes effect immediately and is permanent.' },
+  intro:   { cs: 'KlientHunter zobrazuje podnikatelské subjekty z veřejných rejstříků (ARES, RES ČSÚ, OpenStreetMap). Pokud si nepřejete, aby se váš subjekt v aplikaci zobrazoval, zadejte IČO. Vyřazení platí okamžitě po odeslání a je trvalé.',
+             sk: 'KlientHunter zobrazuje podnikateľské subjekty z verejných registrov (ARES, RES ČSÚ, OpenStreetMap). Ak si neželáte, aby sa váš subjekt v aplikácii zobrazoval, zadajte IČO. Vyradenie platí okamžite po odoslaní a je trvalé.',
+             en: 'KlientHunter shows business entities from public registers (ARES, the Czech Statistical Office register, OpenStreetMap). If you do not want your entity shown in the app, enter its company ID. The removal takes effect immediately and is permanent.' },
   ico:     { cs: 'IČO', sk: 'IČO', en: 'Company ID (IČO)' },
   email:   { cs: 'Váš e-mail (nepovinné)', sk: 'Váš e-mail (nepovinné)', en: 'Your e-mail (optional)' },
   emailHint: { cs: 'Jen abychom se vám mohli ozvat, kdyby žádost byla nejasná. Vyřazení proběhne i bez něj. Nikde se nezobrazuje.',

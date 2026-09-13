@@ -3,12 +3,15 @@ import { osmSource } from './osm';
 import { aresRzpSource } from './ares-rzp';
 import { aresResSource } from './ares-res';
 import { dphSource } from './dph';
+import { registryCanServe, registryDiscover, type RegistryQuery } from './registry';
 import type { DiscoverySource, EnrichmentSource, RawLead } from './types';
 export type { TradeLicence } from './types';
 
 export type { RawLead, DiscoverySource, EnrichmentSource } from './types';
 export { extractContacts, contactPageUrl } from './site-contacts';
 export { OSM_ATTRIBUTION } from './osm';
+export { registryCanServe } from './registry';
+export type { RegistryQuery } from './registry';
 
 /**
  * Every source in the product, and the only place that decides which ones run.
@@ -30,8 +33,16 @@ export async function discoverAll(
   niche: string,
   city: string,
   limit: number,
+  opts: { registry?: RegistryQuery } = {},
 ): Promise<RawLead[][]> {
   return Promise.all(
-    DISCOVERY_SOURCES.map(s => s.search(niche, city, limit).catch(() => [] as RawLead[])),
+    DISCOVERY_SOURCES.map(s => {
+      // Filtr podle vzniku: místo dotazu do ARESu jde první zdroj přes index z ČSÚ, který
+      // umí datum i celý kraj. OpenStreetMap běží dál stejně — kontakty index nemá.
+      if (s.id === 'ares' && opts.registry && registryCanServe(opts.registry)) {
+        return registryDiscover(opts.registry).catch(() => [] as RawLead[]);
+      }
+      return s.search(niche, city, limit).catch(() => [] as RawLead[]);
+    }),
   );
 }

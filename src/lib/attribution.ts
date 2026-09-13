@@ -19,3 +19,14 @@ export const OSM_ATTRIBUTION_L = {
   sk: '© prispievatelia OpenStreetMap (ODbL)',
   en: '© OpenStreetMap contributors (ODbL)',
 };
+
+/**
+ * Index firem (etapa 3) stojí na otevřených datech Registru ekonomických subjektů ČSÚ,
+ * licence CC BY 4.0. Podmínka licence je uvést zdroj — v patičce a na stránce o zdrojích dat,
+ * ne schovaně v podmínkách.
+ */
+export const RES_ATTRIBUTION_L = {
+  cs: 'Registr ekonomických subjektů — ČSÚ (CC BY 4.0)',
+  sk: 'Register ekonomických subjektov — ČSÚ (CC BY 4.0)',
+  en: 'Register of Economic Subjects — Czech Statistical Office (CC BY 4.0)',
+};

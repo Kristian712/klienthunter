@@ -20,6 +20,13 @@ export const maxDuration = 300;
 const SearchSchema = z.object({
   region: z.string().min(1),
   industry: z.string().min(1),
+  /**
+   * Filtry a scénář, se kterými hledání startuje. Nejsou jen popisek do uloženého hledání:
+   * filtr podle vzniku přepíná zdroj firem na index z ČSÚ (search-job.ts), a to se musí
+   * vědět dřív, než běh začne — autosave přes PATCH přijde až po něm.
+   */
+  filters: z.array(z.string()).max(50).optional(),
+  scenario: z.string().max(40).optional(),
 });
 
 const WHOLE_CZ_TRIGGERS = ['celá čr', 'cela cr', 'celá cr', 'celé česko'];
@@ -145,11 +152,11 @@ export async function POST(req: NextRequest) {
 
     const payload = session;
     const body = await req.json();
-    const { region, industry } = SearchSchema.parse(body);
+    const { region, industry, filters, scenario } = SearchSchema.parse(body);
 
     // Limity tarifu, nárazová pojistka, založení běhu a spuštění na pozadí jsou v lib/start-search.ts —
     // totéž používá „Spustit znovu" u uloženého hledání.
-    const started = await startSearch({ userId: payload.userId, industry, region });
+    const started = await startSearch({ userId: payload.userId, industry, region, filters, scenario });
     if (!started.ok) {
       const message = started.code === 'PLAN_LIMIT' ? 'Search limit reached for your plan'
         : started.code === 'RATE_LIMITED' ? 'Too many searches in a short time' : 'Unauthorized';

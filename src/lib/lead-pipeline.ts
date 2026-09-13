@@ -152,7 +152,7 @@ export function toCandidate(lead: RawLead): Candidate {
     signals: {
       claimedUrl: lead.website,
       osmSaysEmpty: lead.sourceId === 'osm' && !lead.website,
-      registryHasNoField: lead.sourceId === 'ares',
+      registryHasNoField: isRegistry(lead.sourceId),
     },
   };
 }
@@ -183,7 +183,7 @@ function absorb(target: Candidate, lead: RawLead): void {
   if (!isRealWebsite(target.signals.claimedUrl) && lead.website) {
     target.signals.claimedUrl = lead.website;
   }
-  if (lead.sourceId === 'ares') target.signals.registryHasNoField = true;
+  if (isRegistry(lead.sourceId)) target.signals.registryHasNoField = true;
   if (!target.source.split('+').includes(lead.sourceId)) target.source += `+${lead.sourceId}`;
 }
 
@@ -193,6 +193,9 @@ function absorb(target: Candidate, lead: RawLead): void {
  * An inverted index on name tokens keeps this from being a quadratic scan: with a few hundred
  * leads per source, comparing every pair would cost more than the ARES request did.
  */
+/** `res` je index z ČSÚ dohledaný v ARESu — pro pipeline stejný rejstříkový zdroj jako `ares`. */
+const isRegistry = (sourceId: string) => sourceId === 'ares' || sourceId === 'res';
+
 export function mergeLeads(batches: RawLead[][], limit: number): Candidate[] {
   const candidates: Candidate[] = [];
   const byToken = new Map<string, Candidate[]>();

@@ -2,7 +2,7 @@ import { MetadataRoute } from 'next';
 
 const BASE = process.env.NEXT_PUBLIC_APP_URL || 'https://klienthunter-vanek.vercel.app';
 const locales = ['cs', 'en', 'sk'];
-const pages = ['', '/pricing', '/search', '/contact', '/privacy', '/terms'];
+const pages = ['', '/pricing', '/search', '/contact', '/privacy', '/terms', '/data-sources', '/optout'];
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const entries: MetadataRoute.Sitemap = [];

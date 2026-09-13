@@ -1,6 +1,7 @@
 import { Readable } from 'node:stream';
 import Papa from 'papaparse';
 import { prisma } from './db';
+import { REGISTRY_INDEX_MONTHS } from './registry-index-config';
 
 /**
  * Index ekonomických subjektů z otevřených dat ČSÚ (RES).
@@ -14,11 +15,9 @@ import { prisma } from './db';
  * „firmy vzniklé za 30 dní v kraji" jinak nejdou získat. Index říká KOHO dohledat; detail se
  * bere z ARESu až u firem, které projdou filtrem.
  *
- * Rozsah je záměrně konzervativní (majitel, 13. 9. 2026): Neon free má 0,5 GB a přesné číslo
- * zbylého místa se čte až z běžící aplikace. Po importu se změří, kolik tabulka zabírá, a okno
- * se rozšíří podle skutečnosti. 24 měsíců ≈ 250 tisíc řádků ≈ 38 MB.
+ * Rozsah (`REGISTRY_INDEX_MONTHS`) je v registry-index-config.ts, aby ho šlo číst bez Prismy.
  */
-export const REGISTRY_INDEX_MONTHS = 24;
+export { REGISTRY_INDEX_MONTHS };
 export const RES_URL = 'https://opendata.csu.gov.cz/soubory/od/od_org03/res_data.csv';
 export const RES_ATTRIBUTION = 'Registr ekonomických subjektů, Český statistický úřad, CC BY 4.0';
 

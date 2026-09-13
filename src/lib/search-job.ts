@@ -3,6 +3,8 @@ import { persistResults } from './lead-persist';
 import { enrichAndVerify, mergeLeads } from './lead-pipeline';
 import { fillCoordinates } from './ruian';
 import { CZ_STAGES } from './search-options';
+import { registryWindowDays } from './lead-filters';
+import { scenarioById } from './scenarios';
 import { discoverAll } from './sources';
 import { createSearchQuota } from './web-search-quota';
 
@@ -75,6 +77,21 @@ export async function runSearchJob(jobId: string): Promise<void> {
     select: { targetFilters: true },
   });
 
+  /**
+   * Filtry hledání rozhodují, odkud se firmy berou. Zapnutý filtr podle vzniku (chip nebo
+   * scénář „Nové firmy") přepne první zdroj z ARESu na index z ČSÚ, který umí datum i celý
+   * kraj. Filtry se čtou z kořene uloženého hledání — běh nese jen kopii, která může být stará.
+   */
+  const search = await prisma.search.findUnique({
+    where: { id: job.searchId },
+    select: { filters: true, scenario: true, savedId: true },
+  });
+  const root = search?.savedId
+    ? await prisma.search.findUnique({ where: { id: search.savedId }, select: { filters: true, scenario: true } })
+    : null;
+  const criteria = root ?? search;
+  const windowDays = registryWindowDays([...(criteria?.filters ?? []), ...scenarioById(criteria?.scenario).filters]);
+
   try {
     const deadlineAt = Date.now() + NETWORK_BUDGET_MS;
     const stages = stagesFor(job.region);
@@ -127,7 +144,9 @@ export async function runSearchJob(jobId: string): Promise<void> {
 
       const room = Math.min(perStage, job.targetCount - total);
       const city = stage.value.split(',')[0].trim();
-      const [aresLeads, osmLeads] = await discoverAll(job.industry, city, room);
+      const [aresLeads, osmLeads] = await discoverAll(job.industry, city, room, {
+        registry: windowDays ? { industry: job.industry, region: stage.value, windowDays, limit: room } : undefined,
+      });
       const candidates = mergeLeads([osmLeads, aresLeads], room).filter(c => {
         if (seenIco.has(c.ico ?? '') || seenPlace.has(c.placeId)) return false;
         if (c.ico) seenIco.add(c.ico);
