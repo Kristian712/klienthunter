@@ -10,9 +10,9 @@ import { OPERATOR } from '@/lib/legal';
 /**
  * Trvalé vyřazení subjektu na jeho žádost — veřejná stránka bez přihlášení.
  *
- * Vyřazení platí od odeslání formuláře. Ověření (odkaz v e-mailu, kontrola provozovatelem)
+ * Vyřazení platí od odeslání formuláře a žádné potvrzení nepotřebuje. Kontrola provozovatelem
  * přijde potom; kdyby se žádost ukázala jako neplatná, subjekt se vrátí. Stránka neříká, jestli
- * subjekt v seznamu vůbec je — nesmí sloužit jako ověřovač.
+ * subjekt v seznamu vůbec je — nesmí sloužit jako ověřovač. E-mail je nepovinný.
  */
 const T = {
   title:   { cs: 'Nechci být v seznamu', sk: 'Nechcem byť v zozname', en: 'Remove me from the list' },
@@ -20,15 +20,15 @@ const T = {
              sk: 'KlientHunter zobrazuje podnikateľské subjekty z verejných registrov (ARES, OpenStreetMap). Ak si neželáte, aby sa váš subjekt v aplikácii zobrazoval, zadajte IČO. Vyradenie platí okamžite po odoslaní a je trvalé.',
              en: 'KlientHunter shows business entities from public registers (ARES, OpenStreetMap). If you do not want your entity shown in the app, enter its company ID. The removal takes effect immediately and is permanent.' },
   ico:     { cs: 'IČO', sk: 'IČO', en: 'Company ID (IČO)' },
-  email:   { cs: 'Váš e-mail', sk: 'Váš e-mail', en: 'Your e-mail' },
-  emailHint: { cs: 'Jen pro potvrzení žádosti a případný dotaz. Nikde se nezobrazuje.',
-               sk: 'Len na potvrdenie žiadosti a prípadnú otázku. Nikde sa nezobrazuje.',
-               en: 'Only to confirm the request and for any follow-up. Never shown anywhere.' },
+  email:   { cs: 'Váš e-mail (nepovinné)', sk: 'Váš e-mail (nepovinné)', en: 'Your e-mail (optional)' },
+  emailHint: { cs: 'Jen abychom se vám mohli ozvat, kdyby žádost byla nejasná. Vyřazení proběhne i bez něj. Nikde se nezobrazuje.',
+               sk: 'Len aby sme sa vám mohli ozvať, keby bola žiadosť nejasná. Vyradenie prebehne aj bez neho. Nikde sa nezobrazuje.',
+               en: 'Only so we can reach you if the request is unclear. The removal happens without it. Never shown anywhere.' },
   submit:  { cs: 'Vyřadit ze seznamu', sk: 'Vyradiť zo zoznamu', en: 'Remove from the list' },
   working: { cs: 'Odesílám…', sk: 'Odosielam…', en: 'Sending…' },
-  done:    { cs: 'Hotovo. Subjekt s tímto IČO se od této chvíle v aplikaci nezobrazuje, nezapisuje do nových hledání ani neexportuje. Na e-mail vám pošleme potvrzení; pokud by se žádost ukázala jako neoprávněná, ozveme se.',
-             sk: 'Hotovo. Subjekt s týmto IČO sa od tejto chvíle v aplikácii nezobrazuje, nezapisuje do nových hľadaní ani neexportuje. Na e-mail vám pošleme potvrdenie; ak by sa žiadosť ukázala ako neoprávnená, ozveme sa.',
-             en: 'Done. From now on the entity with this ID is not shown in the app, not written into new searches and not exported. We will send a confirmation to your e-mail; if the request turns out to be unauthorised, we will get in touch.' },
+  done:    { cs: 'Hotovo. Subjekt s tímto IČO je vyřazen od této chvíle — v aplikaci se nezobrazuje, nezapisuje se do nových hledání a neexportuje. Žádné potvrzení není potřeba. Pokud by byla žádost nejasná a uvedli jste e-mail, ozveme se.',
+             sk: 'Hotovo. Subjekt s týmto IČO je vyradený od tejto chvíle — v aplikácii sa nezobrazuje, nezapisuje sa do nových hľadaní a neexportuje. Žiadne potvrdenie nie je potrebné. Ak by bola žiadosť nejasná a uviedli ste e-mail, ozveme sa.',
+             en: 'Done. The entity with this ID is removed as of now — not shown in the app, not written into new searches, not exported. No confirmation is needed. If the request is unclear and you gave an e-mail, we will get in touch.' },
   confirmed: { cs: 'Žádost je potvrzená. Děkujeme.', sk: 'Žiadosť je potvrdená. Ďakujeme.', en: 'The request is confirmed. Thank you.' },
   invalid: { cs: 'Tenhle potvrzovací odkaz neznáme. Vyřazení z původní žádosti platí dál.',
              sk: 'Tento potvrdzovací odkaz nepoznáme. Vyradenie z pôvodnej žiadosti platí ďalej.',
@@ -103,12 +103,12 @@ export default function OptoutPage() {
           </div>
           <div>
             <label className="label" htmlFor="optout-email">{t('email')}</label>
-            <input id="optout-email" className="input" type="email" autoComplete="email" required
+            <input id="optout-email" className="input" type="email" autoComplete="email"
                    value={email} onChange={e => setEmail(e.target.value)} />
             <p className="text-xs text-ink-faint mt-1">{t('emailHint')}</p>
           </div>
           {error && <p className="text-sm font-medium border border-ink px-3 py-2">{error}</p>}
-          <button type="submit" className="btn-primary" disabled={busy || !ico || !email}>
+          <button type="submit" className="btn-primary" disabled={busy || !ico}>
             {busy ? t('working') : t('submit')}
           </button>
         </form>

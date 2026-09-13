@@ -44,7 +44,7 @@ export async function withoutOptouts<T extends { ico?: string | null; placeId: s
  * Založí žádost. Idempotentní: druhá žádost na totéž IČO jen obnoví e-mail a token, vyřazení
  * platí dál. Vrací token pro potvrzovací odkaz.
  */
-export async function requestOptout(ico: string, email: string): Promise<{ token: string; created: boolean }> {
+export async function requestOptout(ico: string, email: string | null): Promise<{ token: string; created: boolean }> {
   const token = randomBytes(24).toString('base64url');
   const existing = await prisma.optout.findUnique({ where: { firmKey: ico }, select: { id: true, status: true } });
   if (existing) {
@@ -70,11 +70,12 @@ export async function confirmOptout(token: string): Promise<boolean> {
 }
 
 /**
- * Potvrzovací e-mail.
+ * Potvrzovací e-mail — dnes se NEODESÍLÁ a nikde se to netvrdí.
  *
- * Aplikace dnes žádnou poštu neodesílá (Brevo bylo odstraněno ve Vlně 2) a napojení nové služby
- * je rozhodnutí majitele. Do té doby se odkaz zapíše do logu serveru, aby šel žadateli poslat
- * ručně — a vyřazení platí od okamžiku žádosti bez ohledu na e-mail.
+ * Aplikace žádnou poštu neposílá; poštovní služba bude jedna pro celou aplikaci (registrace,
+ * reset hesla, notifikace) a majitel ji zavede zvlášť, až bude mít doménu pro odesílatele.
+ * Vyřazení platí od okamžiku žádosti a žádné potvrzení nepotřebuje; odkaz i stav `confirmed`
+ * zůstávají v kódu pro tu chvíli, kdy se pošta zapne. Do té doby se odkaz jen zapíše do logu.
  */
 export async function sendOptoutMail(email: string, confirmUrl: string): Promise<'sent' | 'logged'> {
   console.info(`optout: potvrzovací odkaz pro ${email}: ${confirmUrl}`);

@@ -307,8 +307,9 @@ model Optout {
   id          String    @id @default(cuid())
   /// IČO, nebo `osm:<placeId>` — stejný klíč jako u nároků (lib/claim-order.ts).
   firmKey     String    @unique
-  /// E-mail žadatele, jen pro potvrzení a případný dotaz. Nikde se nezobrazuje.
-  email       String
+  /// E-mail žadatele, nepovinný — jen abychom se mohli ozvat, kdyby žádost byla nejasná.
+  /// Vyřazení na něm nezávisí. Nikde se nezobrazuje.
+  email       String?
   /// Jednorázový token pro potvrzovací odkaz.
   token       String    @unique
   /// `active` (platí hned) | `confirmed` (žadatel klikl na odkaz) | `rejected` (neplatná žádost, subjekt vrácen)

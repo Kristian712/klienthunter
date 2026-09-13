@@ -10,12 +10,15 @@ const OPTOUTS_PER_IP = 10;
 
 const Body = z.object({
   ico: z.string().trim().min(1).max(12),
-  email: z.string().trim().email().max(200),
+  /** Nepovinný. Vyřazení na něm nezávisí — je jen pro případný dotaz k nejasné žádosti. */
+  email: z.string().trim().max(200).optional().transform(v => (v ? v : null))
+          .refine(v => v === null || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v), 'Invalid e-mail'),
 });
 
 /**
- * Žádost o trvalé vyřazení. Vyřazení platí OKAMŽITĚ — zápis se nečeká na nikoho. Potvrzení
- * e-mailem a kontrola v adminu přijdou potom; neplatnou žádost admin zamítne a subjekt se vrátí.
+ * Žádost o trvalé vyřazení. Vyřazení platí OKAMŽITĚ — zápis se nečeká na nikoho a žádné
+ * potvrzení nepotřebuje. Kontrola v adminu přijde potom; neplatnou žádost admin zamítne a
+ * subjekt se vrátí.
  *
  * Odpověď je stejná pro nové i opakované IČO a neříká, jestli subjekt v databázi vůbec je:
  * formulář nesmí sloužit jako ověřovač, kdo v seznamu figuruje.
@@ -33,10 +36,14 @@ export async function POST(req: NextRequest) {
     await recordHit(ipHash, 'optout');
     const { token } = await requestOptout(ico, email);
 
-    const base = process.env.NEXT_PUBLIC_APP_URL ?? req.nextUrl.origin;
-    const mail = await sendOptoutMail(email, `${base}/api/optout/confirm?token=${token}`);
+    // Pošta se dnes neodesílá (viz `sendOptoutMail`); odkaz se jen zaloguje. Odpověď o tom
+    // schválně nic neříká — nesmí vzniknout dojem, že něco odešlo.
+    if (email) {
+      const base = process.env.NEXT_PUBLIC_APP_URL ?? req.nextUrl.origin;
+      await sendOptoutMail(email, `${base}/api/optout/confirm?token=${token}`);
+    }
 
-    return NextResponse.json({ ok: true, mail });
+    return NextResponse.json({ ok: true });
   } catch (err) {
     if (err instanceof z.ZodError) return NextResponse.json({ error: err.errors, code: 'INVALID' }, { status: 422 });
     console.error('/api/optout:', err);

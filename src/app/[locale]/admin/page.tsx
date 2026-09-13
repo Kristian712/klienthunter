@@ -31,7 +31,7 @@ const ROW_BTN_BLOCK = `${ROW_BTN} font-medium border-field text-ink-muted hover:
 const BADGE_STRONG = 'badge border-field text-ink';
 
 interface Optout {
-  id: string; firmKey: string; email: string; status: 'active' | 'confirmed' | 'rejected';
+  id: string; firmKey: string; email: string | null; status: 'active' | 'confirmed' | 'rejected';
   note: string | null; createdAt: string; confirmedAt: string | null; reviewedAt: string | null;
 }
 
@@ -318,7 +318,7 @@ export default function AdminPage() {
                   {optouts.map(o => (
                     <tr key={o.id}>
                       <td className="font-mono text-xs">{o.firmKey}</td>
-                      <td className="text-xs">{o.email}</td>
+                      <td className="text-xs">{o.email || '—'}</td>
                       <td className="text-xs">
                         {o.status === 'confirmed' ? (isCs ? 'potvrzeno' : 'confirmed') : o.status === 'rejected' ? (isCs ? 'zamítnuto' : 'rejected') : (isCs ? 'platí, nepotvrzeno' : 'active, unconfirmed')}
                       </td>
