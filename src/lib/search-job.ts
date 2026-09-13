@@ -7,6 +7,7 @@ import { ALL_INDUSTRIES, isAllIndustries, splitIndustries } from './industries';
 import { registryWindowDays } from './lead-filters';
 import { scenarioById } from './scenarios';
 import { discoverAll, type RawLead } from './sources';
+import { notifySearchDone } from './webhook';
 import { createSearchQuota } from './web-search-quota';
 
 /**
@@ -227,6 +228,8 @@ export async function runSearchJob(jobId: string): Promise<void> {
         // a naváže od `stageIndex`, jakmile se klient znovu zeptá na stav.
         : { status: 'paused', processedCount: processed, stageIndex: index, stageLabel: stages[index].label },
     });
+    // Webhook až po zápisu `done`: kdo si ho nastavil, dostane hotový seznam. Selhání se jen zaloguje.
+    if (finished) await notifySearchDone(job.searchId).catch(err => console.warn('search-job webhook:', err));
   } catch (err) {
     console.error('search-job:', jobId, err);
     // Co je zapsané, zůstává. Uživatel uvidí částečný výsledek i důvod, proč není celý.

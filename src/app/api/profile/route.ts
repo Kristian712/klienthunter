@@ -4,6 +4,7 @@ import { sessionFrom, hashPassword, comparePassword } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { LEAD_FILTERS } from '@/lib/lead-filters';
 import { LEGACY_PROFESSION, PROFESSIONS, professionById } from '@/lib/profile';
+import { isWebhookUrl, newWebhookSecret } from '@/lib/webhook';
 
 const PROFESSION_IDS = PROFESSIONS.map(p => p.id);
 const FILTER_IDS = new Set(LEAD_FILTERS.map(f => f.id));
@@ -44,12 +45,15 @@ const UpdateSchema = z.object({
                     .optional(),
   /** Sent as `true` on both finishing and skipping the modal — we ask once either way. */
   onboarded:      z.boolean().optional(),
+  /** Webhook pro Make/Zapier. Jen https a ne vnitřní síť (lib/webhook.ts). Prázdné = vypnout. */
+  webhookUrl:     nullableText(300).refine(v => v == null || isWebhookUrl(v), 'Webhook must be an https URL'),
   // Roomier than the rest: it usually holds a URL and a phone number on one line.
 });
 
 const PROFILE_SELECT = {
   profession: true, professionRaw: true, professionText: true, clientType: true, targetIndustry: true,
   targetRegion: true, targetCity: true, targetFilters: true, onboardedAt: true,
+  webhookUrl: true, webhookSecret: true,
 } as const;
 
 /**
@@ -114,7 +118,7 @@ export async function PATCH(req: NextRequest) {
     if (!payload) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const body = await req.json();
     const parsed = UpdateSchema.parse(body);
-    const { name, currentPassword, newPassword, onboarded, ...profile } = parsed;
+    const { name, currentPassword, newPassword, onboarded, webhookUrl, ...profile } = parsed;
 
     const user = await prisma.user.findUnique({ where: { id: payload.userId } });
     if (!user) return NextResponse.json({ error: 'Not found' }, { status: 404 });
@@ -142,6 +146,12 @@ export async function PATCH(req: NextRequest) {
     // the first is skipped.
     for (const [key, value] of Object.entries(profile)) {
       if (value !== undefined) updateData[key] = value;
+    }
+
+    // Webhook: s novou adresou vzniká tajemství pro podpis; smazání adresy smaže i tajemství.
+    if (webhookUrl !== undefined) {
+      updateData.webhookUrl = webhookUrl;
+      updateData.webhookSecret = webhookUrl ? (user.webhookSecret ?? newWebhookSecret()) : null;
     }
 
     // One-way: once asked, never asked again — including when the user skipped.

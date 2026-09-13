@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
 import Link from 'next/link';
-import { Crown, Shield, User, Mail, Calendar, Search, BarChart3, Edit2, Check, X, Lock, Target, CreditCard } from 'lucide-react';
+import { Crown, Shield, User, Mail, Calendar, Search, BarChart3, Edit2, Check, X, Lock, Target, CreditCard, Webhook } from 'lucide-react';
 import { clearUser } from '@/lib/client-auth';
 import { localized } from '@/lib/lead-filters';
 import { EMPTY_PROFILE, type UserProfile } from '@/lib/profile';
@@ -20,6 +20,7 @@ interface ProfileData {
     id: string; email: string; name?: string;
     plan: string; isAdmin: boolean; isVip: boolean; createdAt: string;
     subscriptionStatus?: string | null; currentPeriodEnd?: string | null; trialEndsAt?: string | null;
+    webhookUrl?: string | null; webhookSecret?: string | null;
     _count: { searches: number };
   };
   searches: Array<{
@@ -128,6 +129,39 @@ export default function ProfilePage() {
   };
 
   const patch = (next: Partial<ProfileDraft>) => setDraft(d => ({ ...d, ...next }));
+
+  /**
+   * Webhook pro Make/Zapier. Adresa se ukládá zvlášť od profilu: je to technické nastavení,
+   * ne odpověď z dotazníku, a tajemství pro podpis vzniká na serveru při prvním uložení.
+   */
+  const [webhookVal, setWebhookVal] = useState('');
+  const [webhookBusy, setWebhookBusy] = useState<'save' | 'test' | null>(null);
+  const [webhookNote, setWebhookNote] = useState('');
+  useEffect(() => { setWebhookVal(data?.user.webhookUrl ?? ''); }, [data?.user.webhookUrl]);
+  const saveWebhook = async () => {
+    setWebhookBusy('save'); setWebhookNote('');
+    const res = await fetch('/api/profile', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ webhookUrl: webhookVal.trim() || null }),
+    });
+    const d = await res.json().catch(() => null);
+    if (res.ok && d?.user) {
+      setData(prev => (prev ? { ...prev, user: { ...prev.user, webhookUrl: d.user.webhookUrl, webhookSecret: d.user.webhookSecret } } : prev));
+      setWebhookNote(webhookVal.trim() ? (isCs ? 'Uloženo. Tajemství pro podpis je níž.' : 'Saved. The signing secret is below.') : (isCs ? 'Webhook vypnutý.' : 'Webhook off.'));
+    } else {
+      setWebhookNote(isCs ? 'Adresa musí začínat https:// a nesmí mířit do vnitřní sítě.' : 'The address must start with https:// and must not point to a private network.');
+    }
+    setWebhookBusy(null);
+  };
+  const testWebhook = async () => {
+    setWebhookBusy('test'); setWebhookNote('');
+    const res = await fetch('/api/profile/webhook-test', { method: 'POST' });
+    const d = await res.json().catch(() => null);
+    setWebhookNote(res.ok
+      ? (isCs ? `Odesláno, server odpověděl ${d?.status}.` : `Sent, the server answered ${d?.status}.`)
+      : (isCs ? `Nedoručeno${d?.status ? ` (HTTP ${d.status})` : ''}. Zkontrolujte adresu a scénář.` : `Not delivered${d?.status ? ` (HTTP ${d.status})` : ''}. Check the address and the scenario.`));
+    setWebhookBusy(null);
+  };
 
   const saveProfile = async () => {
     setSavingProfile(true);
@@ -375,6 +409,37 @@ export default function ProfilePage() {
               {savingProfile ? localized(T.savingNow, locale) : localized(T.save, locale)}
             </button>
           </div>
+        </div>
+
+        {/* Integrace: webhook pro Make a Zapier. Viz lib/webhook.ts. */}
+        <div className="card" id="integrace">
+          <h2 className="font-semibold text-ink flex items-center gap-2 mb-1">
+            <Webhook size={16} className="text-ink-faint" />
+            {isCs ? 'Integrace: Make, Zapier, vlastní systém' : 'Integrations: Make, Zapier, your own system'}
+          </h2>
+          <p className="text-xs text-ink-faint mb-4 max-w-2xl">
+            {isCs
+              ? 'Když doběhne hledání, pošleme firmy jako JSON (název, IČO, telefon, e-mail, web, skóre, věta „proč oslovit", audit webu) na tuhle adresu. V Make nebo Zapieru založte „Custom webhook / Catch hook" a vložte sem jeho URL. Tělo je podepsané hlavičkou X-KlientHunter-Signature (HMAC-SHA256 tajemstvím níž).'
+              : 'When a search finishes we POST the firms as JSON (name, company ID, phone, e-mail, website, score, the “why” sentence, website audit) to this address. Create a “Custom webhook / Catch hook” in Make or Zapier and paste its URL here. The body is signed with the X-KlientHunter-Signature header (HMAC-SHA256 with the secret below).'}
+          </p>
+          <div className="flex flex-col sm:flex-row gap-2 max-w-2xl">
+            <input id="kh-webhook" type="url" className="input" placeholder="https://hook.eu1.make.com/…" value={webhookVal}
+              onChange={e => setWebhookVal(e.target.value)} aria-label="Webhook URL" />
+            <button type="button" onClick={saveWebhook} disabled={webhookBusy !== null} className="btn-primary btn-sm whitespace-nowrap">
+              {webhookBusy === 'save' ? (isCs ? 'Ukládám…' : 'Saving…') : (isCs ? 'Uložit' : 'Save')}
+            </button>
+            {user.webhookUrl && (
+              <button type="button" onClick={testWebhook} disabled={webhookBusy !== null} className="btn-outline btn-sm whitespace-nowrap">
+                {webhookBusy === 'test' ? (isCs ? 'Posílám…' : 'Sending…') : (isCs ? 'Poslat test' : 'Send a test')}
+              </button>
+            )}
+          </div>
+          {webhookNote && <p className="text-xs text-ink-muted mt-2">{webhookNote}</p>}
+          {user.webhookSecret && (
+            <p className="text-[11px] text-ink-faint mt-3">
+              {isCs ? 'Tajemství pro podpis: ' : 'Signing secret: '}<code className="font-mono text-ink-muted select-all">{user.webhookSecret}</code>
+            </p>
+          )}
         </div>
 
         {/* Change password */}

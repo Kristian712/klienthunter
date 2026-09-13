@@ -56,6 +56,10 @@ model User {
   /// Firmy s pozdějším vznikem jsou „nové od minule". Datum, ne čas návštěvy — index se plní
   /// dvakrát měsíčně a čas návštěvy by neřekl nic.
   digestFoundedAt  DateTime?
+  /// Webhook pro Make/Zapier: kam poslat firmy po doběhnutí hledání (jen https). Viz lib/webhook.ts.
+  webhookUrl       String?
+  /// Tajemství pro podpis těla (HMAC-SHA256). Vzniká s adresou, uživatel ho vidí v profilu.
+  webhookSecret    String?
   targetCity       String?
   // Ids from LEAD_FILTERS. The share of these a firm meets is its score, so an
   // empty list is meaningful: it means "score by the neutral default".

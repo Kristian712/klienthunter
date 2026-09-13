@@ -6,8 +6,9 @@ import { useTranslations, useLocale } from 'next-intl';
 import {
   Search, Globe, Users, ExternalLink, Check, Bookmark, RefreshCw, Sparkles,
   Mail, MapPin, X, Clock, ChevronDown,
-  FileText, Table2, PhoneCall, ShieldCheck,
+  FileText, Table2, PhoneCall, ShieldCheck, Share2,
 } from 'lucide-react';
+import { CRM_FORMATS } from '@/lib/crm-export';
 import { LEAD_FILTERS, GROUP_LABELS, GROUP_ORDER, employeeLabel, matchesAll, localized, registryWindowDays, type FilterGroup } from '@/lib/lead-filters';
 import { leadReason } from '@/lib/lead-reason';
 import { reachHint, reachScore } from '@/lib/reach-score';
@@ -825,6 +826,15 @@ export default function SearchPage() {
   const [industryActive, setIndustryActive] = useState(-1);
   /** Id ze SCENARIOS. Předvyplní se podle profese z onboardingu, uživatel ho může přepnout. */
   const [scenario, setScenario]           = useState('all');
+  /** Nabídka „CRM" u exportu; zavírá se kliknutím mimo. */
+  const [crmMenu, setCrmMenu]             = useState(false);
+  const crmMenuRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!crmMenu) return;
+    const close = (e: MouseEvent) => { if (!crmMenuRef.current?.contains(e.target as Node)) setCrmMenu(false); };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [crmMenu]);
 
   // ── Profile ───────────────────────────────────────────────────────────────
   // The profile decides two things: what the form starts out as, and how the results are
@@ -1939,7 +1949,7 @@ export default function SearchPage() {
                       <button
                         onClick={() => window.open(`/api/export/${searchId}?format=csv&locale=${locale}`, '_blank')}
                         className="btn-outline btn-sm gap-1.5"
-                        title={isCs ? 'Exportovat do CSV (pro CRM)' : 'Export to CSV (for CRM)'}
+                        title={isCs ? 'Exportovat do CSV' : 'Export to CSV'}
                       >
                         <FileText size={13} />{isCs ? 'CSV export' : 'CSV'}
                       </button>
@@ -1952,6 +1962,28 @@ export default function SearchPage() {
                           <Table2 size={13} />{t('export_excel')}
                         </button>
                       )}
+                      {/* Soubor přímo pro CRM: jen sloupce, které importér zná, věta „proč" v poznámce. */}
+                      <div className="relative" ref={crmMenuRef}>
+                        <button type="button" onClick={() => setCrmMenu(v => !v)} aria-haspopup="menu" aria-expanded={crmMenu}
+                          className="btn-outline btn-sm gap-1.5" title={isCs ? 'Export pro CRM' : 'Export for CRM'}>
+                          <Share2 size={13} />CRM<ChevronDown size={12} />
+                        </button>
+                        {crmMenu && (
+                          <div role="menu" className="absolute right-0 top-full mt-1 z-20 w-56 rounded-lg border border-line-strong bg-surface-muted py-1 shadow-pop animate-fade-in">
+                            {CRM_FORMATS.map(f => (
+                              <button key={f.id} role="menuitem" type="button"
+                                onClick={() => { setCrmMenu(false); window.open(`/api/export/${searchId}?format=${f.id}&locale=${locale}`, '_blank'); }}
+                                className="block w-full text-left px-3 py-2 text-sm hover:bg-ink/[0.06]">
+                                {f.label}
+                                <span className="block text-[11px] text-ink-faint">{isCs ? 'CSV k importu bez mapování sloupců' : 'CSV ready to import without mapping'}</span>
+                              </button>
+                            ))}
+                            <Link href={`/${locale}/profile#integrace`} className="block px-3 py-2 text-[11px] text-ink-faint hover:text-ink border-t border-line mt-1">
+                              {isCs ? 'Make / Zapier webhook nastavíte v profilu' : 'Set up the Make / Zapier webhook in your profile'}
+                            </Link>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>

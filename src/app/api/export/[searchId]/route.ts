@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 import { EXPORT_COLUMNS, exportRow, exportToExcel } from '@/lib/excel-export';
 import { localized } from '@/lib/lead-filters';
 import { withoutOptouts } from '@/lib/optout';
+import { crmTable, isCrmFormat } from '@/lib/crm-export';
 
 /**
  * Oddělovač sloupců. Excel v českém a slovenském Windows čte CSV podle systémového nastavení,
@@ -21,25 +22,27 @@ function neutralize(value: string): string {
   return /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
 }
 
+function csvLines(headers: string[], rows: Array<Array<string | number>>, sep: string): string {
+  const escape = (v: unknown) => {
+    const s = neutralize(v == null ? '' : String(v));
+    if (s.includes(sep) || s.includes(',') || s.includes('"') || s.includes('\n')) {
+      return `"${s.replace(/"/g, '""')}"`;
+    }
+    return s;
+  };
+  return [headers.map(escape).join(sep), ...rows.map(r => r.map(escape).join(sep))].join('\r\n');
+}
+
 function toCsv(
   businesses: Parameters<typeof exportToExcel>[0],
   criteria: readonly string[] | null | undefined,
   locale: string,
 ): string {
-  const escape = (v: unknown) => {
-    const s = neutralize(v == null ? '' : String(v));
-    if (s.includes(SEP) || s.includes(',') || s.includes('"') || s.includes('\n')) {
-      return `"${s.replace(/"/g, '""')}"`;
-    }
-    return s;
-  };
 
   // Sloupce i hodnoty jsou tytez jako v XLSX (`EXPORT_COLUMNS`, `exportRow`), aby se oba exporty
   // nemohly rozejit v poradi ani v obsahu.
   const headers = EXPORT_COLUMNS.map(c => localized(c, locale));
-  const rows = businesses.map(b => exportRow(b, criteria, locale).map(escape).join(SEP));
-
-  return [headers.map(escape).join(SEP), ...rows].join('\r\n');
+  return csvLines(headers, businesses.map(b => exportRow(b, criteria, locale)), SEP);
 }
 
 export async function GET(
@@ -94,6 +97,16 @@ export async function GET(
     const disposition = (ext: string) =>
       `attachment; filename="klienthunter-${asciiSlug}.${ext}"; ` +
       `filename*=UTF-8''${encodeURIComponent(`klienthunter-${slug}.${ext}`)}`;
+
+    // Formáty pro CRM: jen sloupce, které Pipedrive nebo Raynet znají (lib/crm-export.ts). CSV, tedy zdarma.
+    if (isCrmFormat(format)) {
+      const table = crmTable(format, rows, profile?.targetFilters, locale);
+      const sep = format === 'pipedrive' ? ',' : ';';
+      const csv = `\uFEFF${csvLines(table.headers, table.rows, sep)}`;
+      return new NextResponse(csv, {
+        headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': disposition(`${format}.csv`) },
+      });
+    }
 
     if (format === 'csv') {
       // BOM: dvojklik v Excelu hlavičku Content-Type nevidí a bez něj čte soubor jako CP1250,
