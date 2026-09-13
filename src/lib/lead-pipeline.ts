@@ -1,5 +1,6 @@
 import { createRobotsCache } from './robots';
 import { ENRICHMENT_SOURCES, contactPageUrl, extractContacts, type RawLead, type TradeLicence } from './sources';
+import { splitIndustries } from './industries';
 import { resolveNiche } from './nace-map';
 import {
   addressParts,
@@ -286,8 +287,14 @@ export function domainCityFor(address: string | undefined, region: string): stri
  * nikdy. Změřeno na vzorku 100 firem (11. 9. 2026): dva přehlédnuté weby právě kvůli tomu.
  */
 export function tradeWordsFor(industry: string): string[] {
-  const niche = resolveNiche(industry);
-  return Array.from(new Set([...niche.keywords, ...(niche.pageWords ?? []), industry]))
+  // Víc oborů = sjednocení jejich slov; „všechny obory" nemá slova žádná, web se pak potvrdí
+  // jen podle IČO nebo celého názvu — poctivější než hádat obor.
+  const parts = splitIndustries(industry);
+  const words = parts.flatMap(part => {
+    const niche = resolveNiche(part);
+    return [...niche.keywords, ...(niche.pageWords ?? []), part];
+  });
+  return Array.from(new Set(words))
     .map(w => w.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim())
     .filter(w => w.length >= 4);
 }

@@ -1,3 +1,5 @@
+import { ALL_INDUSTRIES_LABEL, INDUSTRY_SEP, isAllIndustries, splitIndustries } from './industries';
+import { localized } from './lead-filters';
 /**
  * The pick-lists behind both the search form and the onboarding modal.
  *
@@ -292,6 +294,10 @@ export const INDUSTRIES: Record<string, { group: string; items: { value: string;
  * unchanged rather than disappearing.
  */
 export function industryLabel(value: string, locale: string): string {
+  // Víc oborů naráz a „všechny obory" — viz lib/industries.ts.
+  if (isAllIndustries(value)) return localized(ALL_INDUSTRIES_LABEL, locale);
+  const parts = splitIndustries(value);
+  if (parts.length > 1) return parts.map(p => industryLabel(p, locale)).join(INDUSTRY_SEP);
   const lists = [INDUSTRIES[locale], INDUSTRIES.cs, INDUSTRIES.en].filter(Boolean);
   for (const groups of lists) {
     for (const group of groups) {

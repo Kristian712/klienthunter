@@ -6,6 +6,7 @@ import { enrichAndVerify, mergeLeads, type VerifiedCandidate } from '@/lib/lead-
 import {
   ANONYMOUS_RESULTS, ANONYMOUS_SEARCHES, countHits, hashIp, recordHit,
 } from '@/lib/rate-limit';
+import { splitIndustries } from '@/lib/industries';
 import { startSearch } from '@/lib/start-search';
 import { CZ_STAGES } from '@/lib/search-options';
 import { discoverAll } from '@/lib/sources';
@@ -117,7 +118,12 @@ export async function POST(req: NextRequest) {
     // zablokovat IP u Overpassu.
     if (!session) {
       const body = await req.json();
-      const { region, industry } = SearchSchema.parse(body);
+      const parsed = SearchSchema.parse(body);
+      // Ukázka je jeden obor: víc oborů nebo „všechny" by stálo víc dotazů, než si nepřihlášený
+      // smí vzít, a index z ČSÚ ukázka schválně nepoužívá.
+      const region = parsed.region;
+      const industry = splitIndustries(parsed.industry)[0];
+      if (!industry) return NextResponse.json({ error: 'Pick a trade for the demo', code: 'DEMO_ONE_TRADE' }, { status: 422 });
       const ipHash = hashIp(req);
 
       if (await countHits(ipHash, 'search') >= ANONYMOUS_SEARCHES) {
@@ -159,7 +165,8 @@ export async function POST(req: NextRequest) {
     const started = await startSearch({ userId: payload.userId, industry, region, filters, scenario });
     if (!started.ok) {
       const message = started.code === 'PLAN_LIMIT' ? 'Search limit reached for your plan'
-        : started.code === 'RATE_LIMITED' ? 'Too many searches in a short time' : 'Unauthorized';
+        : started.code === 'RATE_LIMITED' ? 'Too many searches in a short time'
+        : started.code === 'ALL_NEEDS_EVENT' ? 'All trades need a founding-date filter' : 'Unauthorized';
       return NextResponse.json(
         { error: message, code: started.code },
         { status: started.status, headers: started.retryAfterS ? { 'Retry-After': String(started.retryAfterS) } : undefined },

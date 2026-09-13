@@ -8,13 +8,14 @@ import {
   Mail, MapPin, X, Clock, ChevronDown,
   FileText, Table2, PhoneCall,
 } from 'lucide-react';
-import { LEAD_FILTERS, GROUP_LABELS, GROUP_ORDER, employeeLabel, matchesAll, localized } from '@/lib/lead-filters';
+import { LEAD_FILTERS, GROUP_LABELS, GROUP_ORDER, employeeLabel, matchesAll, localized, registryWindowDays } from '@/lib/lead-filters';
 import { leadReason } from '@/lib/lead-reason';
 import { reachHint, reachScore } from '@/lib/reach-score';
 import { scoreBreakdown } from '@/lib/lead-score';
 import { YIELD_NOTE, yieldFor } from '@/lib/nace-map';
 import { SCENARIOS, SCENARIO_BY_PROFESSION, scenarioById } from '@/lib/scenarios';
-import { EMPTY_PROFILE, presetFiltersFor, type UserProfile } from '@/lib/profile';
+import { EMPTY_PROFILE, industriesFor, presetFiltersFor, type UserProfile } from '@/lib/profile';
+import { ALL_INDUSTRIES, ALL_INDUSTRIES_LABEL, MAX_INDUSTRIES, isAllIndustries, joinIndustries } from '@/lib/industries';
 import { compareRanked, type ClaimMark } from '@/lib/claim-order';
 
 /** Totéž, co vrací `searchMeta` v lib/saved-search.ts. */
@@ -598,6 +599,16 @@ const S = {
   errTimeoutWholeCz: { cs: 'Hledání přes celou ČR nestihlo doběhnout v časovém limitu. Zvolte prosím jeden kraj — nad celou republikou je firem tolik, že se ověřování webů do limitu nevejde.',
                 sk: 'Hľadanie cez celú ČR nestihlo dobehnúť v časovom limite. Zvoľte prosím jeden kraj — nad celou republikou je firiem toľko, že sa overovanie webov do limitu nezmestí.',
                 en: 'A nationwide search ran out of time. Please pick a single region — across the whole country there are too many firms for the website checks to finish in time.' },
+  /** „Všechny obory" umí jen index z ČSÚ, a ten hledá podle data vzniku — bez toho není co spustit. */
+  allNeedsEvent: { cs: 'Všechny obory naráz jdou jen podle data vzniku — zapněte scénář „Nové firmy" nebo filtr „Nová firma". Hledá se pak v celém kraji v indexu RES ČSÚ.',
+                   sk: 'Všetky odbory naraz idú len podľa dátumu vzniku — zapnite scenár „Nové firmy" alebo filter „Nová firma". Hľadá sa potom v celom kraji v indexe RES ČSÚ.',
+                   en: 'All trades at once work only by founding date — turn on the “New firms” scenario or a “New firm” filter. The search then covers the whole region from the CZSO index.' },
+  turnOnNew:  { cs: 'Zapnout „Nové firmy"', sk: 'Zapnúť „Nové firmy"', en: 'Turn on “New firms”' },
+  maxIndustries: { cs: `Nejvýš ${MAX_INDUSTRIES} oborů naráz.`, sk: `Najviac ${MAX_INDUSTRIES} odborov naraz.`, en: `At most ${MAX_INDUSTRIES} trades at once.` },
+  industriesHint: { cs: 'Obory se sčítají — přidejte další, nebo zvolte „Všechny obory".',
+                    sk: 'Odbory sa sčítavajú — pridajte ďalší, alebo zvoľte „Všetky odbory".',
+                    en: 'Trades add up — add another, or pick “All trades”.' },
+  removeIndustry: { cs: 'Odebrat obor', sk: 'Odobrať odbor', en: 'Remove trade' },
   errServer:  { cs: 'Hledání se nepodařilo — chyba na naší straně. Zkuste to prosím znovu.',
                 sk: 'Hľadanie sa nepodarilo — chyba na našej strane. Skúste to prosím znova.',
                 en: 'The search failed on our side. Please try again.' },
@@ -792,7 +803,11 @@ export default function SearchPage() {
 
   const [region, setRegion]               = useState('');
   const [customRegion, setCustomRegion]   = useState('');
-  const [industry, setIndustry]           = useState('');
+  /**
+   * Vybrané obory. Víc naráz (do `MAX_INDUSTRIES`), nebo jediná hodnota `ALL_INDUSTRIES` =
+   * bez omezení oboru. Do API jde jeden řetězec (`joinIndustries`), viz lib/industries.ts.
+   */
+  const [industries, setIndustries]       = useState<string[]>([]);
   const [customIndustry, setCustomIndustry] = useState('');
   /** Text v našeptávači oborů. Prázdný, dokud uživatel nezačne psát. */
   const [industryQuery, setIndustryQuery] = useState('');
@@ -935,12 +950,7 @@ export default function SearchPage() {
     // U uloženého hledání se přednastavení nepřidává vůbec (viz `savedLockRef`).
     if (preset.length > 0 && presetsOn && !savedLockRef.current) setActive(prev => new Set([...Array.from(prev), ...preset]));
     if (p.targetRegion)   setRegion(r => r || p.targetRegion!);
-    if (p.targetIndustry) {
-      setIndustry(i => i || p.targetIndustry!);
-      // Bez tohohle by našeptávač zůstal prázdný, i když je obor z profilu vybraný — uživatel
-      // by viděl prázdné pole a nevěděl, co se vlastně bude hledat.
-      setIndustryQuery(q => q || industryLabelFor(p.targetIndustry!, locale));
-    }
+    if (p.targetIndustry) setIndustries(i => (i.length ? i : [p.targetIndustry!]));
     // Scénář je jen výchozí hodnota přepínače; jakmile s ním uživatel hnul, profil ho nepřebíjí.
     if (p.profession && SCENARIO_BY_PROFESSION[p.profession]) {
       setScenario(sc => (sc === 'all' ? SCENARIO_BY_PROFESSION[p.profession!] : sc));
@@ -1012,7 +1022,21 @@ export default function SearchPage() {
    * jeho text — pipeline si s ním poradí (`resolveNiche` hledá i podle českých slov), takže
    * „jiný obor" už nepotřebuje vlastní volbu v seznamu.
    */
-  const effectiveIndustry = industry || industryQuery.trim() || customIndustry;
+  const effectiveIndustry = industries.length ? joinIndustries(industries) : industryQuery.trim() || customIndustry;
+  const allPicked = industries.length === 1 && isAllIndustries(industries[0]);
+  /** „Všechny obory" bez filtru podle vzniku nejde spustit — index z ČSÚ hledá jen podle data. */
+  const allBlocked = allPicked && registryWindowDays([...Array.from(active), ...scenarioById(scenario).filters]) === null;
+
+  const addIndustry = (value: string) => {
+    setIndustries(prev => {
+      if (value === ALL_INDUSTRIES) return [ALL_INDUSTRIES];
+      const rest = prev.filter(v => v !== ALL_INDUSTRIES && v !== value);
+      return rest.length >= MAX_INDUSTRIES ? prev : [...rest, value];
+    });
+    setIndustryQuery('');
+  };
+  const toggleIndustry = (value: string) =>
+    industries.includes(value) ? setIndustries(prev => prev.filter(v => v !== value)) : addIndustry(value);
 
   /**
    * Text v poli je zároveň vybraná hodnota — po výběru oboru v něm stojí jeho název. Kdyby se
@@ -1021,18 +1045,18 @@ export default function SearchPage() {
    * co už má. Vybraná hodnota se proto jako filtr nepočítá — jakmile uživatel začne psát,
    * `onChange` výběr zruší a filtrování se rozjede normálně.
    */
-  const industryPicked = Boolean(industry) && industryQuery === industryLabelFor(industry, locale);
 
   /** Obory, které odpovídají tomu, co uživatel napsal. Bez diakritiky, aby „zubar" našel „Zubaři". */
   const industryMatches = (() => {
     const groups = INDUSTRIES[locale] ?? INDUSTRIES.en;
     const all = groups.flatMap(g => g.items.map(i => ({ ...i, group: g.group })));
     const norm = (x: string) => x.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-    const q = industryPicked ? '' : norm(industryQuery.trim());
-    // Bez filtru se nabídne všechno. Dřív tu byl strop 40, jenže českých oborů je 41 — poslední
-    // („Podlaháři") tak nešel vybrat nikdy, ani s prázdným polem.
-    if (!q) return all;
-    return all.filter(i => norm(i.label).includes(q) || norm(i.group).includes(q));
+    const q = norm(industryQuery.trim());
+    // Už vybrané obory se nenabízejí podruhé. Bez filtru se nabídne všechno. Dřív tu byl strop
+    // 40, jenže českých oborů je 41 — poslední („Podlaháři") tak nešel vybrat nikdy.
+    const open = all.filter(i => !industries.includes(i.value));
+    if (!q) return open;
+    return open.filter(i => norm(i.label).includes(q) || norm(i.group).includes(q));
   })();
 
   /**
@@ -1040,7 +1064,8 @@ export default function SearchPage() {
    * že u kadeřnic bude webů málo — jinak by po hledání usoudil, že je aplikace rozbitá.
    */
   const yieldNote = (() => {
-    if (!effectiveIndustry) return null;
+    // Odhad platí pro jeden obor; u víc oborů nebo „všech" by byl průměr, který nic neříká.
+    if (!effectiveIndustry || industries.length > 1 || allPicked) return null;
     const note = YIELD_NOTE[yieldFor(effectiveIndustry)];
     return note ? localized(note, locale) : null;
   })();
@@ -1342,7 +1367,7 @@ export default function SearchPage() {
         // „ukázka je vyčerpaná". Rozliší je kód v těle, a když tělo není JSON, zůstane
         // původní hláška.
         let code = '';
-        if (res.status === 429 || res.status === 403) {
+        if (res.status === 429 || res.status === 403 || res.status === 422) {
           code = await res.json().then(d => d?.code ?? '').catch(() => '');
         }
         // Vyčerpaný tarif má vlastní zobrazení s odkazem na ceník — obyčejná věta by uživatele
@@ -1353,6 +1378,7 @@ export default function SearchPage() {
           return;
         }
         const byStatus =
+          code === 'ALL_NEEDS_EVENT' ? S.allNeedsEvent :
           res.status === 401 ? S.errLogin  :
           res.status === 403 ? S.errPlan   :
           code === 'DEMO_USED' ? S.errDemoUsed :
@@ -1397,7 +1423,14 @@ export default function SearchPage() {
     }
   };
 
-  const popularChips = POPULAR_CHIPS[locale] ?? POPULAR_CHIPS.en;
+  /**
+   * Rychlé chipy podle profilu, ne pevných osm řemesel. Účetní má na dosah účetní, právníky
+   * a zubaře, tvůrce webů restaurace a kadeřnictví. Bez profilu zůstává obecná osmička.
+   */
+  const quickChips = (() => {
+    const fromProfile = industriesFor(profile).map(value => ({ value, label: industryLabelFor(value, locale) }));
+    return fromProfile.length ? fromProfile : (POPULAR_CHIPS[locale] ?? POPULAR_CHIPS.en);
+  })();
   const isPro = userPlan === 'PRO' || userPlan === 'BUSINESS';
   /** Job běží dál i po tom, co odpověď na POST dorazila — `loading` o tom nic neví. */
   const jobRunning = Boolean(job && job.status !== 'done' && job.status !== 'failed');
@@ -1457,15 +1490,17 @@ export default function SearchPage() {
             plocha přes půl karty. Nahoře navíc čtou líp: je to volba, ne dekorace pole.
           */}
           <div className="flex flex-wrap gap-1.5 mb-4">
-            {popularChips.map(chip => (
+            {/* „Všechny obory" první: pro účetní nebo pojišťováka je to ten hlavní případ. */}
+            <button type="button" onClick={() => toggleIndustry(ALL_INDUSTRIES)} className={allPicked ? 'chip-active' : 'chip'}>
+              {localized(ALL_INDUSTRIES_LABEL, locale)}
+            </button>
+            {quickChips.map(chip => (
               <button
                 key={chip.value}
                 type="button"
-                // Název bereme od oboru, ne od chipu: chip „Reality" míří na obor „Realitní
-                // kancelář" a jeho vlastní popisek by v poli zůstal jako text, který nesedí na
-                // žádnou položku nabídky.
-                onClick={() => { setIndustry(chip.value); setIndustryQuery(industryLabelFor(chip.value, locale)); }}
-                className={industry === chip.value ? 'chip-active' : 'chip'}
+                onClick={() => toggleIndustry(chip.value)}
+                className={industries.includes(chip.value) ? 'chip-active' : 'chip'}
+                aria-pressed={industries.includes(chip.value)}
               >
                 {chip.label}
               </button>
@@ -1541,13 +1576,43 @@ export default function SearchPage() {
                 {t('industry_label')}
               </label>
 
+              {/* Vybrané obory jako odebíratelné chipy. Pole pod nimi slouží jen k přidání dalšího,
+                  takže se v něm nemusí držet název vybraného oboru jako dřív. */}
+              {industries.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                  {industries.map(value => (
+                    <span key={value} className="chip-active inline-flex items-center gap-1 pr-1.5">
+                      {value === ALL_INDUSTRIES ? localized(ALL_INDUSTRIES_LABEL, locale) : industryLabelFor(value, locale)}
+                      <button type="button" onClick={() => setIndustries(prev => prev.filter(v => v !== value))}
+                        className="rounded-full p-0.5 hover:bg-ink/10" aria-label={`${localized(S.removeIndustry, locale)}: ${industryLabelFor(value, locale)}`}>
+                        <X size={12} />
+                      </button>
+                    </span>
+                  ))}
+                  {!allPicked && (
+                    <span className="text-[11px] text-ink-faint">
+                      {industries.length >= MAX_INDUSTRIES ? localized(S.maxIndustries, locale) : localized(S.industriesHint, locale)}
+                    </span>
+                  )}
+                </div>
+              )}
+              {allBlocked && (
+                <p className="mb-2 text-xs text-ink-muted leading-snug">
+                  {localized(S.allNeedsEvent, locale)}{' '}
+                  <button type="button" onClick={() => setScenario('new')} className="underline text-accent">{localized(S.turnOnNew, locale)}</button>
+                </p>
+              )}
+
               <div className="relative">
                 <input
                   id="kh-industry"
                   className="input pr-9"
                   value={industryQuery}
-                  placeholder={isCs ? 'Začněte psát: zubaři, restaurace, autoservis…' : 'Start typing: dentists, restaurants…'}
-                  onChange={e => { setIndustryQuery(e.target.value); setIndustry(''); setIndustryOpen(true); setIndustryActive(-1); }}
+                  placeholder={industries.length
+                    ? (isCs ? 'Přidat další obor…' : 'Add another trade…')
+                    : (isCs ? 'Začněte psát: zubaři, restaurace, autoservis…' : 'Start typing: dentists, restaurants…')}
+                  disabled={allPicked}
+                  onChange={e => { setIndustryQuery(e.target.value); setIndustryOpen(true); setIndustryActive(-1); }}
                   // Text se označí, aby první stisknutá klávesa přepsala vybraný obor a nepsala se
                   // za něj — jinak by z „Kadeřnictví" + „zub" vzniklo „Kadeřnictvízub", což
                   // neodpovídá žádnému oboru. `onMouseUp` musí zabránit výchozímu chování, jinak
@@ -1581,8 +1646,7 @@ export default function SearchPage() {
                       const item = industryMatches[industryActive];
                       if (item) {
                         e.preventDefault();
-                        setIndustry(item.value);
-                        setIndustryQuery(item.label);
+                        addIndustry(item.value);
                         setIndustryOpen(false);
                         setIndustryActive(-1);
                       }
@@ -1612,8 +1676,7 @@ export default function SearchPage() {
                           onMouseDown={e => e.preventDefault()}
                           onMouseEnter={() => setIndustryActive(i)}
                           onClick={() => {
-                            setIndustry(item.value);
-                            setIndustryQuery(item.label);
+                            addIndustry(item.value);
                             setIndustryOpen(false);
                             setIndustryActive(-1);
                           }}
@@ -1646,7 +1709,7 @@ export default function SearchPage() {
                 utrácí dotazy do vyhledávače z téhož měsíčního stropu, o kterém uživatel na
                 obrazovce už neví. */}
             <button type="submit"
-              disabled={loading || jobRunning || !effectiveRegion || !effectiveIndustry}
+              disabled={loading || jobRunning || !effectiveRegion || !effectiveIndustry || allBlocked}
               className="btn-primary h-[42px] md:mt-[23px]">
               {loading || jobRunning ? (
                 <span className="flex items-center gap-2">

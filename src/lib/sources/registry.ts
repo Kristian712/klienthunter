@@ -1,4 +1,5 @@
 import { prisma } from '../db';
+import { isAllIndustries, splitIndustries } from '../industries';
 import { resolveNiche, USELESS_NACE } from '../nace-map';
 import { activeOptoutKeys } from '../optout';
 import { nuts3ForRegion } from '../regions-nuts';
@@ -34,11 +35,13 @@ export interface RegistryQuery {
 
 /** Zda index pro tenhle dotaz vůbec může něco vrátit — jinak se hledá po staru přes ARES. */
 export function registryCanServe(q: Pick<RegistryQuery, 'industry' | 'region'>): boolean {
-  return nuts3ForRegion(q.region) !== null && naceCodesFor(q.industry).length > 0;
+  return nuts3ForRegion(q.region) !== null && (isAllIndustries(q.industry) || naceCodesFor(q.industry).length > 0);
 }
 
+/** NACE kódy všech oborů v dotazu (`a + b` = sjednocení). Pro „všechny obory" prázdné = bez filtru. */
 function naceCodesFor(industry: string): string[] {
-  return resolveNiche(industry).nace.filter(c => !USELESS_NACE.has(c));
+  const codes = splitIndustries(industry).flatMap(part => resolveNiche(part).nace);
+  return Array.from(new Set(codes.filter(c => !USELESS_NACE.has(c))));
 }
 
 /**
@@ -59,12 +62,14 @@ function naceWhere(codes: string[]) {
 
 export async function registryDiscover(q: RegistryQuery): Promise<RawLead[]> {
   const nuts3 = nuts3ForRegion(q.region);
+  const all = isAllIndustries(q.industry);
   const codes = naceCodesFor(q.industry);
-  if (!nuts3 || codes.length === 0 || q.limit <= 0) return [];
+  if (!nuts3 || (!all && codes.length === 0) || q.limit <= 0) return [];
 
   const since = new Date(Date.now() - q.windowDays * 24 * 60 * 60 * 1000);
   const rows = await prisma.registrySubject.findMany({
-    where: { district: { startsWith: nuts3 }, foundedAt: { gte: since }, ...naceWhere(codes) },
+    // „Všechny obory": jen kraj a datum. Jediné místo v aplikaci, kde jde hledat bez oboru.
+    where: { district: { startsWith: nuts3 }, foundedAt: { gte: since }, ...(all ? {} : naceWhere(codes)) },
     // Nejnovější první: kdo hledá nové firmy, chce být u nich první.
     orderBy: { foundedAt: 'desc' },
     select: { ico: true },

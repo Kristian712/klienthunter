@@ -1,6 +1,9 @@
 import { waitUntil } from '@vercel/functions';
 import { activeAccount, getPlanLimits } from './auth';
 import { prisma } from './db';
+import { isAllIndustries } from './industries';
+import { registryWindowDays } from './lead-filters';
+import { scenarioById } from './scenarios';
 import { runSearchJob } from './search-job';
 
 /**
@@ -27,7 +30,7 @@ const BURST_MAX = 12;
 
 export type StartSearchResult =
   | { ok: true; jobId: string; searchId: string }
-  | { ok: false; status: 401 | 403 | 429; code: 'UNAUTHORIZED' | 'PLAN_LIMIT' | 'RATE_LIMITED'; retryAfterS?: number };
+  | { ok: false; status: 401 | 403 | 422 | 429; code: 'UNAUTHORIZED' | 'PLAN_LIMIT' | 'RATE_LIMITED' | 'ALL_NEEDS_EVENT'; retryAfterS?: number };
 
 export async function startSearch(opts: {
   userId: string;
@@ -39,6 +42,13 @@ export async function startSearch(opts: {
   filters?: string[];
   scenario?: string | null;
 }): Promise<StartSearchResult> {
+  // „Všechny obory" umí jen index z ČSÚ, a ten potřebuje filtr podle vzniku (lib/industries.ts).
+  // Bez něj by běh šel do ARESu bez NACE a ten ho odmítne — lepší říct to hned než po minutě.
+  if (isAllIndustries(opts.industry)) {
+    const ids = [...(opts.filters ?? []), ...scenarioById(opts.scenario).filters];
+    if (registryWindowDays(ids) === null) return { ok: false, status: 422, code: 'ALL_NEEDS_EVENT' };
+  }
+
   // Počítáme už založená hledání, ne dokončená — jinak by série souběžných požadavků
   // proklouzla všechna najednou, protože žádné z nich by v tu chvíli ještě nebylo hotové.
   const burstSince = new Date(Date.now() - BURST_WINDOW_MS);

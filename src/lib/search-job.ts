@@ -3,9 +3,10 @@ import { persistResults } from './lead-persist';
 import { enrichAndVerify, mergeLeads } from './lead-pipeline';
 import { fillCoordinates } from './ruian';
 import { CZ_STAGES } from './search-options';
+import { ALL_INDUSTRIES, isAllIndustries, splitIndustries } from './industries';
 import { registryWindowDays } from './lead-filters';
 import { scenarioById } from './scenarios';
-import { discoverAll } from './sources';
+import { discoverAll, type RawLead } from './sources';
 import { createSearchQuota } from './web-search-quota';
 
 /**
@@ -144,9 +145,23 @@ export async function runSearchJob(jobId: string): Promise<void> {
 
       const room = Math.min(perStage, job.targetCount - total);
       const city = stage.value.split(',')[0].trim();
-      const [aresLeads, osmLeads] = await discoverAll(job.industry, city, room, {
-        registry: windowDays ? { industry: job.industry, region: stage.value, windowDays, limit: room } : undefined,
-      });
+      /**
+       * Víc oborů naráz: každý obor je vlastní průchod zdroji, místo se dělí rovným dílem.
+       * „Všechny obory" je jeden průchod bez NACE — umí ho jen index z ČSÚ (viz lib/industries.ts;
+       * `startSearch` bez filtru vzniku takový běh vůbec nezaloží).
+       */
+      const parts = isAllIndustries(job.industry) ? [ALL_INDUSTRIES] : splitIndustries(job.industry);
+      const perPart = Math.ceil(room / Math.max(parts.length, 1));
+      // Obory po sobě, ne naráz: každý průchod si sám paralelizuje dotazy do ARESu a pět oborů
+      // najednou by přelezlo limit 500 za minutu.
+      const batches: RawLead[][][] = [];
+      for (const part of parts) {
+        batches.push(await discoverAll(part, city, perPart, {
+          registry: windowDays ? { industry: part, region: stage.value, windowDays, limit: perPart } : undefined,
+        }));
+      }
+      const osmLeads = batches.flatMap(b => b[1]);
+      const aresLeads = batches.flatMap(b => b[0]);
       const candidates = mergeLeads([osmLeads, aresLeads], room).filter(c => {
         if (seenIco.has(c.ico ?? '') || seenPlace.has(c.placeId)) return false;
         if (c.ico) seenIco.add(c.ico);
