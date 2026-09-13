@@ -135,6 +135,32 @@ export function googleMapsHref(lead: MapLead): string {
  * a úpravu stylu, neexistovala by mapa, do které se dají sázet body, a první dávka firem by se
  * ztratila.
  */
+const STYLE_URL = 'https://tiles.openfreemap.org/styles/positron';
+
+/**
+ * Styl se stahuje ručně a s opakováním. OpenFreeMap občas odpoví 503 (změřeno 13. 9. 2026:
+ * první dotaz 503, druhý 200) a MapLibre to nezkouší znovu — mapa pak zůstala tichý šedý
+ * obdélník s body a vypadala rozbitě. Tři pokusy s rozestupem pokryjí krátký výpadek; delší
+ * se ohlásí větou pod mapou.
+ */
+async function fetchStyle(): Promise<unknown> {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const res = await fetch(STYLE_URL, { cache: 'force-cache' });
+      if (res.ok) return await res.json();
+      lastErr = new Error(`style HTTP ${res.status}`);
+    } catch (err) {
+      lastErr = err;
+    }
+    await new Promise(r => setTimeout(r, 700 * (attempt + 1)));
+  }
+  throw lastErr;
+}
+
+/** Popisky česky: OpenMapTiles nese `name:cs` u měst a států, jinak místní `name`. Ne `name_en`. */
+const LOCAL_NAME = ['coalesce', ['get', 'name:cs'], ['get', 'name'], ['get', 'name:latin']];
+
 function tintVanek(m: MapLibreMap) {
   const style = m.getStyle();
   if (!style?.layers) return;
@@ -148,27 +174,37 @@ function tintVanek(m: MapLibreMap) {
       continue;
     }
     try {
-      if (layer.type === 'background') m.setPaintProperty(id, 'background-color', '#101113');
+      /**
+       * Tmavý podklad s čitelnou strukturou. Dřív byly silnice #26272c na zemi #131417 — rozdíl
+       * 1,15 : 1, takže mapa vypadala jako prázdná šedá plocha. Teď má voda modrý nádech, zástavba
+       * je o stupeň světlejší než krajina a hlavní silnice jsou vidět i při pohledu na celý kraj.
+       */
+      if (layer.type === 'background') m.setPaintProperty(id, 'background-color', '#0f1013');
       if (layer.type === 'fill') {
         const voda = /water/i.test(id);
-        // Domy zůstávají, jen skoro splynou s podkladem. Dávají městu strukturu, ve které bod
-        // sedí v ulici a ne v prázdnu — a ve 3D režimu z nich vyrostou skutečné bloky.
         const dum = /building/i.test(id);
         const park = /park|wood|landcover|grass/i.test(id);
-        m.setPaintProperty(id, 'fill-color', voda ? '#171a1f' : dum ? '#18191c' : park ? '#141518' : '#131417');
-        if (dum) m.setPaintProperty(id, 'fill-outline-color', '#1f2024');
+        const mesto = /residential|landuse/i.test(id);
+        m.setPaintProperty(id, 'fill-color', voda ? '#16202c' : dum ? '#23252b' : park ? '#12161a' : mesto ? '#191b20' : '#131518');
+        if (dum) m.setPaintProperty(id, 'fill-outline-color', '#2b2d34');
+        if (mesto) m.setPaintProperty(id, 'fill-opacity', 1);
       }
       if (layer.type === 'line') {
-        if (/water|river|stream/i.test(id)) m.setPaintProperty(id, 'line-color', '#1c2027');
-        else if (/boundary|admin/i.test(id)) m.setPaintProperty(id, 'line-color', 'rgba(255,255,255,.18)');
-        // Silnice jen o kousek světlejší než zem: struktura města bez šumu. Bílé by na tmavé
-        // mapě přezářily body, které mají být to jediné výrazné.
-        else m.setPaintProperty(id, 'line-color', '#26272c');
+        if (/water|river|stream/i.test(id)) m.setPaintProperty(id, 'line-color', '#1e2b3a');
+        else if (/boundary|admin/i.test(id)) m.setPaintProperty(id, 'line-color', 'rgba(255,255,255,.22)');
+        else if (/motorway|trunk|major/i.test(id)) m.setPaintProperty(id, 'line-color', /casing/i.test(id) ? '#2a2c33' : '#4a4d57');
+        else if (/rail/i.test(id)) m.setPaintProperty(id, 'line-color', '#2c2e35');
+        else m.setPaintProperty(id, 'line-color', '#33353c');
       }
       if (layer.type === 'symbol') {
-        m.setPaintProperty(id, 'text-color', '#9a9ba1');
-        m.setPaintProperty(id, 'text-halo-color', '#101113');
-        m.setPaintProperty(id, 'text-halo-width', 1.4);
+        const mesto = /label_city|label_town|label_country/i.test(id);
+        m.setPaintProperty(id, 'text-color', mesto ? '#c9cbd2' : '#8f9199');
+        m.setPaintProperty(id, 'text-halo-color', '#0f1013');
+        m.setPaintProperty(id, 'text-halo-width', 1.6);
+        // Česky, ne „Prague" a „Czechia": aplikace je česká a mapa má mluvit stejně.
+        if (m.getLayoutProperty(id, 'text-field') && !/shield/i.test(id)) {
+          m.setLayoutProperty(id, 'text-field', LOCAL_NAME);
+        }
       }
     } catch {
       // Vrstva, která tuhle vlastnost nemá. Přeskočit ji je správně — styl se mezi verzemi mění
@@ -341,9 +377,14 @@ export function ResultsMap({ leads, total, locale, onSetStatus, hideDone, hidden
   const [styleReady, setStyleReady] = useState(false);
   const [selected, setSelected] = useState<MapLead | null>(null);
   const [failed, setFailed] = useState(false);
+  /** Dokud nedorazí styl a první dlaždice, ukáže se místo prázdna, že se mapa načítá. */
+  const [loading, setLoading] = useState(true);
   const [labelsOn, setLabelsOn] = useState(false);
+  /** Aktuální body pro posluchač `load` — ten vzniká jednou a nesmí vidět zastaralé pole. */
+  const placeableRef = useRef<MapLead[]>([]);
 
   const placeable = leads.filter(l => typeof l.lat === 'number' && typeof l.lon === 'number');
+  placeableRef.current = placeable;
   // Tři čísla, ne dvě: „bez webu" a „neověřeno" jsou dvě různá tvrzení a slévat je do jednoho
   // je přesně ta věc, kvůli které mapa lhala.
   const withWeb = placeable.filter(l => webStateOf(l) === 'HAS').length;
@@ -356,7 +397,8 @@ export function ResultsMap({ leads, total, locale, onSetStatus, hideDone, hidden
     if (!container.current || map.current) return;
     const m = new MapLibreMap({
       container: container.current,
-      style: 'https://tiles.openfreemap.org/styles/positron',
+      // Prázdný styl na start; skutečný přijde přes `fetchStyle` s opakováním (viz výš).
+      style: { version: 8, sources: {}, layers: [] },
       center: [15.47, 49.82], // střed ČR, než dorazí první firmy
       zoom: 6.5,
       attributionControl: false,
@@ -373,15 +415,43 @@ export function ResultsMap({ leads, total, locale, onSetStatus, hideDone, hidden
       cooperativeGestures: typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches,
     });
     m.addControl(new NavigationControl({ visualizePitch: true }), 'top-right');
-    m.on('style.load', () => { tintVanek(m); setStyleReady(true); });
+    m.on('style.load', () => {
+      // `style.load` přijde i pro prázdný startovní styl; tintovat je co až ten pravý.
+      if (!m.getSource('openmaptiles')) return;
+      tintVanek(m);
+      setStyleReady(true);
+    });
+    // První vykreslení s daty. Přiblížení na výsledky se tu opakuje pro případ, že se
+    // vykonalo dřív, než mapa znala svou velikost (mount ve skryté záložce, přepnutí pohledu).
+    m.once('load', () => {
+      setLoading(false);
+      const pts = placeableRef.current;
+      if (pts.length > 0) {
+        const b = new LngLatBounds();
+        pts.forEach(l => b.extend([l.lon!, l.lat!]));
+        m.fitBounds(b, { padding: 56, maxZoom: 13, duration: 0 });
+        fitted.current = true;
+      }
+    });
     // Když se nepovede načíst styl nebo dlaždice, ať to není tichý prázdný obdélník.
-    m.on('error', e => { console.warn('mapa:', e?.error?.message ?? e); setFailed(true); });
+    m.on('error', e => { console.warn('mapa:', e?.error?.message ?? e); });
+    let alive = true;
+    fetchStyle()
+      .then(style => { if (alive) m.setStyle(style as never); })
+      .catch(err => { console.warn('mapa: styl se nepodařilo načíst', err); if (alive) { setFailed(true); setLoading(false); } });
     // Popisky se přerovnávají až po dojetí pohybu. Během posouvání jedou s body samy — jsou
     // jejich potomci — takže překreslovat je v každém snímku by nic nepřidalo.
     m.on('moveend', () => relayout.current());
     m.on('zoomend', () => relayout.current());
     map.current = m;
-    return () => { m.remove(); map.current = null; };
+    return () => {
+      alive = false;
+      m.remove();
+      map.current = null;
+      // Nová instance mapy (StrictMode, návrat na stránku) musí na výsledky doskočit znovu.
+      fitted.current = false;
+      seen.current.clear();
+    };
   }, []);
 
   // Body. Překreslují se při každé změně dat — je jich řádově stovky, takže je levnější je
@@ -536,7 +606,7 @@ export function ResultsMap({ leads, total, locale, onSetStatus, hideDone, hidden
       fitted.current = true;
       const b = new LngLatBounds();
       placeable.forEach(l => b.extend([l.lon!, l.lat!]));
-      m.fitBounds(b, { padding: 48, maxZoom: 14, duration: 0 });
+      m.fitBounds(b, { padding: 56, maxZoom: 13, duration: 0 });
     }
 
     relayout.current();
@@ -664,7 +734,16 @@ export function ResultsMap({ leads, total, locale, onSetStatus, hideDone, hidden
             {tilted ? '2D' : '3D'}
           </button>
 
-          {placeable.length === 0 && (
+          {loading && !failed && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <p className="inline-flex items-center gap-2 bg-surface-subtle/95 border border-line-strong rounded-full px-3.5 py-1.5 text-xs text-ink-muted shadow-pop">
+                <span className="h-2 w-2 rounded-full bg-accent animate-pulse" />
+                {localized({ cs: 'Načítám mapu…', sk: 'Načítavam mapu…', en: 'Loading the map…' }, locale)}
+              </p>
+            </div>
+          )}
+
+          {placeable.length === 0 && !loading && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <p className="bg-surface-subtle/95 border border-line-strong rounded-lg shadow-[0_8px_24px_rgba(0,0,0,.5)] px-4 py-3 text-sm text-ink-muted max-w-xs text-center">
                 {localized(T.none, locale)}

@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { useLocale } from 'next-intl';
-import { ArrowRight, Building2, Calculator, Camera, Code2, Database, MapPinned, Megaphone, Plus, Sparkles, type LucideIcon } from 'lucide-react';
+import { ArrowRight, Building2, Calculator, Camera, Code2, Database, ListOrdered, MapPinned, Megaphone, MessageSquareText, Plus, Search as SearchIcon, ShieldCheck, Sparkles, type LucideIcon } from 'lucide-react';
 import { Backdrop } from '@/components/Backdrop';
 import { LeadScore, GOOD_LEAD } from '@/components/LeadScore';
 import { Reveal } from '@/components/Reveal';
@@ -174,9 +174,12 @@ const UI = {
   ctaHow:     { cs: 'Jak to funguje',           sk: 'Ako to funguje',           en: 'How it works' },
   ctaTry:     { cs: 'Vyzkoušet',                sk: 'Vyskúšať',                 en: 'Try it' },
   ctaAccount: { cs: 'Založit účet zdarma',      sk: 'Založiť účet zadarmo',     en: 'Create a free account' },
-  demoHead:   { cs: 'Účetní hledá v Brně · 7 z 214 výsledků',
-                sk: 'Účtovník hľadá v Brne · 7 z 214 výsledkov',
-                en: 'An accountant searching Brno · 7 of 214 results' },
+  demoHead:   { cs: '7 z 214 výsledků, seřazeno podle skóre',
+                sk: '7 z 214 výsledkov, zoradené podľa skóre',
+                en: '7 of 214 results, ranked by score' },
+  demoQuery:  { cs: 'Účetní hledá: Nové firmy · Všechny obory · Jihomoravský kraj',
+                sk: 'Účtovník hľadá: Nové firmy · Všetky odbory · Juhomoravský kraj',
+                en: 'An accountant searches: New firms · All trades · South Moravia' },
   demoTag:    { cs: 'Ukázková data',            sk: 'Ukážkové dáta',            en: 'Sample data' },
   demoCrit:   { cs: 'Jeho kritéria',            sk: 'Jeho kritériá',            en: 'Their criteria' },
   demoNote:   { cs: 'Ukázková data pro představu, jak výsledek vypadá. Skóre je podíl splněných kritérií — jiný obor si zapne jiná a dostane jiné pořadí.',
@@ -203,6 +206,14 @@ const FACTS: Array<{ icon: LucideIcon; tile: string; text: Text }> = [
   { icon: Database,  tile: 'who',      text: { cs: 'Jen veřejné rejstříky, nic koupeného', sk: 'Len verejné registre, nič kúpené', en: 'Public registers only, nothing bought' } },
   { icon: MapPinned, tile: 'standing', text: { cs: 'Celý kraj, ne jen krajské město',      sk: 'Celý kraj, nie len krajské mesto',  en: 'The whole region, not just its capital' } },
   { icon: Sparkles,  tile: 'event',    text: { cs: 'Nové firmy do 30 dnů od vzniku',       sk: 'Nové firmy do 30 dní od vzniku',    en: 'New firms within 30 days of founding' } },
+];
+
+/** Ikonka ke každému kroku — v pořadí `STEPS`. Bez číslování: pořadí říká mřížka sama. */
+const STEP_ICONS: Array<{ icon: LucideIcon; tile: string }> = [
+  { icon: MessageSquareText, tile: 'who' },
+  { icon: Database,          tile: 'standing' },
+  { icon: ShieldCheck,       tile: 'event' },
+  { icon: ListOrdered,       tile: 'reach' },
 ];
 
 /** Ikonka a barva ke každému z pěti lidí — v pořadí `AUDIENCE`. */
@@ -257,9 +268,25 @@ export default function HomePage() {
       <section className="px-5 pb-24">
         <div className="max-w-6xl mx-auto">
           <div className="card-glow p-0 overflow-hidden">
-            <div className="flex items-baseline justify-between gap-4 px-5 pt-5 pb-3 md:px-7 md:pt-6">
-              <h2 className="text-sm font-semibold uppercase tracking-wider">{t(UI.demoHead)}</h2>
+            {/* Rám prohlížeče: ukázka má vypadat jako aplikace, ne jako tabulka na webu. Tři tečky
+                a řádek s adresou jsou konvence, kterou každý přečte na první pohled. */}
+            <div className="flex items-center gap-3 border-b border-line bg-surface-muted/60 px-4 py-2.5">
+              <span className="flex gap-1.5" aria-hidden="true">
+                <span className="h-2.5 w-2.5 rounded-full bg-ink/20" />
+                <span className="h-2.5 w-2.5 rounded-full bg-ink/20" />
+                <span className="h-2.5 w-2.5 rounded-full bg-ink/20" />
+              </span>
+              <span className="mx-auto rounded-md border border-line bg-surface px-3 py-0.5 font-mono text-[11px] text-ink-faint">klienthunter.vercel.app/search</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-3 px-5 pt-5 md:px-7">
+              <div className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-field bg-surface-muted px-3 py-2 text-sm">
+                <SearchIcon size={14} className="shrink-0 text-ink-faint" />
+                <span className="truncate text-ink">{t(UI.demoQuery)}</span>
+              </div>
               <span className="badge-warm">{t(UI.demoTag)}</span>
+            </div>
+            <div className="flex items-baseline justify-between gap-4 px-5 pt-4 pb-2 md:px-7">
+              <h2 className="text-sm font-semibold">{t(UI.demoHead)}</h2>
             </div>
 
             {/* Naming the criteria makes the score readable: without them a number is just a number. */}
@@ -333,15 +360,18 @@ export default function HomePage() {
           <h2 className="display-sm max-w-2xl">{t(UI.stepsTitle)}</h2>
 
           <ol className="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {STEPS.map(([title, desc], i) => (
+            {STEPS.map(([title, desc], i) => {
+              const Icon = STEP_ICONS[i].icon;
+              return (
               <Reveal key={title.en} delay={i * 60}>
                 <li className="card h-full">
-                  <span className="font-mono text-2xl font-bold text-warm tnum">0{i + 1}</span>
+                  <span className={`icon-tile icon-tile--${STEP_ICONS[i].tile}`}><Icon size={16} /></span>
                   <p className="mt-4 font-semibold">{t(title)}</p>
                   <p className="text-sm text-ink-muted mt-1.5 leading-relaxed">{t(desc)}</p>
                 </li>
               </Reveal>
-            ))}
+              );
+            })}
           </ol>
 
           <div className="mt-12">
