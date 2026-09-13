@@ -1,5 +1,7 @@
 import Link from 'next/link';
 import { useLocale } from 'next-intl';
+import { ArrowRight, Building2, Calculator, Camera, Code2, Database, MapPinned, Megaphone, Plus, Sparkles, type LucideIcon } from 'lucide-react';
+import { Backdrop } from '@/components/Backdrop';
 import { LeadScore, GOOD_LEAD } from '@/components/LeadScore';
 import { Reveal } from '@/components/Reveal';
 import { localized } from '@/lib/lead-filters';
@@ -14,10 +16,11 @@ import { localized } from '@/lib/lead-filters';
  * them. What it actually does is match public registry data against criteria the user picks, so
  * the page shows one concrete person's criteria and the rows they get.
  *
- * Deliberately absent: gradients, coloured sections, card shadows, stock imagery, and any
- * social proof — we have no real numbers yet, and invented ones would be a lie a paying
- * customer eventually notices. Also absent: any promise the data cannot keep. We know what is
- * publicly recorded about a firm, never what the firm needs.
+ * Deliberately absent: stock imagery and any social proof — we have no real numbers yet, and
+ * invented ones would be a lie a paying customer eventually notices. Also absent: any promise
+ * the data cannot keep. We know what is publicly recorded about a firm, never what the firm
+ * needs. Colour and motion (13. 9. 2026, majitel: „živější tmavá") jsou jen v pozadí, ikonkách
+ * a jednom teplém akcentu — text a čísla zůstávají v původní paletě.
  */
 
 type Text = { cs: string; sk?: string; en: string };
@@ -161,12 +164,14 @@ const FAQ: Array<{ q: Text; a: Text }> = [
 ];
 
 const UI = {
+  eyebrow:    { cs: 'Veřejné rejstříky · ARES, RES ČSÚ, OpenStreetMap', sk: 'Verejné registre · ARES, RES ČSÚ, OpenStreetMap', en: 'Public registers · ARES, CZSO, OpenStreetMap' },
   hero1:      { cs: 'Najdi firmy, které',       sk: 'Nájdi firmy, ktoré',       en: 'Find the firms that' },
   hero2:      { cs: 'můžou být tvoji klienti',  sk: 'môžu byť tvoji klienti',   en: 'could be your clients' },
   perex:      { cs: 'S kontakty. Z veřejných rejstříků a map. Řekneš nám, komu prodáváš a kde, a my seřadíme, koho volat první.',
                 sk: 'S kontaktmi. Z verejných registrov a máp. Povieš nám, komu predávaš a kde, a my zoradíme, koho volať prvého.',
                 en: 'With contacts. From public registries and maps. Tell us who you sell to and where, and we rank who to call first.' },
   ctaFree:    { cs: 'Začít zdarma',             sk: 'Začať zadarmo',            en: 'Start for free' },
+  ctaHow:     { cs: 'Jak to funguje',           sk: 'Ako to funguje',           en: 'How it works' },
   ctaTry:     { cs: 'Vyzkoušet',                sk: 'Vyskúšať',                 en: 'Try it' },
   ctaAccount: { cs: 'Založit účet zdarma',      sk: 'Založiť účet zadarmo',     en: 'Create a free account' },
   demoHead:   { cs: 'Účetní hledá v Brně · 7 z 214 výsledků',
@@ -179,13 +184,35 @@ const UI = {
                 en: 'Sample rows showing what a result looks like. The score is the share of criteria met — another trade ticks different ones and gets a different order.' },
   since:      { cs: 'od',                       sk: 'od',                       en: 'since' },
   audTitle:   { cs: 'Pět lidí, pět hledání.',   sk: 'Päť ľudí, päť hľadaní.',   en: 'Five people, five searches.' },
-  audNote:    { cs: 'Když se ve výčtu nevidíš, poskládáš si kritéria sám — je jich šestnáct a kombinují se libovolně.',
-                sk: 'Keď sa vo výpočte nevidíš, poskladáš si kritériá sám — je ich šestnásť a kombinujú sa ľubovoľne.',
-                en: 'Not on the list? Build your own combination — there are sixteen criteria and they mix freely.' },
+  audNote:    { cs: 'Když se ve výčtu nevidíš, poskládáš si kritéria sám — je jich přes dvacet a kombinují se libovolně, i napříč obory.',
+                sk: 'Keď sa vo výpočte nevidíš, poskladáš si kritériá sám — je ich vyše dvadsať a kombinujú sa ľubovoľne, aj naprieč odbormi.',
+                en: 'Not on the list? Build your own combination — there are over twenty criteria and they mix freely, across trades too.' },
   stepsTitle: { cs: 'Čtyři kroky, tři minuty.', sk: 'Štyri kroky, tri minúty.', en: 'Four steps, three minutes.' },
   faqTitle:   { cs: 'Otázky.',                  sk: 'Otázky.',                  en: 'Questions.' },
   closing:    { cs: 'Kdo je na řadě',           sk: 'Kto je na rade',           en: 'Who is next' },
+  closingSub: { cs: 'Účet zdarma, bez karty. Pět hledání za měsíc na vyzkoušení.',
+                sk: 'Účet zadarmo, bez karty. Päť hľadaní za mesiac na vyskúšanie.',
+                en: 'Free account, no card. Five searches a month to try it out.' },
 };
+
+/**
+ * Tři fakta pod nadpisem. Každé musí být doložitelné z aplikace, ne slib: zdroje jsou ty, které
+ * patička uvádí; „celý kraj" a „do 30 dnů" dává index z ČSÚ (lib/registry-index.ts).
+ */
+const FACTS: Array<{ icon: LucideIcon; tile: string; text: Text }> = [
+  { icon: Database,  tile: 'who',      text: { cs: 'Jen veřejné rejstříky, nic koupeného', sk: 'Len verejné registre, nič kúpené', en: 'Public registers only, nothing bought' } },
+  { icon: MapPinned, tile: 'standing', text: { cs: 'Celý kraj, ne jen krajské město',      sk: 'Celý kraj, nie len krajské mesto',  en: 'The whole region, not just its capital' } },
+  { icon: Sparkles,  tile: 'event',    text: { cs: 'Nové firmy do 30 dnů od vzniku',       sk: 'Nové firmy do 30 dní od vzniku',    en: 'New firms within 30 days of founding' } },
+];
+
+/** Ikonka a barva ke každému z pěti lidí — v pořadí `AUDIENCE`. */
+const AUDIENCE_ICONS: Array<{ icon: LucideIcon; tile: string }> = [
+  { icon: Calculator, tile: 'event' },
+  { icon: Building2,  tile: 'standing' },
+  { icon: Megaphone,  tile: 'reach' },
+  { icon: Camera,     tile: 'reach' },
+  { icon: Code2,      tile: 'who' },
+];
 
 export default function HomePage() {
   const locale = useLocale();
@@ -194,62 +221,79 @@ export default function HomePage() {
   return (
     <div>
 
-      {/* ── Hero: one headline, one line, one button ── */}
-      <section className="px-5 pt-32 pb-16 md:pt-44 md:pb-24">
-        <div className="max-w-6xl mx-auto">
-          <h1 className="display animate-fade-up max-w-5xl">
-            {t(UI.hero1)}<br />{t(UI.hero2)}<span className="text-accent">.</span>
+      {/* ── Hero: štítek, nadpis, jedna věta, dvě tlačítka, tři fakta. Pod tím živé pozadí. ── */}
+      <section className="relative overflow-hidden px-5 pt-32 pb-16 md:pt-44 md:pb-24">
+        <Backdrop />
+        <div className="relative z-10 max-w-6xl mx-auto">
+          <p className="eyebrow animate-fade-up">{t(UI.eyebrow)}</p>
+
+          <h1 className="display animate-fade-up max-w-5xl mt-6" style={{ animationDelay: '.04s' }}>
+            {t(UI.hero1)}<br /><span className="text-gradient">{t(UI.hero2)}</span><span className="text-accent">.</span>
           </h1>
 
-          <p className="mt-8 text-lg md:text-xl text-ink-muted max-w-xl animate-fade-up" style={{ animationDelay: '.06s' }}>
+          <p className="mt-8 text-lg md:text-xl text-ink-muted max-w-xl animate-fade-up" style={{ animationDelay: '.08s' }}>
             {t(UI.perex)}
           </p>
 
-          <div className="mt-10 animate-fade-up" style={{ animationDelay: '.12s' }}>
+          <div className="mt-10 flex flex-wrap items-center gap-3 animate-fade-up" style={{ animationDelay: '.12s' }}>
             <Link href={`/${locale}/auth/register`} className="btn-primary btn-lg">
-              {t(UI.ctaFree)}
+              {t(UI.ctaFree)} <ArrowRight size={16} />
             </Link>
+            <a href="#how" className="btn-ghost btn-lg">{t(UI.ctaHow)}</a>
           </div>
+
+          <ul className="mt-14 grid gap-3 sm:grid-cols-3 animate-fade-up" style={{ animationDelay: '.16s' }}>
+            {FACTS.map(f => (
+              <li key={f.text.en} className="flex items-center gap-3 rounded-xl border border-line bg-surface-subtle/70 px-4 py-3 backdrop-blur">
+                <span className={`icon-tile icon-tile--${f.tile}`}><f.icon size={16} /></span>
+                <span className="text-sm text-ink-muted">{t(f.text)}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       </section>
 
       {/* ── The product, before registering ── */}
       <section className="px-5 pb-24">
         <div className="max-w-6xl mx-auto">
-          <div className="flex items-baseline justify-between border-b border-ink pb-3 mb-3">
-            <h2 className="text-sm font-semibold uppercase tracking-wider">{t(UI.demoHead)}</h2>
-            <span className="text-xs text-ink-faint">{t(UI.demoTag)}</span>
-          </div>
+          <div className="card-glow p-0 overflow-hidden">
+            <div className="flex items-baseline justify-between gap-4 px-5 pt-5 pb-3 md:px-7 md:pt-6">
+              <h2 className="text-sm font-semibold uppercase tracking-wider">{t(UI.demoHead)}</h2>
+              <span className="badge-warm">{t(UI.demoTag)}</span>
+            </div>
 
-          {/* Naming the criteria makes the score readable: without them a number is just a number. */}
-          <p className="text-xs text-ink-faint mb-1">
-            <span className="uppercase tracking-wider font-semibold">{t(UI.demoCrit)}:</span>{' '}
-            {DEMO_CRITERIA.map(c => t(c)).join(' · ')}
-          </p>
+            {/* Naming the criteria makes the score readable: without them a number is just a number. */}
+            <p className="px-5 md:px-7 text-xs text-ink-faint mb-2">
+              <span className="uppercase tracking-wider font-semibold">{t(UI.demoCrit)}:</span>{' '}
+              {DEMO_CRITERIA.map(c => t(c)).join(' · ')}
+            </p>
 
-          <div>
-            {DEMO.map((d, i) => {
-              const score = Math.round((d.meets.length / DEMO_CRITERIA.length) * 100);
-              return (
-                <div
-                  key={d.name}
-                  className="stagger row flex items-center gap-5 py-5 pl-4 border-l-[3px]"
-                  style={{ '--i': i, borderLeftColor: score >= GOOD_LEAD ? 'rgb(var(--accent))' : 'transparent' } as React.CSSProperties}
-                >
-                  <LeadScore value={score} />
-                  <div className="min-w-0 flex-1">
-                    <p className="font-semibold truncate">{d.name}</p>
-                    <p className="text-sm text-ink-muted truncate">{t(d.trade)} · Brno</p>
+            <div className="px-2 md:px-4 pb-3">
+              {DEMO.map((d, i) => {
+                const score = Math.round((d.meets.length / DEMO_CRITERIA.length) * 100);
+                return (
+                  <div
+                    key={d.name}
+                    className="stagger row flex items-center gap-5 py-5 pl-4 pr-3 border-l-[3px] rounded-r-lg"
+                    style={{ '--i': i, borderLeftColor: score >= GOOD_LEAD ? 'rgb(var(--accent))' : 'transparent' } as React.CSSProperties}
+                  >
+                    <LeadScore value={score} />
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold truncate">{d.name}</p>
+                      <p className="text-sm text-ink-muted truncate">{t(d.trade)} · Brno</p>
+                    </div>
+                    <div className="hidden sm:flex flex-wrap justify-end gap-1.5 w-64">
+                      {d.meets.map(m => (
+                        <span key={m} className={m === 0 ? 'badge-warm' : 'badge'}>{t(DEMO_CRITERIA[m])}</span>
+                      ))}
+                    </div>
+                    <div className="hidden md:block text-sm text-ink-faint tnum w-20 text-right">
+                      {t(UI.since)} {d.since}
+                    </div>
                   </div>
-                  <div className="hidden sm:block text-sm text-ink-muted w-56 text-right truncate">
-                    {d.meets.map(m => t(DEMO_CRITERIA[m])).join(' · ')}
-                  </div>
-                  <div className="hidden md:block text-sm text-ink-faint tnum w-24 text-right">
-                    {t(UI.since)} {d.since}
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
 
           <p className="mt-6 text-sm text-ink-faint max-w-2xl">{t(UI.demoNote)}</p>
@@ -261,40 +305,48 @@ export default function HomePage() {
         <div className="max-w-6xl mx-auto">
           <h2 className="display-sm max-w-2xl">{t(UI.audTitle)}</h2>
 
-          <div className="mt-14 max-w-3xl">
-            {AUDIENCE.map((a, i) => (
-              <Reveal key={a.who.en} delay={i * 60}>
-                <div className="py-6 border-b border-line md:flex md:gap-8">
-                  <p className="font-semibold md:w-48 md:shrink-0">{t(a.who)}</p>
-                  <p className="text-ink-muted mt-1.5 md:mt-0">{t(a.what)}</p>
-                </div>
-              </Reveal>
-            ))}
+          <div className="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {AUDIENCE.map((a, i) => {
+              const Icon = AUDIENCE_ICONS[i].icon;
+              return (
+                <Reveal key={a.who.en} delay={i * 60}>
+                  <div className="card h-full hover:border-line-strong transition-colors">
+                    <span className={`icon-tile icon-tile--${AUDIENCE_ICONS[i].tile}`}><Icon size={16} /></span>
+                    <p className="mt-4 font-semibold">{t(a.who)}</p>
+                    <p className="mt-1.5 text-sm text-ink-muted leading-relaxed">{t(a.what)}</p>
+                  </div>
+                </Reveal>
+              );
+            })}
+            <Reveal delay={AUDIENCE.length * 60}>
+              <div className="h-full rounded-xl border border-dashed border-line-strong p-6 flex items-center">
+                <p className="text-sm text-ink-muted leading-relaxed">{t(UI.audNote)}</p>
+              </div>
+            </Reveal>
           </div>
-
-          <p className="mt-8 text-sm text-ink-faint max-w-2xl">{t(UI.audNote)}</p>
         </div>
       </section>
 
       {/* ── How it works ── */}
-      <section className="px-5 py-24 border-t border-line">
+      <section id="how" className="px-5 py-24 border-t border-line scroll-mt-20">
         <div className="max-w-6xl mx-auto">
           <h2 className="display-sm max-w-2xl">{t(UI.stepsTitle)}</h2>
 
-          <div className="mt-14 max-w-3xl">
+          <ol className="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {STEPS.map(([title, desc], i) => (
               <Reveal key={title.en} delay={i * 60}>
-                <div className="py-6 border-b border-line">
-                  <p className="font-semibold">{t(title)}</p>
-                  <p className="text-ink-muted mt-1.5">{t(desc)}</p>
-                </div>
+                <li className="card h-full">
+                  <span className="font-mono text-2xl font-bold text-warm tnum">0{i + 1}</span>
+                  <p className="mt-4 font-semibold">{t(title)}</p>
+                  <p className="text-sm text-ink-muted mt-1.5 leading-relaxed">{t(desc)}</p>
+                </li>
               </Reveal>
             ))}
-          </div>
+          </ol>
 
           <div className="mt-12">
             <Link href={`/${locale}/auth/register`} className="btn-primary btn-lg">
-              {t(UI.ctaTry)}
+              {t(UI.ctaTry)} <ArrowRight size={16} />
             </Link>
           </div>
         </div>
@@ -304,28 +356,36 @@ export default function HomePage() {
       <section className="px-5 py-24 border-t border-line">
         <div className="max-w-3xl mx-auto">
           <h2 className="display-sm mb-12">{t(UI.faqTitle)}</h2>
-          {FAQ.map((item, i) => (
-            <details key={i} className="group border-b border-line py-5">
-              <summary className="font-semibold cursor-pointer list-none flex items-start justify-between gap-6">
-                {t(item.q)}
-                <span className="text-ink-faint shrink-0 group-open:rotate-45 transition-transform duration-200">+</span>
-              </summary>
-              <p className="text-ink-muted mt-3 leading-relaxed">{t(item.a)}</p>
-            </details>
-          ))}
+          <div className="space-y-3">
+            {FAQ.map((item, i) => (
+              <details key={i} className="group card py-4 px-5 md:px-6">
+                <summary className="font-semibold cursor-pointer list-none flex items-start justify-between gap-6">
+                  {t(item.q)}
+                  <span className="icon-tile icon-tile--who h-7 w-7 rounded-full group-open:rotate-45 transition-transform duration-200"><Plus size={14} /></span>
+                </summary>
+                <p className="text-ink-muted mt-3 leading-relaxed">{t(item.a)}</p>
+              </details>
+            ))}
+          </div>
         </div>
       </section>
 
       {/* ── Closing CTA ── */}
       <section className="px-5 py-28 border-t border-line">
         <div className="max-w-6xl mx-auto">
-          <h2 className="display max-w-4xl">
-            {t(UI.closing)}<span className="text-accent">?</span>
-          </h2>
-          <div className="mt-10">
-            <Link href={`/${locale}/auth/register`} className="btn-primary btn-lg">
-              {t(UI.ctaAccount)}
-            </Link>
+          <div className="card-glow relative overflow-hidden px-6 py-14 md:px-14 md:py-20">
+            <Backdrop />
+            <div className="relative z-10">
+              <h2 className="display max-w-4xl">
+                {t(UI.closing)}<span className="text-accent">?</span>
+              </h2>
+              <p className="mt-6 text-lg text-ink-muted max-w-xl">{t(UI.closingSub)}</p>
+              <div className="mt-10">
+                <Link href={`/${locale}/auth/register`} className="btn-primary btn-lg">
+                  {t(UI.ctaAccount)} <ArrowRight size={16} />
+                </Link>
+              </div>
+            </div>
           </div>
         </div>
       </section>

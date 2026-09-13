@@ -39,6 +39,22 @@ const config: Config = {
          *  - `field`  hranice formulářového pole a obrysového tlačítka: 3,3 : 1 vůči kartě
          *             i stránce, tedy nad 3 : 1, které WCAG 1.4.11 chce u ovládacích prvků
          */
+        /**
+         * Druhý, teplý akcent (jantar). Nese události a „nové": vznik firmy, nové od minule,
+         * zkušební období. Modrá zůstává akcím a výběru — dvě barvy, dva významy, nic víc.
+         */
+        warm: {
+          DEFAULT: 'rgb(var(--warm) / <alpha-value>)',
+          ink:     'rgb(var(--warm-ink) / <alpha-value>)',
+          soft:    'rgb(var(--warm) / 0.14)',
+        },
+        /** Barvy skupin filtrů: kdo · co se stalo · jak na tom je · jak oslovit. Jen pro ikonky a tečky. */
+        group: {
+          who:      'rgb(var(--g-who) / <alpha-value>)',
+          event:    'rgb(var(--g-event) / <alpha-value>)',
+          standing: 'rgb(var(--g-standing) / <alpha-value>)',
+          reach:    'rgb(var(--g-reach) / <alpha-value>)',
+        },
         line: 'rgb(var(--line) / 0.10)',
         'line-strong': 'rgb(var(--line) / 0.20)',
         field: 'rgb(var(--line) / 0.36)',
@@ -75,12 +91,19 @@ const config: Config = {
         mono:    ['var(--font-mono)', 'JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'monospace'],
       },
       borderRadius: {
-        // Nothing rounder than 8px anywhere. `xl`/`2xl` are remapped rather than removed so
-        // older markup cannot reintroduce the bubbly look.
-        lg:  '8px',
-        xl:  '8px',
-        '2xl': '8px',
-        '3xl': '8px',
+        // Živější vzhled (13. 9. 2026): 8 px bylo strohé. Základ je 12 px, karty a panely 16–20.
+        DEFAULT: '8px',
+        lg:  '12px',
+        xl:  '16px',
+        '2xl': '20px',
+        '3xl': '28px',
+      },
+      boxShadow: {
+        /** Měkká záře pod hlavním tlačítkem a zvýrazněnou kartou — hloubka bez rámečků. */
+        glow:      '0 8px 30px -6px rgb(var(--accent) / 0.45)',
+        'glow-warm': '0 8px 30px -6px rgb(var(--warm) / 0.45)',
+        card:      '0 1px 0 rgb(var(--line) / 0.06) inset, 0 12px 40px -20px rgba(0, 0, 0, .8)',
+        pop:       '0 12px 32px rgba(0, 0, 0, .6)',
       },
       fontSize: {
         // Fluid display sizes. The landing headline is meant to fill a third of the screen.

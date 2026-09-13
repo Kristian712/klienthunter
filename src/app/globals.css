@@ -55,6 +55,14 @@
     --accent:         137 207 240;
     --accent-hover:   167 216 255;
     --accent-ink:     10 10 11;
+    /* Teplý akcent (jantar #FFB86C, 12,4 : 1 na stránce). Události a „nové". Text na něm tmavý. */
+    --warm:           255 184 108;
+    --warm-ink:       10 10 11;
+    /* Skupiny filtrů. Jen ikonky, tečky a jemná podbarvení — text zůstává v paletě výš. */
+    --g-who:          137 207 240;
+    --g-event:        255 184 108;
+    --g-standing:     126 224 176;
+    --g-reach:        196 181 253;
   }
 
   body {
@@ -128,7 +136,12 @@
    * Hlavní akce je světle modrá s tmavým textem (11,5 : 1, na hoveru 13,1 : 1).
    */
   .btn-primary {
-    @apply btn bg-accent text-accent-ink hover:bg-accent-hover px-5 py-2.5 text-sm font-semibold;
+    @apply btn bg-accent text-accent-ink hover:bg-accent-hover px-5 py-2.5 text-sm font-semibold
+           shadow-glow hover:-translate-y-px transition-[background-color,transform,box-shadow];
+  }
+  /* Teplá varianta pro jednu akci na stránce, která má být vidět jinak než modře (zkušební období). */
+  .btn-warm {
+    @apply btn bg-warm text-warm-ink hover:brightness-110 px-5 py-2.5 text-sm font-semibold shadow-glow-warm;
   }
 
   /* Alias na primární. Zůstává, aby starší markup dál kompiloval. */
@@ -167,10 +180,30 @@
   /* ── Surfaces ──────────────────────────────────────────────────────────────
      Karta je o stupeň světlejší plocha s jemnou linkou. Stránka < karta < pole a menu. */
   .card {
-    @apply rounded-lg p-6 bg-surface-subtle border border-line;
+    @apply rounded-xl p-6 bg-surface-subtle border border-line shadow-card;
   }
   .card-hover {
     @apply card hover:border-line-strong hover:bg-surface-muted transition-colors duration-150 cursor-pointer;
+  }
+  /**
+   * Zvýrazněná karta: gradientový rámeček, který se od podkladu odlepí. Rámeček je pseudo-prvek
+   * pod obsahem (mask), takže nic uvnitř neposouvá.
+   */
+  .card-glow {
+    @apply relative rounded-xl p-6 bg-surface-subtle border border-transparent shadow-card;
+  }
+  .card-glow::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(135deg, rgb(var(--accent) / .7), rgb(var(--warm) / .35) 60%, rgb(var(--line) / .08));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
   }
 
   /* A data row: separated from its neighbour by one line, nothing else. */
@@ -193,13 +226,48 @@
   .badge-red    { @apply badge border-ink text-ink font-semibold; }
 
   .badge-accent { @apply badge border-accent/60 text-accent bg-accent/10; }
+  /* Události a „nové": vznik firmy, nové od minule. Teplá barva je jejich a ničeho jiného. */
+  .badge-warm   { @apply badge border-warm/60 text-warm bg-warm/10; }
+
+  /* Ikonka skupiny (filtry, publikum na úvodce): barevná tečka v měkkém podbarvení. */
+  .icon-tile {
+    @apply inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg;
+    background: rgb(var(--tile) / .14);
+    color: rgb(var(--tile));
+    box-shadow: inset 0 0 0 1px rgb(var(--tile) / .25);
+  }
+  .icon-tile--who      { --tile: var(--g-who); }
+  .icon-tile--event    { --tile: var(--g-event); }
+  .icon-tile--standing { --tile: var(--g-standing); }
+  .icon-tile--reach    { --tile: var(--g-reach); }
+
+  /* Štítek nad nadpisem: pilulka s dýchající tečkou. */
+  .eyebrow {
+    @apply inline-flex items-center gap-2 rounded-full border border-line-strong bg-surface-subtle/80
+           px-3 py-1 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-muted backdrop-blur;
+  }
+  .eyebrow::before {
+    content: '';
+    width: 6px; height: 6px; border-radius: 50%;
+    background: rgb(var(--warm));
+    box-shadow: 0 0 0 0 rgb(var(--warm) / .6);
+    animation: kh-breathe 2.4s ease-out infinite;
+  }
+
+  /* Slovo v nadpisu, které svítí: přechod z modré do teplé. */
+  .text-gradient {
+    background: linear-gradient(100deg, rgb(var(--accent)) 0%, rgb(var(--accent-hover)) 45%, rgb(var(--warm)) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
 
   /* ── Chips (filters) ───────────────────────────────────────────────────────
      Zapnutý chip má akcentovou výplň s tmavým textem (11,5 : 1), vypnutý tmavou plochu
      s okrajem. Dokud byl akcent oranžový, zapnuté chipy byly světlé, aby deset oranžových
      filtrů nekřičelo; modrá je dost klidná, aby výběr nesla barva. */
   .chip {
-    @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
+    @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium
            border border-line-strong text-ink-muted bg-surface-muted
            hover:border-ink hover:text-ink transition-colors duration-150
            focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent
@@ -236,8 +304,61 @@
 .stagger { animation: fadeUp .22s ease-out both; animation-delay: calc(var(--i, 0) * 50ms); }
 
 /* Revealed on scroll by an IntersectionObserver that adds `is-visible`. */
-.reveal { opacity: 0; transform: translateY(8px); transition: opacity .22s ease-out, transform .22s ease-out; }
+.reveal { opacity: 0; transform: translateY(12px); transition: opacity .35s ease-out, transform .35s cubic-bezier(.2, .8, .3, 1); }
 .reveal.is-visible { opacity: 1; transform: none; }
+
+/* Dýchající tečka u štítku. */
+@keyframes kh-breathe {
+  0%   { box-shadow: 0 0 0 0 rgb(var(--warm) / .55); }
+  70%  { box-shadow: 0 0 0 7px rgb(var(--warm) / 0); }
+  100% { box-shadow: 0 0 0 0 rgb(var(--warm) / 0); }
+}
+
+/* ── Pozadí úvodky a ceníku ──────────────────────────────────────────────────
+   Dvě měkké barevné skvrny (modrá a teplá), které se pomalu přelévají, a pod nimi jemná
+   mřížka. Jen `transform` a `opacity`, takže to počítá grafická karta; při reduced-motion
+   stojí. Vrstva je `fixed` a `pointer-events: none`, obsah jde přes ni. */
+.kh-backdrop {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+  /* Dole vyhasne, aby oříznutá skvrna nedělala na hraně sekce tvrdou čáru. */
+  -webkit-mask-image: linear-gradient(#000 55%, transparent 100%);
+  mask-image: linear-gradient(#000 55%, transparent 100%);
+}
+.kh-backdrop__grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgb(var(--line) / .045) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(var(--line) / .045) 1px, transparent 1px);
+  background-size: 56px 56px;
+  -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 30%, transparent 100%);
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 30%, transparent 100%);
+}
+.kh-blob {
+  position: absolute;
+  width: 46vw;
+  height: 46vw;
+  min-width: 420px;
+  min-height: 420px;
+  border-radius: 50%;
+  filter: blur(90px);
+  opacity: .32;
+  will-change: transform;
+}
+.kh-blob--accent { background: rgb(var(--accent)); top: -18vw; left: -10vw; animation: kh-drift-a 38s ease-in-out infinite alternate; }
+.kh-blob--warm   { background: rgb(var(--warm)); top: 6vw; right: -14vw; opacity: .22; animation: kh-drift-b 46s ease-in-out infinite alternate; }
+@keyframes kh-drift-a {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to   { transform: translate3d(14vw, 10vw, 0) scale(1.15); }
+}
+@keyframes kh-drift-b {
+  from { transform: translate3d(0, 0, 0) scale(1.1); }
+  to   { transform: translate3d(-12vw, 12vw, 0) scale(.9); }
+}
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }

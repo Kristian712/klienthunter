@@ -6,9 +6,9 @@ import { useTranslations, useLocale } from 'next-intl';
 import {
   Search, Globe, Users, ExternalLink, Check, Bookmark, RefreshCw, Sparkles,
   Mail, MapPin, X, Clock, ChevronDown,
-  FileText, Table2, PhoneCall,
+  FileText, Table2, PhoneCall, ShieldCheck,
 } from 'lucide-react';
-import { LEAD_FILTERS, GROUP_LABELS, GROUP_ORDER, employeeLabel, matchesAll, localized, registryWindowDays } from '@/lib/lead-filters';
+import { LEAD_FILTERS, GROUP_LABELS, GROUP_ORDER, employeeLabel, matchesAll, localized, registryWindowDays, type FilterGroup } from '@/lib/lead-filters';
 import { leadReason } from '@/lib/lead-reason';
 import { reachHint, reachScore } from '@/lib/reach-score';
 import { scoreBreakdown } from '@/lib/lead-score';
@@ -752,6 +752,14 @@ function WebsiteStatusBadge({ b, locale }: { b: BusinessResult; locale: string }
  * by `+`. Google Maps and Firmy.cz are marked as historical: those sources were switched off
  * in Vlna 2 for licensing reasons and only older rows still carry them.
  */
+/** Ikonky skupin filtrů — barvu dává `.icon-tile--<skupina>` v globals.css. */
+const GROUP_ICON: Record<FilterGroup, React.ReactNode> = {
+  who:      <Users size={13} />,
+  event:    <Sparkles size={13} />,
+  standing: <ShieldCheck size={13} />,
+  reach:    <PhoneCall size={13} />,
+};
+
 const SOURCE_LABELS: Record<string, string> = {
   ares:   'ARES',
   res:    'RES ČSÚ + ARES',
@@ -1969,7 +1977,9 @@ export default function SearchPage() {
                   if (items.length === 0) return null;
                   return (
                     <div key={group} className="flex flex-wrap items-center gap-2">
-                      <span className="w-16 shrink-0 text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
+                      {/* Barevná ikonka skupiny: kdo · co se stalo · jak na tom je · jak oslovit. */}
+                      <span className="flex w-28 shrink-0 items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
+                        <span className={`icon-tile icon-tile--${group} h-7 w-7`}>{GROUP_ICON[group]}</span>
                         {localized(GROUP_LABELS[group], locale)}
                       </span>
                       {items.map(f => {

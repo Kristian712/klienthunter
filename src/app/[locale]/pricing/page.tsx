@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
+import { Backdrop } from '@/components/Backdrop';
 import { Check } from 'lucide-react';
 import { localized } from '@/lib/lead-filters';
 import { OPERATOR } from '@/lib/legal';
@@ -428,8 +429,9 @@ export default function PricingPage() {
   return (
     <div className="min-h-screen">
       {/* Navigace je fixní a vysoká h-14. pt-24 / md:pt-28 nechá pod ní 40 / 56 px, ne 136 / 168 px jako `.section`. */}
-      <section className="px-5 pt-24 pb-10 md:pt-28">
-        <div className="container grid gap-8 md:grid-cols-2 md:items-end md:gap-12">
+      <section className="relative overflow-hidden px-5 pt-24 pb-10 md:pt-28">
+        <Backdrop />
+        <div className="container relative z-10 grid gap-8 md:grid-cols-2 md:items-end md:gap-12">
           <div>
             <h1 className="display-sm">
               {t(T.title)}<span className="text-accent">.</span>
@@ -501,12 +503,12 @@ export default function PricingPage() {
               return (
                 <div
                   key={plan}
-                  className={`relative flex flex-col rounded-lg border bg-surface-subtle p-7 md:row-span-6 md:grid md:grid-rows-subgrid ${
-                    highlight ? 'border-accent/60' : 'border-line'
+                  className={`flex flex-col p-7 md:row-span-6 md:grid md:grid-rows-subgrid ${
+                    highlight ? 'card-glow' : 'card'
                   }`}
                 >
                   {highlight && (
-                    <span className="absolute -top-3 left-7 rounded-full border border-accent/60 bg-surface px-2.5 py-0.5 text-[11px] font-semibold uppercase leading-4 tracking-wider text-accent">
+                    <span className="absolute -top-3 left-7 z-10 rounded-full border border-accent/60 bg-surface px-2.5 py-0.5 text-[11px] font-semibold uppercase leading-4 tracking-wider text-accent shadow-glow">
                       {t(me ? T.current : T.recommended)}
                     </span>
                   )}
@@ -525,7 +527,7 @@ export default function PricingPage() {
                   <div className="mt-3">
                     {plan === 'FREE' && <p className="text-sm text-ink-muted">{t(T.freeNote)}</p>}
                     {showTrial && (
-                      <p className="inline-flex items-center rounded-full border border-accent/40 bg-accent/10 px-2.5 py-0.5 text-xs font-semibold text-accent">
+                      <p className="inline-flex items-center rounded-full border border-warm/50 bg-warm/10 px-2.5 py-0.5 text-xs font-semibold text-warm">
                         {t(T.trialLine).replace('{n}', String(TRIAL_DAYS))}
                       </p>
                     )}
@@ -558,7 +560,7 @@ export default function PricingPage() {
                     <ul className="space-y-3">
                       {lines(plan).map((line, j) => (
                         <li key={j} className="flex items-start gap-2.5 text-sm text-ink-muted">
-                          <Check size={14} className="shrink-0 mt-0.5 text-ink" />
+                          <Check size={14} className="shrink-0 mt-0.5 text-accent" />
                           {line}
                         </li>
                       ))}
