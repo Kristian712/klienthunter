@@ -86,6 +86,25 @@ async function fetchPage(filter: AresFilter): Promise<AresPage> {
   }
 }
 
+/**
+ * Detail jednoho subjektu podle IČO — pro index z ČSÚ (lib/registry-index.ts), který zná jen IČO
+ * a k firmě potřebuje jméno, sídlo a DIČ. Jeden dotaz, stejný limit 500/min jako všechno ostatní.
+ * `null` = nenalezeno nebo ARES neodpověděl; volající to bere jako „firma vypadla", ne jako chybu.
+ */
+export async function fetchSubject(ico: string): Promise<RawLead | null> {
+  try {
+    const res = await axios.get(`${BASE}/ekonomicke-subjekty/${ico}`, {
+      timeout: 10_000,
+      signal: AbortSignal.timeout(10_000),
+      validateStatus: () => true,
+    });
+    if (res.status !== 200) return null;
+    return toLead(res.data as AresSubject);
+  } catch {
+    return null;
+  }
+}
+
 /** ARES dates are plain `YYYY-MM-DD`; anything else is treated as absent rather than as 1970. */
 function parseAresDate(value?: string): Date | undefined {
   if (!value) return undefined;

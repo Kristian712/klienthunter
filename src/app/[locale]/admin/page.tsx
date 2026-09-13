@@ -5,6 +5,12 @@ import { useLocale } from 'next-intl';
 import { Crown, Shield, Users, RefreshCw, Ticket, Plus, Trash2, Copy, Check, Clock, Link2 } from 'lucide-react';
 import { formatDate } from '@/lib/format-date';
 
+interface RegistryStatus {
+  months: number;
+  stats: { rows: number; bytes: number; oldest: string | null; newest: string | null };
+  last: { startedAt: string; status: string; scanned: number; kept: number; cursorIco: string | null; error: string | null } | null;
+}
+
 interface AdminUser {
   id: string; email: string; name?: string;
   plan: string; isAdmin: boolean; isVip: boolean;
@@ -45,6 +51,10 @@ export default function AdminPage() {
   const [optouts, setOptouts]         = useState<Optout[]>([]);
   /** Velikost databáze — Neon free má 0,5 GB a index z ČSÚ (etapa 3) se dimenzuje podle zbytku. */
   const [dbSize, setDbSize]           = useState<{ bytes: number; tables: Array<{ name: string; bytes: number; rows: number }> } | null>(null);
+  /** Index firem z ČSÚ (etapa 3): kolik má řádků, kolik zabírá a jak dopadl poslední import. */
+  const [registry, setRegistry]       = useState<RegistryStatus | null>(null);
+  const [importing, setImporting]     = useState(false);
+  const [importNote, setImportNote]   = useState<string | null>(null);
   const [loadingUsers, setLoadingUsers] = useState(true);
   /** Načtení selhalo — prázdný panel by tvrdil, že v databázi nikdo není. */
   const [loadFailed, setLoadFailed]   = useState(false);
@@ -119,12 +129,41 @@ export default function AdminPage() {
 
   useEffect(() => { fetchUsers(); fetchCodes(); fetchOptouts(); }, [fetchUsers, fetchCodes, fetchOptouts]);
 
-  useEffect(() => {
+  const fetchDbSize = useCallback(() => {
     fetch('/api/admin/db-size')
       .then(r => (r.ok ? r.json() : null))
       .then(d => { if (d?.bytes != null) setDbSize(d); })
       .catch(err => console.error('admin/db-size:', err));
   }, []);
+  const fetchRegistry = useCallback(() => {
+    fetch('/api/admin/import-res')
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (d?.stats) setRegistry(d); })
+      .catch(err => console.error('admin/import-res:', err));
+  }, []);
+  useEffect(() => { fetchDbSize(); fetchRegistry(); }, [fetchDbSize, fetchRegistry]);
+
+  /**
+   * Import běží uvnitř jednoho HTTP dotazu až 5 minut. Když skončí `done: false`, funkce
+   * vypršela dřív, než dump došel do konce — další kliknutí naváže od posledního IČO.
+   */
+  const runImport = async () => {
+    setImporting(true); setImportNote(null);
+    try {
+      const r = await fetch('/api/admin/import-res', { method: 'POST' });
+      const d = await r.json().catch(() => null);
+      if (r.status === 409) setImportNote(isCs ? 'Import už běží.' : 'Import already running.');
+      else if (!r.ok) setImportNote(isCs ? 'Import selhal — podrobnosti jsou v logu serveru.' : 'Import failed — see server log.');
+      else if (d?.progress?.done) setImportNote(isCs ? `Hotovo: ${d.progress.kept.toLocaleString('cs-CZ')} firem v okně.` : `Done: ${d.progress.kept.toLocaleString('en-GB')} firms in window.`);
+      else setImportNote(isCs ? `Funkce vypršela u IČO ${d?.progress?.cursorIco ?? '?'} — klikněte znovu, naváže.` : `Function timed out at IČO ${d?.progress?.cursorIco ?? '?'} — click again to resume.`);
+    } catch (err) {
+      console.error('admin/import-res:', err);
+      setImportNote(isCs ? 'Spojení se přerušilo — obnovte stránku a zkuste znovu.' : 'Connection dropped — reload and try again.');
+    } finally {
+      setImporting(false);
+      fetchRegistry(); fetchDbSize();
+    }
+  };
 
   const mb = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(1).replace('.', ',')} MB`;
 
@@ -304,6 +343,33 @@ export default function AdminPage() {
             <p className="text-xs text-ink-faint mt-2 tnum">
               {dbSize.tables.slice(0, 5).map(t => `${t.name} ${mb(t.bytes)} (${t.rows.toLocaleString(isCs ? 'cs-CZ' : 'en-GB')})`).join(' · ')}
             </p>
+          </div>
+        )}
+
+        {/* Index firem z ČSÚ: jediné místo, odkud jde produkční import spustit (DATABASE_URL je jen ve Vercelu). */}
+        {registry && (
+          <div className="card mb-6 text-sm">
+            <div className="flex items-baseline gap-3 flex-wrap">
+              <span className="text-xs font-medium text-ink-faint">{isCs ? 'Index firem (RES ČSÚ)' : 'Firm index (CZSO RES)'}</span>
+              <span className="text-2xl font-bold text-ink tnum">{registry.stats.rows.toLocaleString(isCs ? 'cs-CZ' : 'en-GB')}</span>
+              <span className="text-xs text-ink-faint">
+                {isCs ? `firem se vznikem za posledních ${registry.months} měsíců · ${mb(registry.stats.bytes)}` : `firms founded in the last ${registry.months} months · ${mb(registry.stats.bytes)}`}
+              </span>
+              <button type="button" onClick={runImport} disabled={importing}
+                className="btn-outline text-xs py-1.5 px-3 ml-auto disabled:opacity-60">
+                <RefreshCw className={`w-3.5 h-3.5 ${importing ? 'animate-spin' : ''}`} />
+                {importing ? (isCs ? 'Importuji… (až 5 min)' : 'Importing… (up to 5 min)') : (isCs ? 'Spustit import' : 'Run import')}
+              </button>
+            </div>
+            <p className="text-xs text-ink-faint mt-2 tnum">
+              {registry.last
+                ? (isCs
+                  ? `Poslední běh ${formatDate(registry.last.startedAt, locale)}: ${registry.last.status === 'done' ? 'hotovo' : registry.last.status === 'failed' ? 'selhal' : 'nedokončen'}, přečteno ${registry.last.scanned.toLocaleString('cs-CZ')} řádků, v okně ${registry.last.kept.toLocaleString('cs-CZ')}.`
+                  : `Last run ${formatDate(registry.last.startedAt, locale)}: ${registry.last.status}, ${registry.last.scanned.toLocaleString('en-GB')} rows read, ${registry.last.kept.toLocaleString('en-GB')} in window.`)
+                : (isCs ? 'Ještě neproběhl žádný import. Dump ČSÚ vychází dvakrát měsíčně.' : 'No import yet. The CZSO dump is published twice a month.')}
+              {registry.last?.error ? ` (${registry.last.error})` : ''}
+            </p>
+            {importNote && <p className="text-xs text-ink mt-1">{importNote}</p>}
           </div>
         )}
 

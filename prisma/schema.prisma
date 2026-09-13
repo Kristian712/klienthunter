@@ -322,6 +322,56 @@ model Claim {
 /// se do nových hledání a nejde exportovat. Ověření přijde až potom — kdyby se žádost ukázala jako
 /// neplatná, admin ji označí `rejected` a subjekt se vrátí. Opačné pořadí by znamenalo, že žádost
 /// visí, dokud si ji někdo nepřečte, a to se u práva na námitku nedělá.
+/// Index ekonomických subjektů z otevřených dat ČSÚ (RES, CC BY 4.0) — jen aktivní subjekty se
+/// vznikem v posledních `REGISTRY_INDEX_MONTHS` měsících (lib/registry-index.ts).
+///
+/// Schválně jen registrová pole: IČO, data, právní forma, NACE, kategorie zaměstnanců a kódy
+/// okresu a obce. **Žádná jména ani adresy** — 1,9 mil. řádků v dumpu jsou fyzické osoby. Index
+/// říká, KOHO dohledat v ARESu; jméno a kontakt se stáhnou až u těch pár set firem, které projdou
+/// filtrem. Minimalizace dat, a zároveň desetkrát menší tabulka.
+model RegistrySubject {
+  ico              String   @id
+  foundedAt        DateTime
+  /// Právní forma (číselník ČSÚ = stejné kódy jako ARES: 101 živnostník, 112 s.r.o. …).
+  legalForm        String
+  /// Převažující CZ-NACE (RES `NACE`), 5 znaků.
+  nace             String?
+  /// Kategorie počtu pracovníků (KATPO); `000` = neuvedeno.
+  employeeCategory String?
+  /// Okres sídla jako LAU1 (`CZ0724`); kraj = prvních 5 znaků (`CZ072`).
+  district         String
+  /// Kód základní územní jednotky (obec), ICZUJ.
+  municipality     Int?
+  /// Poslední aktualizace záznamu v RES (DDATPAKT).
+  registryUpdatedAt DateTime?
+  /// Který import řádek naposledy viděl. Co běh nepotvrdí, se po jeho dokončení smaže.
+  importedAt       DateTime
+
+  @@index([district, foundedAt])
+  @@index([nace, foundedAt])
+  @@index([importedAt])
+}
+
+/// Průběh importu RES: jeden řádek na běh. Dump je řazený podle IČO, takže přerušený běh
+/// naváže od `cursorIco`.
+model RegistryImport {
+  id          String    @id @default(cuid())
+  startedAt   DateTime  @default(now())
+  finishedAt  DateTime?
+  /// `running` | `done` | `failed`
+  status      String    @default("running")
+  /// Poslední zapsané IČO — odkud navázat po vypršení funkce.
+  cursorIco   String?
+  /// Kolik řádků dumpu běh přečetl a kolik jich splnilo okno.
+  scanned     Int       @default(0)
+  kept        Int       @default(0)
+  /// Datum snímku (Last-Modified souboru ČSÚ).
+  snapshotAt  DateTime?
+  error       String?
+
+  @@index([startedAt])
+}
+
 model Optout {
   id          String    @id @default(cuid())
   /// IČO, nebo `osm:<placeId>` — stejný klíč jako u nároků (lib/claim-order.ts).
