@@ -8,6 +8,7 @@ import { clearUser } from '@/lib/client-auth';
 import { industryLabel } from '@/lib/search-options';
 import { formatDate } from '@/lib/format-date';
 import { NewFirmsDigest } from '@/components/NewFirmsDigest';
+import { Pipeline } from '@/components/Pipeline';
 
 interface Search {
   id: string; query: string; region: string; createdAt: string;
@@ -132,23 +133,26 @@ export default function DashboardPage() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 pt-24">
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-3xl font-bold">
-          {user?.name ? `${isCs ? 'Vítejte' : 'Welcome'}, ${user.name}!` : (isCs ? 'Přehled' : 'Dashboard')}
-        </h1>
-        <div className="flex items-center gap-2 border border-line-strong rounded-lg px-4 py-2">
-          <Crown size={16} className="text-ink-faint" />
+      <div className="flex items-end justify-between gap-4 mb-8 flex-wrap">
+        <div>
+          <p className="eyebrow mb-3">{isCs ? 'Přehled' : 'Dashboard'}</p>
+          <h1 className="display-sm">
+            {user?.name ? `${isCs ? 'Vítejte' : 'Welcome'}, ${user.name}` : (isCs ? 'Přehled' : 'Dashboard')}<span className="text-accent">.</span>
+          </h1>
+        </div>
+        <Link href={`/${locale}/pricing`} className="flex items-center gap-2 rounded-full border border-line-strong bg-surface-subtle px-4 py-2 hover:border-ink transition-colors">
+          <Crown size={14} className="text-warm" />
           <span className="text-sm font-medium text-ink">
             {PLAN_LABELS[user?.plan ?? 'FREE']}
             {user?.isVip && ' · VIP'}
           </span>
-        </div>
+        </Link>
       </div>
 
       {/* Quick actions */}
       <div className="grid md:grid-cols-3 gap-4 mb-8">
         <Link href={`/${locale}/search`} className="card-hover flex items-center gap-4 group">
-          <Search size={20} className="shrink-0 text-ink" />
+          <span className="icon-tile icon-tile--who"><Search size={16} /></span>
           <div>
             <div className="font-semibold">{isCs ? 'Nové vyhledávání' : 'New search'}</div>
             <div className="text-sm text-ink-muted">{isCs ? 'Najít nové firmy' : 'Find new businesses'}</div>
@@ -156,7 +160,7 @@ export default function DashboardPage() {
           <ArrowRight size={18} className="ml-auto text-ink-faint group-hover:text-accent transition-colors" />
         </Link>
         <Link href={`/${locale}/import`} className="card-hover flex items-center gap-4 group">
-          <Upload size={20} className="shrink-0 text-ink" />
+          <span className="icon-tile icon-tile--standing"><Upload size={16} /></span>
           <div>
             <div className="font-semibold">{isCs ? 'Import CSV' : 'CSV import'}</div>
             <div className="text-sm text-ink-muted">{isCs ? 'Ověřit vlastní seznam' : 'Verify your own list'}</div>
@@ -164,7 +168,7 @@ export default function DashboardPage() {
           <ArrowRight size={18} className="ml-auto text-ink-faint group-hover:text-accent transition-colors" />
         </Link>
         <Link href={`/${locale}/profile`} className="card-hover flex items-center gap-4 group">
-          <BarChart3 size={20} className="shrink-0 text-ink" />
+          <span className="icon-tile icon-tile--reach"><BarChart3 size={16} /></span>
           <div>
             <div className="font-semibold">{isCs ? 'Můj profil' : 'My profile'}</div>
             <div className="text-sm text-ink-muted">{isCs ? 'Historie a nastavení' : 'History & settings'}</div>
@@ -176,11 +180,14 @@ export default function DashboardPage() {
       {/* Denní dávka: kolik firem v kraji uživatele nově vzniklo, bez hledání. Viz lib/digest.ts. */}
       {user && <NewFirmsDigest locale={locale} isAdmin={user.isAdmin} />}
 
+      {/* Nástěnka označených firem napříč hledáními. Viz components/Pipeline.tsx. */}
+      <Pipeline locale={locale} />
+
       {/* Uložená hledání: kombinace, ke které se uživatel vrací, a kolik je v ní nového od minula. */}
       {saved.length > 0 && (
         <div className="card mb-6">
           <h2 className="text-lg font-semibold mb-1 flex items-center gap-2">
-            <Bookmark size={16} className="text-ink-faint" />{isCs ? 'Uložená hledání' : 'Saved searches'}
+            <span className="icon-tile icon-tile--who h-7 w-7"><Bookmark size={14} /></span>{isCs ? 'Uložená hledání' : 'Saved searches'}
           </h2>
           <p className="text-xs text-ink-faint mb-4">
             {isCs ? '„Nové" = firmy, které v dřívějších bězích nebyly a přibyly od chvíle, kdy jste hledání naposledy otevřeli.'
@@ -249,7 +256,9 @@ export default function DashboardPage() {
 
       {/* Recent searches */}
       <div className="card">
-        <h2 className="text-lg font-semibold mb-4">{isCs ? 'Poslední vyhledávání' : 'Recent searches'}</h2>
+        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+          <span className="icon-tile icon-tile--standing h-7 w-7"><Clock size={14} /></span>{isCs ? 'Poslední vyhledávání' : 'Recent searches'}
+        </h2>
         {searches.length === 0 ? (
           <div className="text-center py-10 text-ink-faint">
             <Search size={40} className="mx-auto mb-3 opacity-30" />

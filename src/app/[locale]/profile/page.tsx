@@ -326,7 +326,7 @@ export default function ProfilePage() {
         */}
         <div className="card">
           <h2 className="font-semibold text-ink flex items-center gap-2 mb-1">
-            <CreditCard size={16} className="text-ink-faint" />
+            <span className="icon-tile icon-tile--event h-7 w-7"><CreditCard size={14} /></span>
             {isCs ? 'Předplatné' : 'Subscription'}
           </h2>
 
@@ -391,7 +391,7 @@ export default function ProfilePage() {
         {/* Onboarding answers — editable for good, so a change of trade is one visit away */}
         <div className="card">
           <h2 className="font-semibold text-ink flex items-center gap-2 mb-1">
-            <Target size={16} className="text-ink-faint" />
+            <span className="icon-tile icon-tile--who h-7 w-7"><Target size={14} /></span>
             {localized(T.title, locale)}
           </h2>
           <p className="text-xs text-ink-faint mb-6">{localized(T.lead, locale)}</p>
@@ -414,7 +414,7 @@ export default function ProfilePage() {
         {/* Integrace: webhook pro Make a Zapier. Viz lib/webhook.ts. */}
         <div className="card" id="integrace">
           <h2 className="font-semibold text-ink flex items-center gap-2 mb-1">
-            <Webhook size={16} className="text-ink-faint" />
+            <span className="icon-tile icon-tile--reach h-7 w-7"><Webhook size={14} /></span>
             {isCs ? 'Integrace: Make, Zapier, vlastní systém' : 'Integrations: Make, Zapier, your own system'}
           </h2>
           <p className="text-xs text-ink-faint mb-4 max-w-2xl">
@@ -446,7 +446,7 @@ export default function ProfilePage() {
         <div className="card">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold text-ink flex items-center gap-2">
-              <Lock size={16} className="text-ink-faint" />
+              <span className="icon-tile icon-tile--standing h-7 w-7"><Lock size={14} /></span>
               {isCs ? 'Změna hesla' : 'Change password'}
             </h2>
             {!changePw && (
@@ -501,7 +501,7 @@ export default function ProfilePage() {
         <div className="card p-0 overflow-hidden">
           <div className="px-6 py-4 border-b border-line">
             <h2 className="font-semibold text-ink flex items-center gap-2">
-              <Search size={16} className="text-ink-faint" />
+              <span className="icon-tile icon-tile--standing h-7 w-7"><Search size={14} /></span>
               {isCs ? 'Historie vyhledávání' : 'Search history'}
             </h2>
           </div>
