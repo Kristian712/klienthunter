@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useTranslations, useLocale } from 'next-intl';
 import {
-  Search, Globe, Users, ExternalLink,
+  Search, Globe, Users, ExternalLink, Check,
   Mail, MapPin, X, Clock, ChevronDown,
   FileText, Table2, PhoneCall,
 } from 'lucide-react';
@@ -15,6 +15,7 @@ import { scoreBreakdown } from '@/lib/lead-score';
 import { YIELD_NOTE, yieldFor } from '@/lib/nace-map';
 import { SCENARIOS, SCENARIO_BY_PROFESSION, scenarioById } from '@/lib/scenarios';
 import { EMPTY_PROFILE, presetFiltersFor, type UserProfile } from '@/lib/profile';
+import { compareRanked, type ClaimMark } from '@/lib/claim-order';
 import { REGIONS, INDUSTRIES, POPULAR_CHIPS } from '@/lib/search-options';
 import { LeadScore, GOOD_LEAD } from '@/components/LeadScore';
 import { ResultsMap, type MapLead } from '@/components/ResultsMap';
@@ -72,6 +73,10 @@ interface BusinessResult {
   legalForm?: string | null;
   /** Počet provozoven s aktivním živnostenským oprávněním. NULL = nezeptali jsme se. */
   activePremises?: number | null;
+  /** IČO nebo `osm:<placeId>` — klíč pro nároky a míchání pořadí (lib/claim-order.ts). */
+  firmKey?: string;
+  /** `other` = jiný účet firmu nedávno oslovil (skóre pro řazení klesá), `mine` = já. */
+  claim?: ClaimMark;
 }
 
 /** Průběh hledání, které běží na pozadí. Odpovídá řádku `SearchJob` v databázi. */
@@ -457,6 +462,14 @@ const S = {
   errPollLost:{ cs: 'Ztratili jsme spojení s hledáním. Co se stihlo najít, zůstalo uložené — obnovte stránku.',
                 sk: 'Stratili sme spojenie s hľadaním. Čo sa stihlo nájsť, zostalo uložené — obnovte stránku.',
                 en: 'Lost contact with the search. Whatever was found is saved — reload the page.' },
+  claimOther:  { cs: 'Nedávno oslovena jinde', sk: 'Nedávno oslovená inde', en: 'Recently approached elsewhere' },
+  claimOtherTip: { cs: 'Jiný uživatel ji v posledních 30 dnech označil jako oslovenou. Ve výsledcích je proto níž — ne pryč.',
+                   sk: 'Iný používateľ ju v posledných 30 dňoch označil ako oslovenú. Vo výsledkoch je preto nižšie — nie preč.',
+                   en: 'Another user marked it as approached in the last 30 days, so it sits lower in the results — not gone.' },
+  claimMine:   { cs: 'Už jste oslovili', sk: 'Už ste oslovili', en: 'You already approached' },
+  claimMineTip: { cs: 'Označili jste ji jako oslovenou. Na vaše pořadí to nemá vliv.',
+                  sk: 'Označili ste ju ako oslovenú. Na vaše poradie to nemá vplyv.',
+                  en: 'You marked it as approached. Your ordering is unaffected.' },
   presetNote:  { cs: 'Pár filtrů jsme přednastavili podle vašeho oboru.',
                  sk: 'Pár filtrov sme prednastavili podľa vášho odboru.',
                  en: 'We pre-set a few filters based on your trade.' },
@@ -769,6 +782,8 @@ export default function SearchPage() {
    * tlačítkem vypnout — uživatel nesmí vidět „308 z 500 firem" a nevědět proč.
    */
   const [presetsOn, setPresetsOn] = useState(true);
+  /** Sůl pro míchání remíz ve skóre; posílá ji server, tady se jen drží. */
+  const [salt, setSalt] = useState('');
   const presetIds = presetFiltersFor(profile);
 
   /** Fill in only what the user has not already typed, so a reload never eats their input. */
@@ -889,9 +904,11 @@ export default function SearchPage() {
   })();
 
   /** Every active filter has to hold — combining is always AND. Best opportunities first. */
+  // Skóre po srážce za cizí nárok, remízy podle hashe (klíč firmy + sůl účtu), pak název.
+  // Dva účty tak vidí u stejně bodovaných firem jiné pořadí; tentýž účet vždy stejné.
   const filtered = results
     .filter(b => matchesAll(b, active))
-    .sort((a, b) => b.leadScore - a.leadScore || a.name.localeCompare(b.name, 'cs'));
+    .sort(compareRanked(salt));
 
   /**
    * Nejčastější zdroj mezi zobrazenými řádky. Řádky, které z něj pocházejí, štítek nedostanou —
@@ -982,6 +999,7 @@ export default function SearchPage() {
           const d = await res.json();
           resultsRef.current = d.results.length;
           setResults(d.results);
+          if (d.salt) setSalt(d.salt);
           setSearchId(d.job.searchId);
           setJob(d.job);
         })
@@ -990,6 +1008,7 @@ export default function SearchPage() {
           const d = await res.json();
           resultsRef.current = d.results.length;
           setResults(d.results);
+          if (d.salt) setSalt(d.salt);
           setSearchId(savedId);
         });
 
@@ -1049,6 +1068,7 @@ export default function SearchPage() {
         failures = 0;
         const data = await res.json();
         if (stopped) return;
+        if (data.salt) setSalt(data.salt);
         if (data.results?.length) {
           /**
            * Posun offsetu patří sem, ne dovnitř `setResults`.
@@ -1106,6 +1126,11 @@ export default function SearchPage() {
   const setLeadStatus = async (leadId: string, status: LeadStatus) => {
     const previous = tags[leadId];
     setTags(t => ({ ...t, [leadId]: status }));
+    // Značka contacted / talking / client zakládá vlastní nárok — řádek to má vědět hned,
+    // ne až po dalším načtení (u vlastního nároku se skóre nemění, jen štítek).
+    if (['contacted', 'talking', 'client'].includes(status)) {
+      setResults(rs => rs.map(r => (r.id === leadId ? { ...r, claim: 'mine' as const } : r)));
+    }
     try {
       const res = await fetch(`/api/leads/${leadId}/tag`, {
         method: 'PUT',
@@ -1774,6 +1799,18 @@ export default function SearchPage() {
                       {/* Badges */}
                       <div className="flex flex-wrap gap-2 mt-3 items-center">
                         <WebsiteStatusBadge b={b} locale={locale} />
+                        {/* Nárok: cizí sráží pořadí a říká jen „jinde" — bez toho kým, kdy a kolikrát.
+                            Vlastní pořadí nemění. Stejná třída `badge`, žádná nová barva. */}
+                        {b.claim === 'other' && (
+                          <span className="badge text-ink-faint" title={localized(S.claimOtherTip, locale)}>
+                            <Users size={10} />{localized(S.claimOther, locale)}
+                          </span>
+                        )}
+                        {b.claim === 'mine' && (
+                          <span className="badge text-ink-faint" title={localized(S.claimMineTip, locale)}>
+                            <Check size={10} />{localized(S.claimMine, locale)}
+                          </span>
+                        )}
                         <SocialLinks b={b} locale={locale} />
                         {b.ico && (
                           <span className="badge" title="IČO z veřejného rejstříku ARES">IČO {b.ico}</span>

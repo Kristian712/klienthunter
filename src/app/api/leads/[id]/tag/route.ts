@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { sessionFrom } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { LEAD_STATUS_IDS } from '@/lib/lead-tags';
+import { CLAIM_STATUSES, recordClaim } from '@/lib/claims';
 
 const Body = z.object({
   status: z.enum(LEAD_STATUS_IDS as [string, ...string[]]),
@@ -27,9 +28,16 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 
     const owned = await prisma.businessResult.findFirst({
       where: { id: params.id, search: { userId: session.userId } },
-      select: { id: true },
+      select: { id: true, ico: true, placeId: true },
     });
     if (!owned) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+    // Značka contacted / talking / client je jediný zdroj nároku na firmu (viz lib/claims.ts).
+    // Zakládá ho každý přihlášený účet; `new` nárok neruší a `rejected` ho nezakládá — kdo firmu
+    // odmítl, nemá ji ostatním blokovat. Nárok vyprší sám.
+    if (CLAIM_STATUSES.has(status)) {
+      await recordClaim(session.userId, owned).catch(err => console.error('claims/record:', err));
+    }
 
     const tag = await prisma.leadTag.upsert({
       where: { userId_businessResultId: { userId: session.userId, businessResultId: params.id } },

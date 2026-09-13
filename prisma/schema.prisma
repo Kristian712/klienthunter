@@ -64,6 +64,7 @@ model User {
 
   searches         Search[]
   jobs             SearchJob[]
+  claims           Claim[]
   leadTags         LeadTag[]
   savedResults     SavedResult[]
   createdCodes     InviteCode[] @relation("CreatedCodes")
@@ -261,6 +262,29 @@ model AnonymousHit {
 ///
 /// `status` je volný řetězec kontrolovaný v aplikaci (`LEAD_STATUSES`), ne enum v databázi —
 /// přidání šestého stavu by jinak znamenalo migraci schématu kvůli jednomu slovu.
+/// Nárok na firmu: uživatel ji reálně oslovil (značka contacted / talking / client).
+///
+/// Zobrazení ve výsledku ani export nárok nezakládají — export celého hledání by na 30 dní
+/// zabral 500 firem a druhému platícímu odsunul celý výsledek. Zakládá ho každý přihlášený účet
+/// (aby po free uživateli zůstala stopa), **aplikuje se jen platícím**: cizí nárok mladší než
+/// `CLAIM_TTL_DAYS` sníží skóre o `CLAIM_PENALTY` (lib/claims.ts) a dá řádku štítek bez údaje,
+/// čí nárok to je. Vlastní nárok skóre nemění.
+model Claim {
+  id        String   @id @default(cuid())
+  /// IČO, nebo `osm:<placeId>` u firem bez IČO — viz `firmKeyOf` v lib/claim-order.ts.
+  firmKey   String
+  userId    String
+  /// Zatím jen `tag`. Místo pro další zdroje, až budou (export vybraných řádků).
+  source    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Další označení téže firmy týmž uživatelem jen obnoví čas, nezaloží druhý řádek.
+  @@unique([firmKey, userId])
+  @@index([firmKey, createdAt])
+}
+
 model LeadTag {
   id               String   @id @default(cuid())
   userId           String

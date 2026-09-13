@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { waitUntil } from '@vercel/functions';
-import { sessionFrom } from '@/lib/auth';
+import { activeAccount, sessionFrom } from '@/lib/auth';
+import { isPaying, markClaims, orderSalt } from '@/lib/claims';
 import { prisma } from '@/lib/db';
 import { runSearchJob, sweepStaleJobs } from '@/lib/search-job';
 
@@ -69,5 +70,10 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     include: { tags: { where: { userId: session.userId }, select: { status: true, note: true } } },
   });
 
-  return NextResponse.json({ job, results });
+  // Nároky jen pro platící; jeden dotaz na celou dávku. Sůl pro míchání remíz je hash userId —
+  // do prohlížeče nejde userId, a pořadí je pro tentýž účet stabilní i po vymazání localStorage.
+  const account = await activeAccount(session.userId);
+  const marked = await markClaims(results, session.userId, Boolean(account && isPaying(account)));
+
+  return NextResponse.json({ job, results: marked, salt: orderSalt(session.userId) });
 }
