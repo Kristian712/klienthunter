@@ -94,6 +94,9 @@ model Search {
   savedId   String?
   /// Kdy uživatel kořen naposledy otevřel — od toho se počítá „nové od minule".
   lastOpenedAt DateTime?
+  /// Odkud uložené hledání je: `profile` = výchozí kombinace z dotazníku po registraci,
+  /// `user` = uživatel ji upravil nebo založil sám. Jakmile je `user`, profil do ní už nesahá.
+  origin    String?
   createdAt DateTime @default(now())
 
   user    User             @relation(fields: [userId], references: [id], onDelete: Cascade)

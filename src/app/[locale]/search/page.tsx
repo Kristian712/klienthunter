@@ -21,6 +21,8 @@ import { compareRanked, type ClaimMark } from '@/lib/claim-order';
 interface SavedMeta {
   id: string; name: string | null; filters: string[]; scenario: string | null;
   rootId: string; rootName: string | null; lastOpenedAt: string | null; earlierRuns: number;
+  /** `profile` = výchozí kombinace z dotazníku, `user` = uživatelova vlastní. */
+  origin: string | null;
 }
 import { REGIONS, INDUSTRIES, POPULAR_CHIPS } from '@/lib/search-options';
 import { LeadScore, GOOD_LEAD } from '@/components/LeadScore';
@@ -476,6 +478,16 @@ const S = {
                 sk: 'Stratili sme spojenie s hľadaním. Čo sa stihlo nájsť, zostalo uložené — obnovte stránku.',
                 en: 'Lost contact with the search. Whatever was found is saved — reload the page.' },
   insolvency:  { cs: 'V insolvenci', sk: 'V insolvencii', en: 'In insolvency' },
+  fromProfile: { cs: 'výchozí kombinace podle vašeho oboru — filtry i jméno můžete libovolně změnit',
+                 sk: 'východisková kombinácia podľa vášho odboru — filtre aj meno môžete ľubovoľne zmeniť',
+                 en: 'a starting combination based on your trade — change the filters and the name as you like' },
+  fromProfileTip: { cs: 'Založeno z dotazníku po registraci. Jakmile cokoli změníte, je to vaše hledání a profil do něj už nezasahuje.',
+                    sk: 'Založené z dotazníka po registrácii. Len čo čokoľvek zmeníte, je to vaše hľadanie a profil doň už nezasahuje.',
+                    en: 'Created from the sign-up questionnaire. As soon as you change anything it is yours and the profile no longer touches it.' },
+  notRunYet:   { cs: 'ještě nespuštěno', sk: 'ešte nespustené', en: 'not run yet' },
+  savedFilters:{ cs: 'Uložené filtry:', sk: 'Uložené filtre:', en: 'Saved filters:' },
+  noFilters:   { cs: 'žádné', sk: 'žiadne', en: 'none' },
+  runNow:      { cs: 'Spustit hledání', sk: 'Spustiť hľadanie', en: 'Run the search' },
   save:        { cs: 'Uložit hledání', sk: 'Uložiť hľadanie', en: 'Save search' },
   saveTip:     { cs: 'Uloží obor, kraj, zapnuté filtry a scénář. Příště je otevřete jedním kliknutím a uvidíte, co je nové.',
                  sk: 'Uloží odbor, kraj, zapnuté filtre a scenár. Nabudúce ich otvoríte jedným kliknutím a uvidíte, čo je nové.',
@@ -812,6 +824,14 @@ export default function SearchPage() {
    * tlačítkem vypnout — uživatel nesmí vidět „308 z 500 firem" a nevědět proč.
    */
   const [presetsOn, setPresetsOn] = useState(true);
+  /**
+   * Uložené hledání vždycky vyhrává nad profilem. Jakmile se načte, profil (který může dorazit
+   * i později) do aktivních filtrů už nesahá — jinak by se přednastavení přimíchalo k tomu, co
+   * si uživatel uložil, a hledání by přestalo být jeho.
+   */
+  const savedLockRef = useRef(false);
+  /** Uživatel sám sáhl na filtry nebo scénář uloženého hledání — od té chvíle se změny ukládají. */
+  const dirtyRef = useRef(false);
   /** Sůl pro míchání remíz ve skóre; posílá ji server, tady se jen drží. */
   const [salt, setSalt] = useState('');
   /** Metadata uloženého hledání (kořen, jméno, kolik dřívějších běhů). */
@@ -829,8 +849,12 @@ export default function SearchPage() {
    */
   function applySavedMeta(meta: SavedMeta | null) {
     setSavedMeta(meta);
-    if (!meta) return;
-    if (meta.filters.length > 0) { setActive(new Set(meta.filters)); setPresetsOn(false); }
+    if (!meta?.rootName) return;
+    // Uložené filtry se obnoví přesně — i prázdné. Profil od téhle chvíle nezasahuje.
+    savedLockRef.current = true;
+    dirtyRef.current = false;
+    setPresetsOn(false);
+    setActive(new Set(meta.filters));
     if (meta.scenario) setScenario(meta.scenario);
     if (meta.rootName) {
       fetch(`/api/searches/${meta.id}`, {
@@ -838,6 +862,26 @@ export default function SearchPage() {
       }).catch(err => console.error('search/opened:', err));
     }
   }
+
+  /**
+   * Úprava uloženého hledání se ukládá sama, s malým zpožděním. Ukládá se jen po zásahu uživatele
+   * (`dirtyRef`), ne po obnovení z databáze — jinak by každé otevření přepsalo `origin` na `user`
+   * a poznámka „výchozí kombinace podle oboru" by zmizela dřív, než si ji kdo přečte.
+   */
+  useEffect(() => {
+    if (!savedMeta?.rootName || !dirtyRef.current) return;
+    const timer = setTimeout(() => {
+      fetch(`/api/searches/${savedMeta.rootId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filters: Array.from(active), scenario }),
+      })
+        .then(r => (r.ok ? r.json() : null))
+        .then(d => { if (d?.search) setSavedMeta(m => (m ? { ...m, filters: d.search.filters, scenario: d.search.scenario, origin: d.search.origin } : m)); })
+        .catch(err => console.error('search/autosave:', err));
+    }, 800);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, scenario]);
 
   const saveSearch = async () => {
     if (!searchId || !saveName.trim()) return;
@@ -849,7 +893,9 @@ export default function SearchPage() {
       });
       if (!res.ok) throw new Error(`save ${res.status}`);
       const d = await res.json();
-      setSavedMeta(m => ({ ...(m ?? { id: searchId, name: null, filters: [], scenario: null, rootId: searchId, rootName: null, lastOpenedAt: null, earlierRuns: 0 }), rootId: d.search.id, rootName: d.search.name, filters: d.search.filters, scenario: d.search.scenario }));
+      setSavedMeta(m => ({ ...(m ?? { id: searchId, name: null, filters: [], scenario: null, rootId: searchId, rootName: null, lastOpenedAt: null, earlierRuns: 0, origin: null }), rootId: d.search.id, rootName: d.search.name, filters: d.search.filters, scenario: d.search.scenario, origin: d.search.origin ?? 'user' }));
+      // Vlastní uložení = hledání je uživatelovo; profil do něj nesahá.
+      savedLockRef.current = true;
       setShowSave(false);
     } catch (err) {
       console.error('search/save:', err);
@@ -885,7 +931,8 @@ export default function SearchPage() {
     setProfile(p);
     // Přednastavené chipy se k aktivním přidají, nikdy nenahradí, co si uživatel zapnul sám.
     const preset = presetFiltersFor(p);
-    if (preset.length > 0 && presetsOn) setActive(prev => new Set([...Array.from(prev), ...preset]));
+    // U uloženého hledání se přednastavení nepřidává vůbec (viz `savedLockRef`).
+    if (preset.length > 0 && presetsOn && !savedLockRef.current) setActive(prev => new Set([...Array.from(prev), ...preset]));
     if (p.targetRegion)   setRegion(r => r || p.targetRegion!);
     if (p.targetIndustry) {
       setIndustry(i => i || p.targetIndustry!);
@@ -1024,12 +1071,14 @@ export default function SearchPage() {
     return best;
   })();
 
-  const toggle = (id: string) =>
+  const toggle = (id: string) => {
+    dirtyRef.current = true;
     setActive(prev => {
       const next = new Set(prev);
       if (!next.delete(id)) next.add(id);
       return next;
     });
+  };
 
   /**
    * How many rows this chip would leave if it were the *next* one turned on. Showing the count
@@ -1424,7 +1473,7 @@ export default function SearchPage() {
               <button
                 key={sc.id}
                 type="button"
-                onClick={() => setScenario(sc.id)}
+                onClick={() => { dirtyRef.current = true; setScenario(sc.id); }}
                 className={scenario === sc.id ? 'chip-active' : 'chip'}
               >
                 {localized(sc.label, locale)}
@@ -1685,7 +1734,30 @@ export default function SearchPage() {
 
         {/* Hledání doběhlo a nenašlo nic. Bez tohohle bloku zmizel úvodní text i panel průběhu
             a pod formulářem nezůstalo vůbec nic — vypadalo to, že se hledání nespustilo. */}
-        {hasSearched && !loading && !error && results.length === 0
+        {/* Uložené hledání, které ještě nikdo nespustil (typicky to z dotazníku): bez řádků se
+            hlavička s ovládáním nevykreslí, tak je tu vlastní karta s tlačítkem. Spuštění je
+            uživatelovo rozhodnutí — stojí dotazy do rejstříků. */}
+        {savedMeta?.rootName && results.length === 0 && !loading && !job && (
+          <div className="card mb-6">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="badge text-ink"><Bookmark size={10} />{savedMeta.rootName}</span>
+              <span className="text-xs text-ink-faint">{localized(S.notRunYet, locale)}</span>
+            </div>
+            {savedMeta.origin === 'profile' && (
+              <p className="text-xs text-ink-faint mt-2">{localized(S.fromProfile, locale)}</p>
+            )}
+            <p className="text-xs text-ink-muted mt-2">
+              {localized(S.savedFilters, locale)}{' '}
+              {savedMeta.filters.map(id => LEAD_FILTERS.find(f => f.id === id)).filter(Boolean).map(f => localized(f!.label, locale)).join(' · ') || localized(S.noFilters, locale)}
+            </p>
+            {error && <p className="text-sm font-medium border border-ink px-3 py-2 mt-3">{error}</p>}
+            <button onClick={rerunSearch} disabled={rerunning} className="btn-primary btn-sm gap-1.5 mt-4">
+              <RefreshCw size={14} />{rerunning ? localized(S.rerunning, locale) : localized(S.runNow, locale)}
+            </button>
+          </div>
+        )}
+
+        {hasSearched && !loading && !error && results.length === 0 && !savedMeta?.rootName
           && (!job || job.status === 'done') && (
           <div className="text-center py-16 text-ink-faint">
             <p className="mb-2 text-ink-muted">{localized(S.emptyTitle, locale)}</p>
@@ -1740,7 +1812,7 @@ export default function SearchPage() {
                     ))}
                   </div>
                   {active.size > 0 && (
-                    <button onClick={() => { setActive(new Set()); setPresetsOn(false); }}
+                    <button onClick={() => { dirtyRef.current = true; setActive(new Set()); setPresetsOn(false); }}
                       className="flex items-center gap-1 text-xs text-ink-muted hover:text-ink transition-colors">
                       <X size={12} />{isCs ? 'Zrušit filtry' : 'Clear filters'}
                     </button>
@@ -1751,6 +1823,11 @@ export default function SearchPage() {
                       <span className="badge text-ink" title={localized(S.savedAs, locale)}>
                         <Bookmark size={10} />{savedMeta.rootName}
                       </span>
+                      {savedMeta.origin === 'profile' && (
+                        <span className="text-xs text-ink-faint" title={localized(S.fromProfileTip, locale)}>
+                          {localized(S.fromProfile, locale)}
+                        </span>
+                      )}
                       {savedMeta.earlierRuns > 0 && (
                         <button onClick={() => setOnlyNew(v => !v)} className={onlyNew ? 'chip-active' : 'chip'}>
                           {localized(S.onlyNew, locale)}
@@ -1805,6 +1882,7 @@ export default function SearchPage() {
                   <span>{localized(S.presetNote, locale)}</span>
                   <button
                     onClick={() => {
+                      dirtyRef.current = true;
                       setPresetsOn(false);
                       setActive(prev => new Set(Array.from(prev).filter(id => !presetIds.includes(id))));
                     }}

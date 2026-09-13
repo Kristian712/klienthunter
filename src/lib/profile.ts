@@ -1,4 +1,4 @@
-import { localized } from './lead-filters';
+import { LEAD_FILTERS, localized } from './lead-filters';
 
 /**
  * Who the user is and who they are hunting — the answers to the onboarding modal.
@@ -201,6 +201,24 @@ export const LEGACY_PROFESSION: Record<string, string> = {
 };
 
 const BY_ID = new Map(PROFESSIONS.map(p => [p.id, p]));
+
+/**
+ * Přednastavení jsou odkazy do katalogu filtrů (`LEAD_FILTERS`), ne vlastní definice — nový
+ * filtr v katalogu jde hned použít v profilu a obě strany se nemůžou rozejít. Tahle kontrola
+ * to hlídá při načtení modulu: neznámé id je chyba v kódu, ne stav dat.
+ */
+(function assertPresetsInCatalog() {
+  const known = new Set(LEAD_FILTERS.map(f => f.id));
+  const missing: string[] = [];
+  for (const p of PROFESSIONS) {
+    const ids = [...p.presetFilters, ...p.suggests, ...(p.followUp?.options.flatMap(o => o.presetFilters) ?? [])];
+    for (const id of ids) if (!known.has(id)) missing.push(`${p.id}:${id}`);
+  }
+  if (missing.length === 0) return;
+  const message = `profile.ts: přednastavení odkazují na filtry, které v katalogu nejsou: ${missing.join(', ')}`;
+  if (process.env.NODE_ENV !== 'production') throw new Error(message);
+  console.error(message);
+})();
 
 /** Current profile id for a stored value — legacy ids map onto the merged profiles. */
 export function normalizeProfession(id?: string | null): string | null {

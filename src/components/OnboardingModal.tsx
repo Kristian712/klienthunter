@@ -98,6 +98,15 @@ export function OnboardingModal({ locale, initial, onDone }: Props) {
     setFailed(false);
     try {
       const saved = await save({ ...draftToPayload(draft), onboarded: true });
+      /**
+       * První uložené hledání z profilu — jen se uloží, nespustí. Spuštění je uživatelovo
+       * rozhodnutí a stojí dotazy do rejstříků. Kdo dá „Vyberu si sám", sem nedojde a přehled
+       * má prázdný. Selhání tohohle kroku dotazník neshodí: profil je uložený, hledání si
+       * uživatel založí sám.
+       */
+      await fetch(`/api/searches/from-profile?locale=${locale}`, { method: 'POST' })
+        .then(r => { if (!r.ok) throw new Error(`from-profile ${r.status}`); })
+        .catch(err => console.error('onboarding/from-profile:', err));
       onDone(saved);
     } catch {
       setFailed(true);

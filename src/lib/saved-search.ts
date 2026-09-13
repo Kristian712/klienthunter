@@ -20,6 +20,8 @@ export interface SearchMeta {
   rootId: string;
   rootName: string | null;
   lastOpenedAt: Date | null;
+  /** `profile` = výchozí kombinace z dotazníku, `user` = uživatelova vlastní. */
+  origin: string | null;
   /** Kolik dřívějších běhů kořen má — bez nich nemá „nové" s čím srovnávat. */
   earlierRuns: number;
 }
@@ -29,8 +31,8 @@ export async function searchMeta(searchId: string, userId: string): Promise<Sear
   const s = await prisma.search.findFirst({
     where: { id: searchId, userId },
     select: {
-      id: true, name: true, filters: true, scenario: true, savedId: true, lastOpenedAt: true, createdAt: true,
-      saved: { select: { id: true, name: true, filters: true, scenario: true, lastOpenedAt: true } },
+      id: true, name: true, filters: true, scenario: true, savedId: true, lastOpenedAt: true, createdAt: true, origin: true,
+      saved: { select: { id: true, name: true, filters: true, scenario: true, lastOpenedAt: true, origin: true } },
     },
   });
   if (!s) return null;
@@ -41,11 +43,14 @@ export async function searchMeta(searchId: string, userId: string): Promise<Sear
   return {
     id: s.id,
     name: s.name,
-    filters: s.filters.length ? s.filters : root.filters,
-    scenario: s.scenario ?? root.scenario,
+    // Kořen je jediný zdroj pravdy. Běh z „Spustit znovu" dostal při založení kopii filtrů, ale
+    // ta zastará, jakmile si uživatel kořen upraví — a při otevření běhu by se vrátila.
+    filters: root.filters,
+    scenario: root.scenario,
     rootId: root.id,
     rootName: root.name,
     lastOpenedAt: root.lastOpenedAt,
+    origin: root.origin,
     earlierRuns,
   };
 }

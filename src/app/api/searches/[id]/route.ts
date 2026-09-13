@@ -74,9 +74,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (body.name !== undefined) data.name = body.name || null;
     if (body.filters !== undefined) data.filters = body.filters;
     if (body.scenario !== undefined) data.scenario = body.scenario;
+    // Kdo si uložené hledání upraví, dělá ho svým: od té chvíle do něj profil nesahá.
+    if (body.name !== undefined || body.filters !== undefined || body.scenario !== undefined) data.origin = 'user';
     const updated = Object.keys(data).length
-      ? await prisma.search.update({ where: { id: rootId }, data, select: { id: true, name: true, filters: true, scenario: true, lastOpenedAt: true } })
-      : await prisma.search.findUnique({ where: { id: rootId }, select: { id: true, name: true, filters: true, scenario: true, lastOpenedAt: true } });
+      ? await prisma.search.update({ where: { id: rootId }, data, select: { id: true, name: true, filters: true, scenario: true, lastOpenedAt: true, origin: true } })
+      : await prisma.search.findUnique({ where: { id: rootId }, select: { id: true, name: true, filters: true, scenario: true, lastOpenedAt: true, origin: true } });
 
     return NextResponse.json({ search: updated });
   } catch (err) {

@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
       }
       return {
         id: root.id, name: root.name, query: root.query, region: root.region,
-        filters: root.filters, scenario: root.scenario, lastOpenedAt: root.lastOpenedAt,
+        filters: root.filters, scenario: root.scenario, lastOpenedAt: root.lastOpenedAt, origin: root.origin,
         runs: runs.length, latestId: latest.id, latestAt: latest.createdAt, latestCount: latest._count.results,
         newCount,
       };

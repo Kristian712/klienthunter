@@ -35,6 +35,7 @@ export async function startSearch(opts: {
   region: string;
   /** Kořen uloženého hledání, jehož je tenhle běh dalším spuštěním. */
   savedId?: string | null;
+  /** Jen informativní otisk v okamžiku spuštění; čte se vždy kořen (`searchMeta`). */
   filters?: string[];
   scenario?: string | null;
 }): Promise<StartSearchResult> {

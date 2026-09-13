@@ -34,6 +34,8 @@ interface User {
 interface SavedSearch {
   id: string; name: string; query: string; region: string; runs: number;
   latestId: string; latestAt: string; latestCount: number; newCount: number;
+  /** `profile` = výchozí kombinace z dotazníku, ještě neupravená. */
+  origin: string | null;
 }
 
 const PLAN_LABELS: Record<string, string> = { FREE: 'Zdarma', PRO: 'Pro', BUSINESS: 'Business' };
@@ -192,6 +194,15 @@ export default function DashboardPage() {
                   <span className="text-ink-muted">{industryLabel(s.query, locale)}, {s.region}</span>
                   {s.newCount > 0 && (
                     <span className="badge-accent ml-2"><Sparkles size={10} />{s.newCount} {isCs ? 'nových' : 'new'}</span>
+                  )}
+                  {s.origin === 'profile' && (
+                    <span className="badge ml-2 text-ink-faint"
+                          title={isCs ? 'Založeno z dotazníku po registraci. Jakmile cokoli změníte, je to vaše hledání.' : 'Created from the sign-up questionnaire. Once you change anything it is yours.'}>
+                      {isCs ? 'výchozí podle oboru' : 'default for your trade'}
+                    </span>
+                  )}
+                  {s.runs === 1 && s.latestCount === 0 && (
+                    <span className="text-xs text-ink-faint ml-2">{isCs ? 'ještě nespuštěno' : 'not run yet'}</span>
                   )}
                 </div>
                 <div className="flex items-center gap-3">
