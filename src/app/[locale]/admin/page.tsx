@@ -43,6 +43,8 @@ export default function AdminPage() {
   const [codes, setCodes]             = useState<InviteCode[]>([]);
   const [tab, setTab]                 = useState<'users' | 'codes' | 'optouts'>('users');
   const [optouts, setOptouts]         = useState<Optout[]>([]);
+  /** Velikost databáze — Neon free má 0,5 GB a index z ČSÚ (etapa 3) se dimenzuje podle zbytku. */
+  const [dbSize, setDbSize]           = useState<{ bytes: number; tables: Array<{ name: string; bytes: number; rows: number }> } | null>(null);
   const [loadingUsers, setLoadingUsers] = useState(true);
   /** Načtení selhalo — prázdný panel by tvrdil, že v databázi nikdo není. */
   const [loadFailed, setLoadFailed]   = useState(false);
@@ -116,6 +118,15 @@ export default function AdminPage() {
   }, []);
 
   useEffect(() => { fetchUsers(); fetchCodes(); fetchOptouts(); }, [fetchUsers, fetchCodes, fetchOptouts]);
+
+  useEffect(() => {
+    fetch('/api/admin/db-size')
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (d?.bytes != null) setDbSize(d); })
+      .catch(err => console.error('admin/db-size:', err));
+  }, []);
+
+  const mb = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(1).replace('.', ',')} MB`;
 
   /** Zamítnutí vrátí subjekt do výsledků; obnovení ho zase vyřadí. Vyřazení samo na nikoho nečekalo. */
   const setOptoutStatus = async (o: Optout, status: 'active' | 'rejected') => {
@@ -281,6 +292,20 @@ export default function AdminPage() {
             </div>
           ))}
         </div>
+
+        {/* Databáze: jediné místo, kde se dá přečíst, kolik z 0,5 GB Neonu zbývá. */}
+        {dbSize && (
+          <div className="card mb-6 text-sm">
+            <div className="flex items-baseline gap-3 flex-wrap">
+              <span className="text-xs font-medium text-ink-faint">{isCs ? 'Databáze' : 'Database'}</span>
+              <span className="text-2xl font-bold text-ink tnum">{mb(dbSize.bytes)}</span>
+              <span className="text-xs text-ink-faint">{isCs ? 'z 512 MB (Neon free)' : 'of 512 MB (Neon free)'}</span>
+            </div>
+            <p className="text-xs text-ink-faint mt-2 tnum">
+              {dbSize.tables.slice(0, 5).map(t => `${t.name} ${mb(t.bytes)} (${t.rows.toLocaleString(isCs ? 'cs-CZ' : 'en-GB')})`).join(' · ')}
+            </p>
+          </div>
+        )}
 
         {/* Tabs (transparent border on the inactive one: no 2px shift) */}
         <div className="flex gap-1 mb-6 bg-surface-muted border border-line p-1 rounded-xl w-fit">
