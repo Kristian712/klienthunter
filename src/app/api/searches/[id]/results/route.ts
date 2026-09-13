@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { activeAccount, sessionFrom } from '@/lib/auth';
 import { isPaying, markClaims, orderSalt } from '@/lib/claims';
 import { withoutOptouts } from '@/lib/optout';
+import { markNew, searchMeta } from '@/lib/saved-search';
 import { prisma } from '@/lib/db';
 import { cityOf, resolveFilters } from '@/lib/lead-filters';
 
@@ -58,7 +59,9 @@ export async function GET(
     const account = await activeAccount(payload.userId);
     const visible = await withoutOptouts(results);
     const marked = await markClaims(visible, payload.userId, Boolean(account && isPaying(account)));
-    return NextResponse.json({ results: marked, total: marked.length, salt: orderSalt(payload.userId) });
+    const meta = await searchMeta(params.id, payload.userId);
+    const withNew = await markNew(meta, payload.userId, marked);
+    return NextResponse.json({ results: withNew, total: withNew.length, salt: orderSalt(payload.userId), search: meta });
   } catch (err) {
     console.error('/api/searches/[id]/results:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

@@ -3,6 +3,7 @@ import { waitUntil } from '@vercel/functions';
 import { activeAccount, sessionFrom } from '@/lib/auth';
 import { isPaying, markClaims, orderSalt } from '@/lib/claims';
 import { withoutOptouts } from '@/lib/optout';
+import { markNew, searchMeta } from '@/lib/saved-search';
 import { prisma } from '@/lib/db';
 import { runSearchJob, sweepStaleJobs } from '@/lib/search-job';
 
@@ -76,6 +77,9 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const account = await activeAccount(session.userId);
   const visible = await withoutOptouts(results);
   const marked = await markClaims(visible, session.userId, Boolean(account && isPaying(account)));
+  // Uložené hledání: metadata kořene (jméno, filtry) a „nové od minule" u řádků.
+  const meta = await searchMeta(job.searchId, session.userId);
+  const withNew = await markNew(meta, session.userId, marked);
 
-  return NextResponse.json({ job, results: marked, salt: orderSalt(session.userId) });
+  return NextResponse.json({ job, results: withNew, salt: orderSalt(session.userId), search: meta });
 }

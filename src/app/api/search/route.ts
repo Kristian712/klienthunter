@@ -1,16 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { activeAccount, getPlanLimits, sessionFrom } from '@/lib/auth';
-import { prisma } from '@/lib/db';
+import { sessionFrom } from '@/lib/auth';
 import { leadScore } from '@/lib/lead-score';
 import { enrichAndVerify, mergeLeads, type VerifiedCandidate } from '@/lib/lead-pipeline';
 import {
   ANONYMOUS_RESULTS, ANONYMOUS_SEARCHES, countHits, hashIp, recordHit,
 } from '@/lib/rate-limit';
-import { runSearchJob } from '@/lib/search-job';
+import { startSearch } from '@/lib/start-search';
 import { CZ_STAGES } from '@/lib/search-options';
 import { discoverAll } from '@/lib/sources';
-import { waitUntil } from '@vercel/functions';
 
 /**
  * Strop funkce. Bylo 60 s — což bylo naše číslo, ne limit platformy: Vercel dnes s Fluid Compute
@@ -52,21 +50,7 @@ function isWholeCz(region: string): boolean {
  */
 const NETWORK_BUDGET_MS = 40_000;
 
-/**
- * Nárazová pojistka nad rámec měsíčního limitu plánu.
- *
- * Každé hledání střílí dotaz na veřejný Overpass, který ve svých podmínkách výslovně žádá,
- * aby ho nikdo nepoužíval jako backendovou infrastrukturu. Měsíční limit plánu tohle neřeší
- * ze dvou důvodů: plány VIP, BUSINESS a admin ho mají nastavený na nekonečno, a i konečný
- * limit dovolí vystřílet celý měsíční příděl během minuty. Kdyby Overpass zablokoval naši
- * IP, přijdou o kontakty všichni uživatelé najednou — proto tenhle strop platí pro každého
- * včetně adminů.
- *
- * Dvanáct za pět minut je nad rámec toho, co stihne člověk, který si výsledky opravdu čte:
- * jedno hledání trvá i s ověřováním webů desítky sekund.
- */
-const BURST_WINDOW_MS = 5 * 60 * 1000;
-const BURST_MAX = 12;
+// Nárazová pojistka a limity tarifu žijí v lib/start-search.ts.
 
 /**
  * Co z výsledku uvidí někdo bez účtu.
@@ -163,81 +147,19 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { region, industry } = SearchSchema.parse(body);
 
-    // Počítáme už založená hledání, ne dokončená — jinak by série souběžných požadavků
-    // proklouzla všechna najednou, protože žádné z nich by v tu chvíli ještě nebylo hotové.
-    const burstSince = new Date(Date.now() - BURST_WINDOW_MS);
-    const recent = await prisma.search.count({
-      where: { userId: payload.userId, createdAt: { gte: burstSince } },
-    });
-    if (recent >= BURST_MAX) {
+    // Limity tarifu, nárazová pojistka, založení běhu a spuštění na pozadí jsou v lib/start-search.ts —
+    // totéž používá „Spustit znovu" u uloženého hledání.
+    const started = await startSearch({ userId: payload.userId, industry, region });
+    if (!started.ok) {
+      const message = started.code === 'PLAN_LIMIT' ? 'Search limit reached for your plan'
+        : started.code === 'RATE_LIMITED' ? 'Too many searches in a short time' : 'Unauthorized';
       return NextResponse.json(
-        { error: 'Too many searches in a short time', code: 'RATE_LIMITED' },
-        { status: 429, headers: { 'Retry-After': String(Math.ceil(BURST_WINDOW_MS / 1000)) } },
+        { error: message, code: started.code },
+        { status: started.status, headers: started.retryAfterS ? { 'Retry-After': String(started.retryAfterS) } : undefined },
       );
     }
 
-    /**
-     * Tarif z databáze, ne z tokenu.
-     *
-     * Token nese `plan` z chvíle přihlášení a platí sedm dní. Kdyby se limity braly z něj,
-     * zákazník by po zaplacení dostal vyšší tarif až po odhlášení — a Stripe mezitím zapsal
-     * PRO do databáze, kde ho nikdo nečetl. Jeden dotaz navíc na začátku hledání je levnější
-     * než ta reklamace.
-     */
-    const account = await activeAccount(payload.userId);
-    if (!account) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    const limits = getPlanLimits(account.plan, account.isVip, account.isAdmin);
-
-    if (limits.searches !== Infinity) {
-      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-      const searchCount = await prisma.search.count({
-        where: { userId: payload.userId, createdAt: { gte: thirtyDaysAgo } },
-      });
-      if (searchCount >= limits.searches) {
-        return NextResponse.json(
-          { error: 'Search limit reached for your plan', code: 'PLAN_LIMIT' },
-          { status: 403 },
-        );
-      }
-    }
-
-    // Kritéria uživatele si načítá runner na pozadí — v cestě požadavku by to byl jen další
-    // round trip do databáze mezi uživatelem a odpovědí, kterou čeká.
-    const search = await prisma.search.create({
-      data: { userId: payload.userId, query: industry, region },
-    });
-
-    /**
-     * Odsud dál se nečeká.
-     *
-     * Založíme job, vrátíme jeho id — a vlastní hledání běží dál v téže invokaci díky
-     * `waitUntil`, jen už bez prohlížeče na druhém konci. Uživatel může kartu zavřít; výsledky
-     * se plní do databáze po dávkách a on se k nim vrátí, kdy chce.
-     *
-     * `resultsPerSearch` z plánu jde do `targetCount` — je to vstupní strop, ne výsledek.
-     * `foundCount` zůstává nulový a runner ho plní tím, co zdroje opravdu vrátily; u hledání
-     * po fázích ho přičítá po každém městě.
-     */
-    const job = await prisma.searchJob.create({
-      data: {
-        userId: payload.userId,
-        searchId: search.id,
-        region,
-        industry,
-        targetCount: limits.resultsPerSearch === Infinity ? 500 : limits.resultsPerSearch,
-      },
-    });
-
-    // Lokální `next dev` žádný kontext požadavku nemá a `waitUntil` v něm vyhodí výjimku.
-    // Tam se prostě počká — vývojáře to nezdrží a chování zůstane stejné.
-    const work = runSearchJob(job.id);
-    try {
-      waitUntil(work);
-    } catch {
-      await work;
-    }
-
-    return NextResponse.json({ jobId: job.id, searchId: search.id });
+    return NextResponse.json({ jobId: started.jobId, searchId: started.searchId });
   } catch (err) {
     if (err instanceof z.ZodError) {
       return NextResponse.json({ error: err.errors }, { status: 422 });

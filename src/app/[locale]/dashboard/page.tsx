@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
 import Link from 'next/link';
-import { Search, ArrowRight, Crown, Clock, BarChart3, Upload, Trash2 } from 'lucide-react';
+import { Search, ArrowRight, Crown, Clock, BarChart3, Upload, Trash2, Bookmark, RefreshCw, Sparkles } from 'lucide-react';
 import { clearUser } from '@/lib/client-auth';
 import { industryLabel } from '@/lib/search-options';
 import { formatDate } from '@/lib/format-date';
@@ -30,6 +30,11 @@ const JOB_LABEL: Record<Job['status'], { cs: string; en: string }> = {
 interface User {
   name?: string; email: string; plan: string; isAdmin: boolean; isVip: boolean;
 }
+/** Uložené hledání = kořen se jménem; viz `/api/searches`. */
+interface SavedSearch {
+  id: string; name: string; query: string; region: string; runs: number;
+  latestId: string; latestAt: string; latestCount: number; newCount: number;
+}
 
 const PLAN_LABELS: Record<string, string> = { FREE: 'Zdarma', PRO: 'Pro', BUSINESS: 'Business' };
 
@@ -38,6 +43,9 @@ export default function DashboardPage() {
   const isCs = locale === 'cs' || locale === 'sk';
   const [user, setUser]       = useState<User | null>(null);
   const [searches, setSearches] = useState<Search[]>([]);
+  const [saved, setSaved] = useState<SavedSearch[]>([]);
+  const [rerunning, setRerunning] = useState<string | null>(null);
+  const [rerunError, setRerunError] = useState('');
   const [jobs, setJobs] = useState<Record<string, Job>>({});
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -73,6 +81,11 @@ export default function DashboardPage() {
         setUser(d.user);
         setSearches(d.searches ?? []);
         setLoading(false);
+        // Uložená hledání s „co je nové" počítá seznam hledání, ne profil.
+        fetch('/api/searches', { credentials: 'include' })
+          .then(r => (r.ok ? r.json() : { saved: [] }))
+          .then(x => setSaved(x.saved ?? []))
+          .catch(err => console.error('dashboard/searches:', err));
       })
       .catch(err => {
         console.error('dashboard/profile:', err);
@@ -156,6 +169,68 @@ export default function DashboardPage() {
           <ArrowRight size={18} className="ml-auto text-ink-faint group-hover:text-accent transition-colors" />
         </Link>
       </div>
+
+      {/* Uložená hledání: kombinace, ke které se uživatel vrací, a kolik je v ní nového od minula. */}
+      {saved.length > 0 && (
+        <div className="card mb-6">
+          <h2 className="text-lg font-semibold mb-1 flex items-center gap-2">
+            <Bookmark size={16} className="text-ink-faint" />{isCs ? 'Uložená hledání' : 'Saved searches'}
+          </h2>
+          <p className="text-xs text-ink-faint mb-4">
+            {isCs ? '„Nové" = firmy, které v dřívějších bězích nebyly a přibyly od chvíle, kdy jste hledání naposledy otevřeli.'
+                  : '“New” = firms that were not in earlier runs and appeared since you last opened the search.'}
+          </p>
+          {rerunError && <p className="mb-3 text-sm font-medium border border-ink px-3 py-2">{rerunError}</p>}
+          <div className="divide-y divide-line">
+            {saved.map(s => (
+              <div key={s.id} className="flex items-center justify-between py-3 gap-3 flex-wrap">
+                <div className="min-w-0">
+                  <Link href={`/${locale}/search?search=${s.latestId}`} className="font-medium hover:text-accent transition-colors">
+                    {s.name}
+                  </Link>
+                  <span className="text-ink-faint mx-2">·</span>
+                  <span className="text-ink-muted">{industryLabel(s.query, locale)}, {s.region}</span>
+                  {s.newCount > 0 && (
+                    <span className="badge-accent ml-2"><Sparkles size={10} />{s.newCount} {isCs ? 'nových' : 'new'}</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-ink-faint tnum">
+                    {s.runs}× · {s.latestCount} {isCs ? 'firem' : 'businesses'} · {formatDate(s.latestAt, locale)}
+                  </span>
+                  <button
+                    onClick={async () => {
+                      setRerunning(s.id); setRerunError('');
+                      try {
+                        const res = await fetch(`/api/searches/${s.id}/rerun`, { method: 'POST' });
+                        const d = await res.json().catch(() => ({}));
+                        if (!res.ok) {
+                          setRerunError(res.status === 403
+                            ? (isCs ? 'Vyčerpali jste hledání ve svém tarifu.' : 'You have used up the searches in your plan.')
+                            : res.status === 429
+                              ? (isCs ? 'Příliš mnoho hledání za sebou. Zkuste to za pár minut.' : 'Too many searches in a row. Try again in a few minutes.')
+                              : (isCs ? 'Spuštění se nepovedlo. Zkuste to prosím znovu.' : 'Could not start. Please try again.'));
+                          return;
+                        }
+                        window.location.href = `/${locale}/search?job=${d.jobId}`;
+                      } catch (err) {
+                        console.error('dashboard/rerun:', err);
+                        setRerunError(isCs ? 'Nepodařilo se spojit se serverem.' : 'Could not reach the server.');
+                      } finally {
+                        setRerunning(null);
+                      }
+                    }}
+                    disabled={rerunning === s.id}
+                    className="btn-outline btn-sm gap-1.5"
+                  >
+                    <RefreshCw size={14} />{isCs ? 'Spustit znovu' : 'Run again'}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Recent searches */}
       <div className="card">

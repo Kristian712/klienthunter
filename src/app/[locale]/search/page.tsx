@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useTranslations, useLocale } from 'next-intl';
 import {
-  Search, Globe, Users, ExternalLink, Check,
+  Search, Globe, Users, ExternalLink, Check, Bookmark, RefreshCw, Sparkles,
   Mail, MapPin, X, Clock, ChevronDown,
   FileText, Table2, PhoneCall,
 } from 'lucide-react';
@@ -16,6 +16,12 @@ import { YIELD_NOTE, yieldFor } from '@/lib/nace-map';
 import { SCENARIOS, SCENARIO_BY_PROFESSION, scenarioById } from '@/lib/scenarios';
 import { EMPTY_PROFILE, presetFiltersFor, type UserProfile } from '@/lib/profile';
 import { compareRanked, type ClaimMark } from '@/lib/claim-order';
+
+/** Totéž, co vrací `searchMeta` v lib/saved-search.ts. */
+interface SavedMeta {
+  id: string; name: string | null; filters: string[]; scenario: string | null;
+  rootId: string; rootName: string | null; lastOpenedAt: string | null; earlierRuns: number;
+}
 import { REGIONS, INDUSTRIES, POPULAR_CHIPS } from '@/lib/search-options';
 import { LeadScore, GOOD_LEAD } from '@/components/LeadScore';
 import { ResultsMap, type MapLead } from '@/components/ResultsMap';
@@ -78,6 +84,8 @@ interface BusinessResult {
   inInsolvency?: boolean | null;
   nace?: string[] | null;
   registryUpdatedAt?: string | null;
+  /** Firma, která v dřívějších bězích téhož uloženého hledání nebyla (lib/saved-search.ts). */
+  isNew?: boolean;
   /** IČO nebo `osm:<placeId>` — klíč pro nároky a míchání pořadí (lib/claim-order.ts). */
   firmKey?: string;
   /** `other` = jiný účet firmu nedávno oslovil (skóre pro řazení klesá), `mine` = já. */
@@ -468,6 +476,21 @@ const S = {
                 sk: 'Stratili sme spojenie s hľadaním. Čo sa stihlo nájsť, zostalo uložené — obnovte stránku.',
                 en: 'Lost contact with the search. Whatever was found is saved — reload the page.' },
   insolvency:  { cs: 'V insolvenci', sk: 'V insolvencii', en: 'In insolvency' },
+  save:        { cs: 'Uložit hledání', sk: 'Uložiť hľadanie', en: 'Save search' },
+  saveTip:     { cs: 'Uloží obor, kraj, zapnuté filtry a scénář. Příště je otevřete jedním kliknutím a uvidíte, co je nové.',
+                 sk: 'Uloží odbor, kraj, zapnuté filtre a scenár. Nabudúce ich otvoríte jedným kliknutím a uvidíte, čo je nové.',
+                 en: 'Saves the trade, region, active filters and scenario. Next time you open it with one click and see what is new.' },
+  saveNamePh:  { cs: 'Název, např. Nové s.r.o. Zlín', sk: 'Názov, napr. Nové s.r.o. Zlín', en: 'Name, e.g. New Ltds in Zlín' },
+  saveConfirm: { cs: 'Uložit', sk: 'Uložiť', en: 'Save' },
+  cancel:      { cs: 'Zrušit', sk: 'Zrušiť', en: 'Cancel' },
+  savedAs:     { cs: 'Uložené hledání', sk: 'Uložené hľadanie', en: 'Saved search' },
+  rerun:       { cs: 'Spustit znovu', sk: 'Spustiť znova', en: 'Run again' },
+  rerunning:   { cs: 'Spouštím…', sk: 'Spúšťam…', en: 'Starting…' },
+  onlyNew:     { cs: 'Nové od minule', sk: 'Nové od minule', en: 'New since last time' },
+  newBadge:    { cs: 'Nové', sk: 'Nové', en: 'New' },
+  newTip:      { cs: 'V dřívějších bězích tohoto uloženého hledání tahle firma nebyla.',
+                 sk: 'V skorších behoch tohto uloženého hľadania táto firma nebola.',
+                 en: 'This firm was not in earlier runs of this saved search.' },
   provenBy:    { cs: 'Doloženo:', sk: 'Doložené:', en: 'Backed by:' },
   claimOther:  { cs: 'Nedávno oslovena jinde', sk: 'Nedávno oslovená inde', en: 'Recently approached elsewhere' },
   claimOtherTip: { cs: 'Jiný uživatel ji v posledních 30 dnech označil jako oslovenou. Ve výsledcích je proto níž — ne pryč.',
@@ -791,6 +814,70 @@ export default function SearchPage() {
   const [presetsOn, setPresetsOn] = useState(true);
   /** Sůl pro míchání remíz ve skóre; posílá ji server, tady se jen drží. */
   const [salt, setSalt] = useState('');
+  /** Metadata uloženého hledání (kořen, jméno, kolik dřívějších běhů). */
+  const [savedMeta, setSavedMeta] = useState<SavedMeta | null>(null);
+  const [saveName, setSaveName] = useState('');
+  const [savingSearch, setSavingSearch] = useState(false);
+  const [showSave, setShowSave] = useState(false);
+  const [onlyNew, setOnlyNew] = useState(false);
+  const [rerunning, setRerunning] = useState(false);
+
+  /**
+   * Uložené hledání obnoví filtry a scénář, jak byly uložené, a zapíše otevření — od téhle chvíle
+   * se „nové od minule" počítá znovu. Zapisuje se až po načtení, takže řádky v téhle odpovědi
+   * ještě nesou `isNew` z minulého otevření.
+   */
+  function applySavedMeta(meta: SavedMeta | null) {
+    setSavedMeta(meta);
+    if (!meta) return;
+    if (meta.filters.length > 0) { setActive(new Set(meta.filters)); setPresetsOn(false); }
+    if (meta.scenario) setScenario(meta.scenario);
+    if (meta.rootName) {
+      fetch(`/api/searches/${meta.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ opened: true }),
+      }).catch(err => console.error('search/opened:', err));
+    }
+  }
+
+  const saveSearch = async () => {
+    if (!searchId || !saveName.trim()) return;
+    setSavingSearch(true);
+    try {
+      const res = await fetch(`/api/searches/${searchId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: saveName.trim(), filters: Array.from(active), scenario }),
+      });
+      if (!res.ok) throw new Error(`save ${res.status}`);
+      const d = await res.json();
+      setSavedMeta(m => ({ ...(m ?? { id: searchId, name: null, filters: [], scenario: null, rootId: searchId, rootName: null, lastOpenedAt: null, earlierRuns: 0 }), rootId: d.search.id, rootName: d.search.name, filters: d.search.filters, scenario: d.search.scenario }));
+      setShowSave(false);
+    } catch (err) {
+      console.error('search/save:', err);
+      setError(localized(S.errServer, locale));
+    } finally {
+      setSavingSearch(false);
+    }
+  };
+
+  /** Nový běh uloženého hledání: stejný obor, kraj i filtry. Otevře se přes `?job=`. */
+  const rerunSearch = async () => {
+    if (!savedMeta) return;
+    setRerunning(true);
+    try {
+      const res = await fetch(`/api/searches/${savedMeta.rootId}/rerun`, { method: 'POST' });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(localized(res.status === 403 ? S.errPlan : res.status === 429 ? S.errBurst : S.errServer, locale));
+        return;
+      }
+      window.location.href = `${window.location.pathname}?job=${d.jobId}`;
+    } catch (err) {
+      console.error('search/rerun:', err);
+      setError(localized(S.errNetwork, locale));
+    } finally {
+      setRerunning(false);
+    }
+  };
   const presetIds = presetFiltersFor(profile);
 
   /** Fill in only what the user has not already typed, so a reload never eats their input. */
@@ -913,8 +1000,10 @@ export default function SearchPage() {
   /** Every active filter has to hold — combining is always AND. Best opportunities first. */
   // Skóre po srážce za cizí nárok, remízy podle hashe (klíč firmy + sůl účtu), pak název.
   // Dva účty tak vidí u stejně bodovaných firem jiné pořadí; tentýž účet vždy stejné.
+  const newCount = results.filter(b => b.isNew).length;
   const filtered = results
     .filter(b => matchesAll(b, active))
+    .filter(b => !onlyNew || b.isNew)
     .sort(compareRanked(salt));
 
   /**
@@ -1009,6 +1098,7 @@ export default function SearchPage() {
           if (d.salt) setSalt(d.salt);
           setSearchId(d.job.searchId);
           setJob(d.job);
+          applySavedMeta(d.search ?? null);
         })
       : fetch(`/api/searches/${savedId}/results`).then(async res => {
           if (!res.ok) return explain(res.status);
@@ -1017,6 +1107,7 @@ export default function SearchPage() {
           setResults(d.results);
           if (d.salt) setSalt(d.salt);
           setSearchId(savedId);
+          applySavedMeta(d.search ?? null);
         });
 
     load
@@ -1654,6 +1745,38 @@ export default function SearchPage() {
                       <X size={12} />{isCs ? 'Zrušit filtry' : 'Clear filters'}
                     </button>
                   )}
+                  {/* Uložené hledání: jméno, „co je nové od minule" a nový běh. Neuložené: uložit. */}
+                  {searchId && !isDemo && (savedMeta?.rootName ? (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="badge text-ink" title={localized(S.savedAs, locale)}>
+                        <Bookmark size={10} />{savedMeta.rootName}
+                      </span>
+                      {savedMeta.earlierRuns > 0 && (
+                        <button onClick={() => setOnlyNew(v => !v)} className={onlyNew ? 'chip-active' : 'chip'}>
+                          {localized(S.onlyNew, locale)}
+                          <span className={`tnum ${onlyNew ? 'text-accent-ink/70' : 'text-ink-faint'}`}>{newCount}</span>
+                        </button>
+                      )}
+                      <button onClick={rerunSearch} disabled={rerunning || jobRunning} className="btn-outline btn-sm gap-1.5">
+                        <RefreshCw size={14} />{rerunning ? localized(S.rerunning, locale) : localized(S.rerun, locale)}
+                      </button>
+                    </div>
+                  ) : showSave ? (
+                    <form onSubmit={e => { e.preventDefault(); void saveSearch(); }} className="flex items-center gap-2">
+                      <input className="input h-9 w-48" autoFocus placeholder={localized(S.saveNamePh, locale)}
+                             value={saveName} onChange={e => setSaveName(e.target.value)} maxLength={80} />
+                      <button type="submit" className="btn-primary btn-sm" disabled={savingSearch || !saveName.trim()}>
+                        {localized(S.saveConfirm, locale)}
+                      </button>
+                      <button type="button" onClick={() => setShowSave(false)} className="text-xs text-ink-muted hover:text-ink">
+                        {localized(S.cancel, locale)}
+                      </button>
+                    </form>
+                  ) : (
+                    <button onClick={() => setShowSave(true)} className="btn-outline btn-sm gap-1.5" title={localized(S.saveTip, locale)}>
+                      <Bookmark size={14} />{localized(S.save, locale)}
+                    </button>
+                  ))}
                   {searchId && (
                     <div className="flex items-center gap-2">
                       <button
@@ -1817,6 +1940,11 @@ export default function SearchPage() {
                         )}
                         {b.inInsolvency === true && (
                           <span className="badge-red" title="ARES">{localized(S.insolvency, locale)}</span>
+                        )}
+                        {b.isNew && (
+                          <span className="badge-accent" title={localized(S.newTip, locale)}>
+                            <Sparkles size={10} />{localized(S.newBadge, locale)}
+                          </span>
                         )}
                         {b.claim === 'other' && (
                           <span className="badge text-ink-faint" title={localized(S.claimOtherTip, locale)}>

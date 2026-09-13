@@ -77,16 +77,32 @@ enum Plan {
   BUSINESS
 }
 
+/// Jedno hledání = jeden běh. Uložené hledání je běh se jménem; další spuštění téže kombinace
+/// jsou běhy se `savedId` ukazujícím na ten pojmenovaný „kořen". „Co je nové od minule" se
+/// počítá z řádků posledního běhu, jejichž firma v žádném dřívějším běhu kořene nebyla.
 model Search {
   id        String   @id @default(cuid())
   userId    String
   query     String
   region    String
+  /// Jméno, které dal uživatel. Vyplněné jen u kořene uloženého hledání.
+  name      String?
+  /// Uložená kombinace filtrů (id z lead-filters.ts) a scénář — obnoví se při otevření.
+  filters   String[] @default([])
+  scenario  String?
+  /// Kořen (pojmenované hledání), ke kterému tenhle běh patří. NULL = samostatný běh nebo kořen.
+  savedId   String?
+  /// Kdy uživatel kořen naposledy otevřel — od toho se počítá „nové od minule".
+  lastOpenedAt DateTime?
   createdAt DateTime @default(now())
 
   user    User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   results BusinessResult[]
   job     SearchJob?
+  saved   Search?          @relation("SavedRuns", fields: [savedId], references: [id], onDelete: SetNull)
+  runs    Search[]         @relation("SavedRuns")
+
+  @@index([userId, savedId, createdAt])
 }
 
 /// Jedno hledání běžící na pozadí.
