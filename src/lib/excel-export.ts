@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx';
 import { BusinessResult } from '@prisma/client';
 import { leadReason } from './lead-reason';
+import { websiteAudit } from './website-audit';
 import { localized } from './lead-filters';
 import { reachScore } from './reach-score';
 import { resolveStatus, type WebsiteStatus } from './website-status';
@@ -56,6 +57,7 @@ export const EXPORT_COLUMNS = [
   { key: 'score',      cs: 'Skóre',                sk: 'Skóre',                en: 'Score' },
   { key: 'reach',      cs: 'Dosažitelnost',        sk: 'Dosiahnuteľnosť',      en: 'Reachability' },
   { key: 'reason',     cs: 'Proč oslovit',         sk: 'Prečo osloviť',        en: 'Why contact' },
+  { key: 'audit',      cs: 'Audit webu',           sk: 'Audit webu',           en: 'Website audit' },
   { key: 'category',   cs: 'Kategorie',            sk: 'Kategória',            en: 'Category' },
   { key: 'source',     cs: 'Zdroj',                sk: 'Zdroj',                en: 'Source' },
 ] as const;
@@ -80,6 +82,8 @@ export function exportRow(b: BusinessResult, criteria: readonly string[] | null 
     b.leadScore,
     reachScore(b),
     leadReason(b, criteria, locale),
+    // Věta do nabídky („Web působí zastarale (42/100): bez HTTPS…"), stejná jako na řádku.
+    websiteAudit(b, locale)?.sentence ?? '',
     b.category || '',
     b.source,
   ];
@@ -109,7 +113,7 @@ export function exportToExcel(
     { wch: 30 }, { wch: 10 }, { wch: 18 }, { wch: 28 }, { wch: 35 },
     { wch: 30 }, { wch: 34 }, { wch: 10 }, { wch: 38 }, { wch: 38 },
     { wch: 38 }, { wch: 12 }, { wch: 12 }, { wch: 18 }, { wch: 7 },
-    { wch: 14 }, { wch: 70 }, { wch: 20 }, { wch: 16 },
+    { wch: 14 }, { wch: 70 }, { wch: 60 }, { wch: 20 }, { wch: 16 },
   ];
 
   const wb = XLSX.utils.book_new();

@@ -12,6 +12,7 @@ import { LEAD_FILTERS, GROUP_LABELS, GROUP_ORDER, employeeLabel, matchesAll, loc
 import { leadReason } from '@/lib/lead-reason';
 import { reachHint, reachScore } from '@/lib/reach-score';
 import { scoreBreakdown } from '@/lib/lead-score';
+import { websiteAudit } from '@/lib/website-audit';
 import { YIELD_NOTE, yieldFor } from '@/lib/nace-map';
 import { SCENARIOS, SCENARIO_BY_PROFESSION, scenarioById } from '@/lib/scenarios';
 import { EMPTY_PROFILE, industriesFor, presetFiltersFor, type UserProfile } from '@/lib/profile';
@@ -2179,6 +2180,17 @@ export default function SearchPage() {
                         return proofs.length > 0 ? (
                           <p className="text-[11px] text-ink-faint leading-relaxed mt-2">
                             <span className="text-ink-muted">{localized(S.provenBy, locale)}</span> {Array.from(new Set(proofs)).join(' · ')}
+                          </p>
+                        ) : null;
+                      })()}
+
+                      {/* Audit webu jednou větou — argument do nabídky. Dřív jen v bublině myši
+                          nad odznakem; na telefonu ho nikdo neviděl. Viz lib/website-audit.ts. */}
+                      {!isDemo && (() => {
+                        const audit = websiteAudit(b, locale);
+                        return audit ? (
+                          <p className={`text-[11px] leading-relaxed mt-1 ${audit.verdict === 'dated' ? 'text-warm' : 'text-ink-faint'}`}>
+                            <Globe size={10} className="inline -mt-0.5 mr-1" />{audit.sentence}
                           </p>
                         ) : null;
                       })()}
