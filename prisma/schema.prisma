@@ -167,6 +167,18 @@ model BusinessResult {
   /// Kód právní formy z ARESu (112 = s.r.o., 101 = živnostník, 121 = a.s. …). Ukládá se kód,
   /// ne přeložený název — číselník patří do zobrazovací vrstvy.
   legalForm     String?
+  /// Kódy CZ-NACE z ARESu (`czNace`), všechny, ne jen první. Do 13. 9. 2026 se četly a zahazovaly.
+  nace          String[] @default([])
+  /// Živnosti z RŽP: `[{ kind, subject, since }]` — druh, předmět podnikání, datum vzniku oprávnění.
+  trades        Json?
+  /// Kategorie počtu pracovníků z RES (číselník ČSÚ: 110 bez zaměstnanců, 120 = 1–5 …).
+  /// `000` a NULL znamenají „neuvedeno" — třetí stav, nikdy ne nula.
+  employeeCategory String?
+  /// ARES `seznamRegistraci.stavZdrojeIr`: TRUE = subjekt je v insolvenčním rejstříku,
+  /// FALSE = není, NULL = neptali jsme se. Jen negativní filtr; podrobnosti neukládáme.
+  inInsolvency  Boolean?
+  /// ARES `datumAktualizace` — kdy se záznam v rejstříku naposledy změnil.
+  registryUpdatedAt DateTime?
   /// Počet provozoven s aktivním živnostenským oprávněním. Nejlepší volně dostupný signál, že
   /// firma opravdu funguje: kdo měl provozovny a všechny zrušil, skoro jistě skončil. NULL
   /// znamená, že jsme se nezeptali (firma bez IČO nebo nestihnutý dotaz), 0 je odpověď.
@@ -283,6 +295,30 @@ model Claim {
   /// Další označení téže firmy týmž uživatelem jen obnoví čas, nezaloží druhý řádek.
   @@unique([firmKey, userId])
   @@index([firmKey, createdAt])
+}
+
+/// Trvalé vyřazení subjektu na jeho žádost.
+///
+/// Žádost vyřadí subjekt OKAMŽITĚ (status `active`): od zápisu se nezobrazuje nikomu, nezapisuje
+/// se do nových hledání a nejde exportovat. Ověření přijde až potom — kdyby se žádost ukázala jako
+/// neplatná, admin ji označí `rejected` a subjekt se vrátí. Opačné pořadí by znamenalo, že žádost
+/// visí, dokud si ji někdo nepřečte, a to se u práva na námitku nedělá.
+model Optout {
+  id          String    @id @default(cuid())
+  /// IČO, nebo `osm:<placeId>` — stejný klíč jako u nároků (lib/claim-order.ts).
+  firmKey     String    @unique
+  /// E-mail žadatele, jen pro potvrzení a případný dotaz. Nikde se nezobrazuje.
+  email       String
+  /// Jednorázový token pro potvrzovací odkaz.
+  token       String    @unique
+  /// `active` (platí hned) | `confirmed` (žadatel klikl na odkaz) | `rejected` (neplatná žádost, subjekt vrácen)
+  status      String    @default("active")
+  note        String?
+  createdAt   DateTime  @default(now())
+  confirmedAt DateTime?
+  reviewedAt  DateTime?
+
+  @@index([status])
 }
 
 model LeadTag {

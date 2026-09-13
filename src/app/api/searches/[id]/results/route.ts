@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { activeAccount, sessionFrom } from '@/lib/auth';
 import { isPaying, markClaims, orderSalt } from '@/lib/claims';
+import { withoutOptouts } from '@/lib/optout';
 import { prisma } from '@/lib/db';
 import { cityOf, resolveFilters } from '@/lib/lead-filters';
 
@@ -55,7 +56,8 @@ export async function GET(
     const results = city ? rows.filter(r => cityOf(r.address) === city).slice(skip, skip + take) : rows;
     // Stejně jako v /api/jobs/[id]: nároky pro platící jedním dotazem, sůl pro míchání remíz.
     const account = await activeAccount(payload.userId);
-    const marked = await markClaims(results, payload.userId, Boolean(account && isPaying(account)));
+    const visible = await withoutOptouts(results);
+    const marked = await markClaims(visible, payload.userId, Boolean(account && isPaying(account)));
     return NextResponse.json({ results: marked, total: marked.length, salt: orderSalt(payload.userId) });
   } catch (err) {
     console.error('/api/searches/[id]/results:', err);

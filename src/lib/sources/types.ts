@@ -71,6 +71,25 @@ export interface RawLead {
    * jezdící ke klientům provozovnu registrovanou mít nemusí.
    */
   activePremises?: number;
+  /** Všechny kódy CZ-NACE z ARESu. `category` je jen ten první; tady je celý seznam. */
+  nace?: string[];
+  /** Živnosti z RŽP: druh, předmět podnikání a datum vzniku oprávnění. */
+  trades?: TradeLicence[];
+  /** Kategorie počtu pracovníků z RES (kód číselníku ČSÚ). `000` = neuvedeno, stejně jako `undefined`. */
+  employeeCategory?: string;
+  /** ARES říká, že subjekt je v insolvenčním rejstříku. `false` = není, `undefined` = neptali jsme se. */
+  inInsolvency?: boolean;
+  /** ARES `datumAktualizace` — poslední změna záznamu v rejstříku. */
+  registryUpdatedAt?: Date;
+}
+
+export interface TradeLicence {
+  /** `druhZivnosti`: Ohlašovací volná, Ohlašovací řemeslná, Koncesovaná … */
+  kind?: string;
+  /** `predmetPodnikani` */
+  subject?: string;
+  /** `datumVzniku` oprávnění, `YYYY-MM-DD` */
+  since?: string;
 }
 
 export interface DiscoverySource {

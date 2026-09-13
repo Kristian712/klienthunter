@@ -8,7 +8,7 @@ import {
   Mail, MapPin, X, Clock, ChevronDown,
   FileText, Table2, PhoneCall,
 } from 'lucide-react';
-import { LEAD_FILTERS, GROUP_LABELS, GROUP_ORDER, matchesAll, localized } from '@/lib/lead-filters';
+import { LEAD_FILTERS, GROUP_LABELS, GROUP_ORDER, employeeLabel, matchesAll, localized } from '@/lib/lead-filters';
 import { leadReason } from '@/lib/lead-reason';
 import { reachHint, reachScore } from '@/lib/reach-score';
 import { scoreBreakdown } from '@/lib/lead-score';
@@ -73,6 +73,11 @@ interface BusinessResult {
   legalForm?: string | null;
   /** Počet provozoven s aktivním živnostenským oprávněním. NULL = nezeptali jsme se. */
   activePremises?: number | null;
+  /** Rejstříková pole ukládaná od 13. 9. 2026; starší řádky je nemají. */
+  employeeCategory?: string | null;
+  inInsolvency?: boolean | null;
+  nace?: string[] | null;
+  registryUpdatedAt?: string | null;
   /** IČO nebo `osm:<placeId>` — klíč pro nároky a míchání pořadí (lib/claim-order.ts). */
   firmKey?: string;
   /** `other` = jiný účet firmu nedávno oslovil (skóre pro řazení klesá), `mine` = já. */
@@ -462,6 +467,8 @@ const S = {
   errPollLost:{ cs: 'Ztratili jsme spojení s hledáním. Co se stihlo najít, zůstalo uložené — obnovte stránku.',
                 sk: 'Stratili sme spojenie s hľadaním. Čo sa stihlo nájsť, zostalo uložené — obnovte stránku.',
                 en: 'Lost contact with the search. Whatever was found is saved — reload the page.' },
+  insolvency:  { cs: 'V insolvenci', sk: 'V insolvencii', en: 'In insolvency' },
+  provenBy:    { cs: 'Doloženo:', sk: 'Doložené:', en: 'Backed by:' },
   claimOther:  { cs: 'Nedávno oslovena jinde', sk: 'Nedávno oslovená inde', en: 'Recently approached elsewhere' },
   claimOtherTip: { cs: 'Jiný uživatel ji v posledních 30 dnech označil jako oslovenou. Ve výsledcích je proto níž — ne pryč.',
                    sk: 'Iný používateľ ju v posledných 30 dňoch označil ako oslovenú. Vo výsledkoch je preto nižšie — nie preč.',
@@ -1801,6 +1808,16 @@ export default function SearchPage() {
                         <WebsiteStatusBadge b={b} locale={locale} />
                         {/* Nárok: cizí sráží pořadí a říká jen „jinde" — bez toho kým, kdy a kolikrát.
                             Vlastní pořadí nemění. Stejná třída `badge`, žádná nová barva. */}
+                        {/* Zaměstnanci ze statistického registru — tři stavy. `000` je „počet neuveden",
+                            nikdy nula; NULL znamená, že jsme se neptali (starší řádek), a nepíše se nic. */}
+                        {b.employeeCategory != null && (
+                          <span className="badge text-ink-faint" title="RES · ARES">
+                            {employeeLabel(b.employeeCategory, locale)}
+                          </span>
+                        )}
+                        {b.inInsolvency === true && (
+                          <span className="badge-red" title="ARES">{localized(S.insolvency, locale)}</span>
+                        )}
                         {b.claim === 'other' && (
                           <span className="badge text-ink-faint" title={localized(S.claimOtherTip, locale)}>
                             <Users size={10} />{localized(S.claimOther, locale)}
@@ -1859,6 +1876,19 @@ export default function SearchPage() {
                           schovává, takže na telefonu by ji jinak nikdo nikdy neviděl — a je to
                           ta jediná věta, kvůli které má řádek smysl číst. */}
                       <p className="lg:hidden text-xs text-ink-muted leading-relaxed mt-3">{reason}</p>
+                      {/* Čím se zapnuté filtry u téhle firmy opírají — „vznik 14. 9. 2026 · ARES". Filtr,
+                          který důkaz nemá, tu nic netvrdí. */}
+                      {(() => {
+                        const proofs = LEAD_FILTERS
+                          .filter(f => active.has(f.id) && f.evidence)
+                          .map(f => f.evidence!(b, locale))
+                          .filter((x): x is string => Boolean(x));
+                        return proofs.length > 0 ? (
+                          <p className="text-[11px] text-ink-faint leading-relaxed mt-2">
+                            <span className="text-ink-muted">{localized(S.provenBy, locale)}</span> {Array.from(new Set(proofs)).join(' · ')}
+                          </p>
+                        ) : null;
+                      })()}
 
                       {/* Důkaz k příznaku webu se dosud předával jen jako `title`, tedy bublina
                           myši — na telefonu ho nikdo nikdy neviděl. Přitom je to jediné, co

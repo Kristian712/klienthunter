@@ -40,7 +40,9 @@ interface AresSubject {
    * se dnes obchází zvlášť SOAPem na ADIS, ale ten stíhá jen část firem — kdežto tohle přijde
    * v odpovědi, kterou stahujeme tak jako tak.
    */
-  seznamRegistraci?: { stavZdrojeDph?: string };
+  seznamRegistraci?: { stavZdrojeDph?: string; stavZdrojeIr?: string };
+  /** `YYYY-MM-DD` — poslední změna záznamu v ARESu. */
+  datumAktualizace?: string;
 }
 
 interface AresFilter {
@@ -115,6 +117,16 @@ function toLead(s: AresSubject): RawLead | null {
       : s.seznamRegistraci?.stavZdrojeDph === 'NEEXISTUJICI'
         ? false
         : undefined,
+    // Celý seznam NACE, ne jen první — do 13. 9. 2026 se zahazoval a filtr podle oboru nešel postavit.
+    nace,
+    // Insolvenční rejstřík: stejná logika tří stavů jako u DPH. Jen příznak; podrobnosti (kdy, jaké
+    // řízení) by chtěly ISIR a ten se používá výhradně nad IČO, která už máme — nikdy jako zdroj seznamu.
+    inInsolvency: s.seznamRegistraci?.stavZdrojeIr === 'AKTIVNI'
+      ? true
+      : s.seznamRegistraci?.stavZdrojeIr === 'NEEXISTUJICI'
+        ? false
+        : undefined,
+    registryUpdatedAt: parseAresDate(s.datumAktualizace),
   };
 }
 

@@ -57,6 +57,12 @@ const PHRASE: Record<string, Text> = {
   established_10y:  { cs: 'podniká přes deset let', sk: 'podniká vyše desiatich rokov', en: 'it has traded for over ten years' },
   vat_payer:        { cs: 'je plátce DPH', sk: 'je platiteľ DPH', en: 'it is VAT-registered' },
   vat_none:         { cs: 'není plátce DPH', sk: 'nie je platiteľ DPH', en: 'it is not VAT-registered' },
+  sole_trader:      { cs: 'je to živnostník', sk: 'je to živnostník', en: 'it is a sole trader' },
+  company_form:     { cs: 'je to obchodní společnost', sk: 'je to obchodná spoločnosť', en: 'it is a company' },
+  has_employees:    { cs: 'má zaměstnance', sk: 'má zamestnancov', en: 'it has employees' },
+  no_employees:     { cs: 'je bez zaměstnanců', sk: 'je bez zamestnancov', en: 'it has no employees' },
+  no_insolvency:    { cs: 'není v insolvenci', sk: 'nie je v insolvencii', en: 'it is not in insolvency' },
+  in_insolvency:    { cs: 'je v insolvenci', sk: 'je v insolvencii', en: 'it is in insolvency' },
   no_category:      { cs: 'obor nemá v rejstříku uvedený', sk: 'odbor nemá v registri uvedený', en: 'its trade is not listed in the register' },
 };
 

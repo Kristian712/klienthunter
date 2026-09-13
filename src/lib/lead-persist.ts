@@ -1,9 +1,11 @@
 import { analyzeBusinessFull } from './business-checks';
 import { prisma } from './db';
+import type { Prisma } from '@prisma/client';
 import { leadScore } from './lead-score';
 import { contactPageUrl, extractContacts } from './sources';
 import { socialFromUrl } from './website-status';
 import type { VerifiedCandidate } from './lead-pipeline';
+import { withoutOptouts } from './optout';
 
 /**
  * The last step of both a search and a CSV import: turn verdicts into rows.
@@ -56,6 +58,12 @@ export async function persistResults(
       vatUnreliable:  c.vatUnreliable,
       legalForm:      c.legalForm,
       activePremises: c.activePremises,
+      // Rejstříková pole, která se dřív četla a zahazovala. `trades` je JSON, zbytek sloupce.
+      nace:             c.nace ?? [],
+      trades:           c.trades && c.trades.length ? (c.trades as unknown as Prisma.InputJsonValue) : undefined,
+      employeeCategory: c.employeeCategory,
+      inInsolvency:     c.inInsolvency,
+      registryUpdatedAt: c.registryUpdatedAt,
     };
 
     const write = () => prisma.businessResult.create({
@@ -108,5 +116,8 @@ export async function persistResults(
     }
   };
 
-  return (await Promise.all(verified.map(persist))).filter(Boolean);
+  // Subjekt, který požádal o vyřazení, se do nového hledání nezapíše — platí od okamžiku žádosti
+  // (lib/optout.ts). Jeden dotaz na dávku.
+  const allowed = await withoutOptouts(verified.map(v => v.c)).then(cs => new Set(cs));
+  return (await Promise.all(verified.filter(v => allowed.has(v.c)).map(persist))).filter(Boolean);
 }

@@ -30,13 +30,19 @@ const ROW_BTN_BLOCK = `${ROW_BTN} font-medium border-field text-ink-muted hover:
 // Paid plans and unused codes
 const BADGE_STRONG = 'badge border-field text-ink';
 
+interface Optout {
+  id: string; firmKey: string; email: string; status: 'active' | 'confirmed' | 'rejected';
+  note: string | null; createdAt: string; confirmedAt: string | null; reviewedAt: string | null;
+}
+
 export default function AdminPage() {
   const locale = useLocale();
   const isCs = locale === 'cs' || locale === 'sk';
 
   const [users, setUsers]             = useState<AdminUser[]>([]);
   const [codes, setCodes]             = useState<InviteCode[]>([]);
-  const [tab, setTab]                 = useState<'users' | 'codes'>('users');
+  const [tab, setTab]                 = useState<'users' | 'codes' | 'optouts'>('users');
+  const [optouts, setOptouts]         = useState<Optout[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
   /** Načtení selhalo — prázdný panel by tvrdil, že v databázi nikdo není. */
   const [loadFailed, setLoadFailed]   = useState(false);
@@ -97,7 +103,36 @@ export default function AdminPage() {
     }
   }, []);
 
-  useEffect(() => { fetchUsers(); fetchCodes(); }, [fetchUsers, fetchCodes]);
+  const fetchOptouts = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/optouts');
+      if (!res.ok) throw new Error(`optouts ${res.status}`);
+      const d = await res.json();
+      setOptouts(d.optouts ?? []);
+    } catch (err) {
+      console.error('admin/optouts:', err);
+      setLoadFailed(true);
+    }
+  }, []);
+
+  useEffect(() => { fetchUsers(); fetchCodes(); fetchOptouts(); }, [fetchUsers, fetchCodes, fetchOptouts]);
+
+  /** Zamítnutí vrátí subjekt do výsledků; obnovení ho zase vyřadí. Vyřazení samo na nikoho nečekalo. */
+  const setOptoutStatus = async (o: Optout, status: 'active' | 'rejected') => {
+    setUpdating(o.id + '-optout');
+    const res = await fetch('/api/admin/optouts', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: o.id, status }),
+    });
+    if (res.ok) {
+      setOptouts(prev => prev.map(x => x.id === o.id ? { ...x, status, reviewedAt: new Date().toISOString() } : x));
+      showToast(status === 'rejected' ? (isCs ? `Žádost zamítnuta, ${o.firmKey} se zase zobrazuje` : `Request rejected, ${o.firmKey} is visible again`)
+                                      : (isCs ? `${o.firmKey} znovu vyřazeno` : `${o.firmKey} removed again`));
+    } else {
+      failToast();
+    }
+    setUpdating(null);
+  };
 
   const toggleVip = async (user: AdminUser) => {
     setUpdating(user.id + '-vip');
@@ -249,20 +284,63 @@ export default function AdminPage() {
 
         {/* Tabs (transparent border on the inactive one: no 2px shift) */}
         <div className="flex gap-1 mb-6 bg-surface-muted border border-line p-1 rounded-xl w-fit">
-          {(['users', 'codes'] as const).map(t => (
+          {(['users', 'codes', 'optouts'] as const).map(t => (
             <button key={t} onClick={() => setTab(t)}
               className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
                 tab === t
                   ? 'bg-surface text-ink border-line-strong'
                   : 'border-transparent text-ink-faint hover:text-ink'
               }`}>
-              {t === 'users' ? (isCs ? 'Uživatelé' : 'Users') : (isCs ? 'Invite kódy' : 'Invite codes')}
+              {t === 'users' ? (isCs ? 'Uživatelé' : 'Users') : t === 'codes' ? (isCs ? 'Invite kódy' : 'Invite codes') : (isCs ? 'Vyřazení' : 'Opt-outs')}
               <span className="ml-2 text-xs tnum text-ink-faint">
-                {t === 'users' ? users.length : codes.length}
+                {t === 'users' ? users.length : t === 'codes' ? codes.length : optouts.length}
               </span>
             </button>
           ))}
         </div>
+
+        {/* ── Opt-outs ── Vyřazení platí od žádosti; tady se jen kontroluje a případně zamítá. */}
+        {tab === 'optouts' && (
+          <div className="card">
+            <p className="text-xs text-ink-faint mb-4">
+              {isCs
+                ? 'Žádost vyřadí subjekt okamžitě. „Potvrzeno" = žadatel klikl na odkaz v e-mailu. Zamítnout jen prokazatelně neoprávněnou žádost — subjekt se pak vrátí do výsledků.'
+                : 'A request removes the entity immediately. “Confirmed” = the requester clicked the e-mail link. Reject only a demonstrably unauthorised request — the entity then returns to results.'}
+            </p>
+            {optouts.length === 0 ? (
+              <p className="text-sm text-ink-faint">{isCs ? 'Zatím žádná žádost.' : 'No requests yet.'}</p>
+            ) : (
+              <div className="overflow-x-auto"><table className="table">
+                <thead><tr>
+                  <th>IČO / klíč</th><th>E-mail</th><th>{isCs ? 'Stav' : 'Status'}</th><th>{isCs ? 'Podáno' : 'Filed'}</th><th></th>
+                </tr></thead>
+                <tbody>
+                  {optouts.map(o => (
+                    <tr key={o.id}>
+                      <td className="font-mono text-xs">{o.firmKey}</td>
+                      <td className="text-xs">{o.email}</td>
+                      <td className="text-xs">
+                        {o.status === 'confirmed' ? (isCs ? 'potvrzeno' : 'confirmed') : o.status === 'rejected' ? (isCs ? 'zamítnuto' : 'rejected') : (isCs ? 'platí, nepotvrzeno' : 'active, unconfirmed')}
+                      </td>
+                      <td className="text-xs text-ink-faint">{new Date(o.createdAt).toLocaleDateString(isCs ? 'cs-CZ' : 'en-GB')}</td>
+                      <td>
+                        {o.status === 'rejected' ? (
+                          <button className="btn-outline btn-sm" disabled={updating === o.id + '-optout'} onClick={() => setOptoutStatus(o, 'active')}>
+                            {isCs ? 'Znovu vyřadit' : 'Remove again'}
+                          </button>
+                        ) : (
+                          <button className="btn-outline btn-sm" disabled={updating === o.id + '-optout'} onClick={() => setOptoutStatus(o, 'rejected')}>
+                            {isCs ? 'Zamítnout žádost' : 'Reject request'}
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table></div>
+            )}
+          </div>
+        )}
 
         {/* ── Users tab ── */}
         {tab === 'users' && (

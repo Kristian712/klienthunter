@@ -3,6 +3,7 @@ import { activeAccount, sessionFrom } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { EXPORT_COLUMNS, exportRow, exportToExcel } from '@/lib/excel-export';
 import { localized } from '@/lib/lead-filters';
+import { withoutOptouts } from '@/lib/optout';
 
 /**
  * Oddělovač sloupců. Excel v českém a slovenském Windows čte CSV podle systémového nastavení,
@@ -68,6 +69,8 @@ export async function GET(
     });
 
     if (!search) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    // Vyřazené subjekty nejdou ani do souboru — export je to, co odchází ven.
+    const rows = await withoutOptouts(search.results);
 
     // Věta „proč oslovit" se počítá ze stejných kritérií jako skóre uložené v řádku, takže
     // export a obrazovka vysvětlují pořadí stejně. Profil bereme aktuální — kdyby si uživatel
@@ -95,7 +98,7 @@ export async function GET(
     if (format === 'csv') {
       // BOM: dvojklik v Excelu hlavičku Content-Type nevidí a bez něj čte soubor jako CP1250,
       // takže z „Květinářství Růže" je nečitelná změť. Ostatní tabulkové programy BOM snesou.
-      const csv = `\uFEFF${toCsv(search.results, profile?.targetFilters, locale)}`;
+      const csv = `\uFEFF${toCsv(rows, profile?.targetFilters, locale)}`;
       return new NextResponse(csv, {
         headers: {
           'Content-Type': 'text/csv; charset=utf-8',
@@ -104,7 +107,7 @@ export async function GET(
       });
     }
 
-    const buffer = exportToExcel(search.results, 'klienthunter-export', profile?.targetFilters, locale);
+    const buffer = exportToExcel(rows, 'klienthunter-export', profile?.targetFilters, locale);
     return new NextResponse(buffer as unknown as BodyInit, {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

@@ -1,5 +1,5 @@
 import { createRobotsCache } from './robots';
-import { ENRICHMENT_SOURCES, contactPageUrl, extractContacts, type RawLead } from './sources';
+import { ENRICHMENT_SOURCES, contactPageUrl, extractContacts, type RawLead, type TradeLicence } from './sources';
 import { resolveNiche } from './nace-map';
 import {
   addressParts,
@@ -117,6 +117,12 @@ export interface Candidate {
   legalForm?: string;
   /** Počet provozoven s aktivním živnostenským oprávněním. Viz `RawLead.activePremises`. */
   activePremises?: number;
+  /** Rejstříková pole, která se do 13. 9. 2026 četla a zahazovala. Viz `RawLead`. */
+  nace?: string[];
+  trades?: TradeLicence[];
+  employeeCategory?: string;
+  inInsolvency?: boolean;
+  registryUpdatedAt?: Date;
   signals: WebsiteSignals;
 }
 
@@ -139,6 +145,9 @@ export function toCandidate(lead: RawLead): Candidate {
     category: lead.category,
     foundedAt: lead.foundedAt,
     legalForm: lead.legalForm,
+    nace: lead.nace,
+    inInsolvency: lead.inInsolvency,
+    registryUpdatedAt: lead.registryUpdatedAt,
     vatPayer: lead.vatPayer,
     signals: {
       claimedUrl: lead.website,
@@ -475,6 +484,8 @@ export async function enrichAndVerify(
       if (patch.vatPayer !== undefined) c.vatPayer = patch.vatPayer;
       if (patch.vatUnreliable !== undefined) c.vatUnreliable = patch.vatUnreliable;
       if (patch.activePremises !== undefined) c.activePremises = patch.activePremises;
+      if (patch.trades) c.trades = patch.trades;
+      if (patch.employeeCategory !== undefined) c.employeeCategory = patch.employeeCategory;
     }
   };
 

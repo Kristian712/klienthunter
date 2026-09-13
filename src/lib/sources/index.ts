@@ -1,8 +1,10 @@
 import { aresSource } from './ares';
 import { osmSource } from './osm';
 import { aresRzpSource } from './ares-rzp';
+import { aresResSource } from './ares-res';
 import { dphSource } from './dph';
 import type { DiscoverySource, EnrichmentSource, RawLead } from './types';
+export type { TradeLicence } from './types';
 
 export type { RawLead, DiscoverySource, EnrichmentSource } from './types';
 export { extractContacts, contactPageUrl } from './site-contacts';
@@ -18,7 +20,7 @@ export { OSM_ATTRIBUTION } from './osm';
  */
 export const DISCOVERY_SOURCES: DiscoverySource[] = [aresSource, osmSource];
 
-export const ENRICHMENT_SOURCES: EnrichmentSource[] = [aresRzpSource, dphSource];
+export const ENRICHMENT_SOURCES: EnrichmentSource[] = [aresRzpSource, aresResSource, dphSource];
 
 /**
  * Runs every discovery source and returns their leads grouped by source, in registration

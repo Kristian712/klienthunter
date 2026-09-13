@@ -16,6 +16,9 @@ interface RzpEstablishment {
 interface RzpTrade {
   provozovny?: RzpEstablishment[];
   predmetPodnikani?: unknown;
+  druhZivnosti?: string;
+  /** `YYYY-MM-DD` — vznik živnostenského oprávnění. */
+  datumVzniku?: string;
 }
 
 interface RzpProvozovnyStav {
@@ -60,9 +63,17 @@ export const aresRzpSource: EnrichmentSource = {
           // Firma bez jediné provozovny v rejstříku počítadlo nemá; to je nula, ne „nevíme".
           : zaznam ? 0 : undefined;
 
+      // Živnosti samotné: druh, předmět a datum vzniku oprávnění. Do 13. 9. 2026 se četly a
+      // zahazovaly; „nová živnost" je přitom událost, na kterou čeká účetní i pojišťovák.
+      const licences = zaznam?.zivnosti?.map(t => ({
+        kind: t.druhZivnosti,
+        subject: typeof t.predmetPodnikani === 'string' ? t.predmetPodnikani : undefined,
+        since: t.datumVzniku,
+      })).filter(t => t.kind || t.subject || t.since);
+
       // Prefer a real shop or workshop address over the registered seat.
       const address = premises[0]?.sidloProvozovny?.textovaAdresa;
-      return address ? { address, activePremises } : { activePremises };
+      return { ...(address ? { address } : {}), activePremises, ...(licences?.length ? { trades: licences } : {}) };
     } catch {
       return {};
     }

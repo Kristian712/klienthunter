@@ -56,9 +56,54 @@ export interface FilterableLead {
   activePremises?: number | null;
   /** Které zdroje o firmě věděly, spojené plusem: `ares`, `osm`, `ares+osm`. */
   source?: string | null;
+  /** Kategorie počtu pracovníků z RES (kód ČSÚ). `000` i NULL = neuvedeno, třetí stav. */
+  employeeCategory?: string | null;
+  /** ARES: subjekt je v insolvenčním rejstříku. NULL = neptali jsme se. */
+  inInsolvency?: boolean | null;
+  nace?: string[] | null;
+  registryUpdatedAt?: Date | string | null;
 }
 
-export type FilterGroup = 'web' | 'contact' | 'company';
+/** Zdroj, o který se filtr opírá — vypisuje se u každého doložení. */
+export type FilterSource = 'ARES' | 'RŽP' | 'RES' | 'MFČR' | 'OSM' | 'web';
+
+const DATE_LOCALE: Record<string, string> = { cs: 'cs-CZ', sk: 'sk-SK', en: 'en-GB' };
+function fmtDate(value: Date | string | null | undefined, locale: string): string | null {
+  if (!value) return null;
+  const d = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d.toLocaleDateString(DATE_LOCALE[locale] ?? 'cs-CZ');
+}
+
+/** Kategorie počtu pracovníků ČSÚ (RES) → text. `000`/NULL = neuvedeno, schválně ne nula. */
+export const EMPLOYEE_CATEGORY: Record<string, { cs: string; sk?: string; en: string }> = {
+  '110': { cs: 'bez zaměstnanců', sk: 'bez zamestnancov', en: 'no employees' },
+  '120': { cs: '1–5 zaměstnanců', sk: '1–5 zamestnancov', en: '1–5 employees' },
+  '130': { cs: '6–9 zaměstnanců', sk: '6–9 zamestnancov', en: '6–9 employees' },
+  '210': { cs: '10–19 zaměstnanců', sk: '10–19 zamestnancov', en: '10–19 employees' },
+  '220': { cs: '20–24 zaměstnanců', sk: '20–24 zamestnancov', en: '20–24 employees' },
+  '230': { cs: '25–49 zaměstnanců', sk: '25–49 zamestnancov', en: '25–49 employees' },
+  '240': { cs: '50–99 zaměstnanců', sk: '50–99 zamestnancov', en: '50–99 employees' },
+  '310': { cs: '100–199 zaměstnanců', sk: '100–199 zamestnancov', en: '100–199 employees' },
+  '320': { cs: '200–249 zaměstnanců', sk: '200–249 zamestnancov', en: '200–249 employees' },
+  '330': { cs: '250–499 zaměstnanců', sk: '250–499 zamestnancov', en: '250–499 employees' },
+  '340': { cs: '500–999 zaměstnanců', sk: '500–999 zamestnancov', en: '500–999 employees' },
+};
+export function employeeLabel(code: string | null | undefined, locale: string): string {
+  const known = code ? EMPLOYEE_CATEGORY[code] : undefined;
+  if (known) return localized(known, locale);
+  if (code && /^[45]\d\d$/.test(code)) return localized({ cs: '1000+ zaměstnanců', sk: '1000+ zamestnancov', en: '1000+ employees' }, locale);
+  return localized({ cs: 'počet zaměstnanců neuveden', sk: 'počet zamestnancov neuvedený', en: 'employee count not stated' }, locale);
+}
+/** Známá hodnota = cokoli kromě NULL a `000`. */
+export function employeesKnown(b: FilterableLead): boolean {
+  return Boolean(b.employeeCategory && b.employeeCategory !== '000');
+}
+
+/**
+ * Skupiny podle toho, co uživatel řeší, ne podle toho, odkud data jsou:
+ * kdo to je · co se u ní stalo · jak na tom je · jak ji oslovit.
+ */
+export type FilterGroup = 'who' | 'event' | 'standing' | 'reach';
 
 /**
  * Slovak falls back to Czech rather than English. Every label here is understood by a Slovak
@@ -99,20 +144,26 @@ export interface LeadFilter {
    * aplikace, a přitom je to ten nejvzácnější ze tří stavů.
    */
   hint?: { cs: string; sk?: string; en: string };
+  /** Typ ovládání. Dnes jen `bool` (chip); `select` a `range` přijdou s indexem (etapa 3). */
+  kind?: 'bool' | 'select' | 'range' | 'date';
+  /** Odkud filtr bere odpověď. */
+  source?: FilterSource;
+  /**
+   * Čím se filtr u téhle firmy opírá — krátký text pro řádek výsledku, např. „vznik 14. 9. 2026 ·
+   * ARES". Když důkaz není (data chybí), vrací null a UI nic netvrdí. Poučení z detekce webu:
+   * filtr nesmí říkat nic, co nedokáže doložit.
+   */
+  evidence?: (b: FilterableLead, locale: string) => string | null;
 }
 
 export const GROUP_LABELS: Record<FilterGroup, { cs: string; sk?: string; en: string }> = {
-  company: { cs: 'Firma',   sk: 'Firma',   en: 'Company' },
-  contact: { cs: 'Kontakt', sk: 'Kontakt', en: 'Contact' },
-  web:     { cs: 'Web',     sk: 'Web',     en: 'Website' },
+  who:      { cs: 'Kdo to je',     sk: 'Kto to je',      en: 'Who they are' },
+  event:    { cs: 'Co se stalo',   sk: 'Čo sa stalo',    en: 'What happened' },
+  standing: { cs: 'Jak na tom je', sk: 'Ako na tom je',  en: 'How they stand' },
+  reach:    { cs: 'Jak oslovit',   sk: 'Ako osloviť',    en: 'How to reach' },
 };
 
-/**
- * Company first, website last. The website group used to lead because the product was about
- * firms without one; it is now one property among many and must not be the first thing a
- * photographer or an accountant reads.
- */
-export const GROUP_ORDER: FilterGroup[] = ['company', 'contact', 'web'];
+export const GROUP_ORDER: FilterGroup[] = ['who', 'event', 'standing', 'reach'];
 
 /**
  * Rows written before three-state classification carry no status; their `hasWebsite: false`
@@ -204,6 +255,91 @@ const vatUnknown = (b: FilterableLead) => b.vatPayer === null || b.vatPayer === 
 
 export const LEAD_FILTERS: LeadFilter[] = [
   {
+    id: 'sole_trader',
+    group: 'who',
+    kind: 'bool',
+    source: 'ARES',
+    label: { cs: 'Živnostník (OSVČ)', sk: 'Živnostník (SZČO)', en: 'Sole trader' },
+    where: { legalForm: { in: SOLE_TRADER_FORMS } },
+    test: b => Boolean(b.legalForm && SOLE_TRADER_FORMS.includes(b.legalForm)),
+    unknown: b => !b.legalForm,
+    evidence: (b, l) => b.legalForm ? localized({ cs: `právní forma ${b.legalForm} · ARES`, sk: `právna forma ${b.legalForm} · ARES`, en: `legal form ${b.legalForm} · ARES` }, l) : null,
+  },
+  {
+    id: 'company_form',
+    group: 'who',
+    kind: 'bool',
+    source: 'ARES',
+    label: { cs: 'Obchodní společnost (s.r.o., a.s.)', sk: 'Obchodná spoločnosť (s.r.o., a.s.)', en: 'Company (Ltd., plc)' },
+    where: { legalForm: { not: null, notIn: SOLE_TRADER_FORMS } },
+    test: b => Boolean(b.legalForm && !SOLE_TRADER_FORMS.includes(b.legalForm)),
+    unknown: b => !b.legalForm,
+    evidence: (b, l) => b.legalForm ? localized({ cs: `právní forma ${b.legalForm} · ARES`, sk: `právna forma ${b.legalForm} · ARES`, en: `legal form ${b.legalForm} · ARES` }, l) : null,
+  },
+  {
+    /**
+     * Tři stavy, ne dva. RES má kategorii počtu pracovníků vyplněnou u 49 % subjektů, u živnostníků
+     * jen asi u 40 % (měřeno 13. 9. 2026). „Neuvedeno" (`000` nebo NULL) proto nikdy nespadne do
+     * „bez zaměstnanců" — je to mezera, a ve výsledku se ukazuje jako „počet neuveden".
+     */
+    id: 'has_employees',
+    group: 'who',
+    kind: 'bool',
+    source: 'RES',
+    label: { cs: 'Má zaměstnance', sk: 'Má zamestnancov', en: 'Has employees' },
+    hint: { cs: 'Podle statistického registru (RES). U živnostníků je údaj vyplněný jen asi u 40 % — ostatní mají „počet neuveden" a filtr je nevybere ani nevyloučí.',
+            sk: 'Podľa štatistického registra (RES). U živnostníkov je údaj vyplnený len asi u 40 % — ostatní majú „počet neuvedený" a filter ich nevyberie ani nevylúči.',
+            en: 'From the statistical register (RES). For sole traders the value is filled in for only about 40 % — the rest show “count not stated” and are neither selected nor excluded.' },
+    where: { employeeCategory: { notIn: ['000', '110'], not: null } },
+    test: b => employeesKnown(b) && b.employeeCategory !== '110',
+    unknown: b => !employeesKnown(b),
+    evidence: (b, l) => employeesKnown(b) ? `${employeeLabel(b.employeeCategory, l)} · RES` : null,
+  },
+  {
+    id: 'no_employees',
+    group: 'who',
+    kind: 'bool',
+    source: 'RES',
+    label: { cs: 'Bez zaměstnanců', sk: 'Bez zamestnancov', en: 'No employees' },
+    hint: { cs: '„Bez zaměstnanců" je jen tam, kde to registr výslovně říká. Neuvedený počet sem nepatří.',
+            sk: '„Bez zamestnancov" je len tam, kde to register výslovne hovorí. Neuvedený počet sem nepatrí.',
+            en: '“No employees” only where the register says so explicitly. An unstated count does not belong here.' },
+    where: { employeeCategory: '110' },
+    test: b => b.employeeCategory === '110',
+    unknown: b => !employeesKnown(b),
+    evidence: (b, l) => b.employeeCategory === '110' ? `${employeeLabel('110', l)} · RES` : null,
+  },
+  {
+    /**
+     * Negativní filtr: koho vyřadit. Jen příznak z ARESu (`stavZdrojeIr`). Podrobnosti by dal ISIR,
+     * a ten se smí použít výhradně nad IČO, která už máme — nikdy jako zdroj seznamu a nikdy pro
+     * fyzické osoby v oddlužení.
+     */
+    id: 'no_insolvency',
+    group: 'standing',
+    kind: 'bool',
+    source: 'ARES',
+    label: { cs: 'Bez insolvence', sk: 'Bez insolvencie', en: 'No insolvency' },
+    hint: { cs: 'Podle příznaku v ARESu. Firmy, u kterých jsme se neptali (starší hledání), filtr nevybere ani nevyloučí.',
+            sk: 'Podľa príznaku v ARESe. Firmy, pri ktorých sme sa nepýtali (staršie hľadania), filter nevyberie ani nevylúči.',
+            en: 'From the ARES flag. Firms we never asked about (older searches) are neither selected nor excluded.' },
+    where: { inInsolvency: false },
+    test: b => b.inInsolvency === false,
+    unknown: b => b.inInsolvency == null,
+    evidence: (b, l) => b.inInsolvency === false ? localized({ cs: 'v insolvenčním rejstříku není · ARES', sk: 'v insolvenčnom registri nie je · ARES', en: 'not in the insolvency register · ARES' }, l) : null,
+  },
+  {
+    id: 'in_insolvency',
+    group: 'standing',
+    kind: 'bool',
+    source: 'ARES',
+    label: { cs: 'V insolvenci', sk: 'V insolvencii', en: 'In insolvency' },
+    where: { inInsolvency: true },
+    test: b => b.inInsolvency === true,
+    unknown: b => b.inInsolvency == null,
+    evidence: (b, l) => b.inInsolvency === true ? localized({ cs: 'v insolvenčním rejstříku · ARES', sk: 'v insolvenčnom registri · ARES', en: 'in the insolvency register · ARES' }, l) : null,
+  },
+  {
     /**
      * Firmy, které dávají znát, že opravdu fungují.
      *
@@ -220,8 +356,14 @@ export const LEAD_FILTERS: LeadFilter[] = [
      * registrovanou mít nemusí. Proto jde filtr vypnout.
      */
     id: 'working',
-    group: 'company',
+    group: 'standing',
     label: { cs: 'Jen fungující podniky', sk: 'Len fungujúce podniky', en: 'Operating businesses only' },
+    source: 'RŽP',
+    evidence: (b, l) => b.activePremises != null && b.activePremises > 0
+      ? localized({ cs: `${b.activePremises} aktivní provozovna/y · RŽP`, sk: `${b.activePremises} aktívna prevádzka/y · RŽP`, en: `${b.activePremises} active premises · RŽP` }, l)
+      : b.vatPayer === true ? localized({ cs: 'plátce DPH · ARES', sk: 'platiteľ DPH · ARES', en: 'VAT registered · ARES' }, l)
+      : b.legalForm && !SOLE_TRADER_FORMS.includes(b.legalForm) ? localized({ cs: `právní forma ${b.legalForm} · ARES`, sk: `právna forma ${b.legalForm} · ARES`, en: `legal form ${b.legalForm} · ARES` }, l)
+      : (b.source ?? '').includes('osm') ? localized({ cs: 'zakreslena v OpenStreetMap', sk: 'zakreslená v OpenStreetMap', en: 'mapped in OpenStreetMap' }, l) : null,
     where: {
       OR: [
         { activePremises: { gt: 0 } },
@@ -243,7 +385,7 @@ export const LEAD_FILTERS: LeadFilter[] = [
      * ne výchozí pohled — vyhodí i spoustu živých malých firem.
      */
     id: 'verified',
-    group: 'company',
+    group: 'standing',
     label: { cs: 'Jen prověřené', sk: 'Len preverené', en: 'Verified only' },
     where: {
       OR: [
@@ -272,7 +414,7 @@ export const LEAD_FILTERS: LeadFilter[] = [
      * rozdělení na „nemá" a „nešlo ověřit" zůstává vedle jako dva samostatné chipy.
      */
     id: 'no_web_found',
-    group: 'web',
+    group: 'reach',
     label: { cs: 'Web jsme nenašli', sk: 'Web sme nenašli', en: 'We found no website' },
     hint: {
       cs: 'Firmy s ověřeným „web nemá" i ty, u kterých web nešlo ověřit. Že web nemají, tím netvrdíme.',
@@ -284,7 +426,7 @@ export const LEAD_FILTERS: LeadFilter[] = [
   },
   {
     id: 'no_website',
-    group: 'web',
+    group: 'reach',
     /**
      * „Web nemá" znamená doložené tvrzení: prošly se domény z názvu firmy, e-mailová doména, to,
      * co uvedly zdroje, **a zeptal se i vyhledávač** — a nic z toho web firmy nebyl (viz
@@ -305,7 +447,7 @@ export const LEAD_FILTERS: LeadFilter[] = [
   },
   {
     id: 'web_unknown',
-    group: 'web',
+    group: 'reach',
     /**
      * Zbytek, u kterého odpověď neznáme: hledání došlo čas, zdroj web uváděl a ten neodpověděl,
      * nebo se z názvu firmy nedá odvodit doména („G A Dent s.r.o."). Je to malá skupina a patří
@@ -323,7 +465,7 @@ export const LEAD_FILTERS: LeadFilter[] = [
   },
   {
     id: 'has_website',
-    group: 'web',
+    group: 'reach',
     label: { cs: 'Má web', sk: 'Má web', en: 'Has website' },
     hint: {
       cs: 'Stránka se načetla a doložila, že patří té firmě — má na sobě IČO, nebo celý název i obor.',
@@ -337,7 +479,7 @@ export const LEAD_FILTERS: LeadFilter[] = [
   },
   {
     id: 'old_website',
-    group: 'web',
+    group: 'reach',
     label: { cs: 'Zastaralý web', sk: 'Zastaraný web', en: 'Outdated website' },
     where: { websiteIsOld: true },
     test: b => Boolean(b.websiteIsOld),
@@ -346,7 +488,7 @@ export const LEAD_FILTERS: LeadFilter[] = [
   },
   {
     id: 'insecure_website',
-    group: 'web',
+    group: 'reach',
     /**
      * Web bez HTTPS. Protokol čteme z uložené adresy, takže to nestojí ani jeden další request —
      * `website` je ta adresa, na které stránka při ověřování skutečně odpověděla.
@@ -362,7 +504,7 @@ export const LEAD_FILTERS: LeadFilter[] = [
   },
   {
     id: 'has_contact_page',
-    group: 'contact',
+    group: 'reach',
     /**
      * Firma má na webu stránku „Kontakt". Čteme ji z odkazu na její vlastní homepage, takže
      * i tohle je zadarmo. Pro oslovení je to nejkratší cesta: bývá tam adresa, otvírací doba
@@ -376,7 +518,7 @@ export const LEAD_FILTERS: LeadFilter[] = [
   },
   {
     id: 'can_reach',
-    group: 'contact',
+    group: 'reach',
     /**
      * „Mám ji jak oslovit."
      *
@@ -400,7 +542,7 @@ export const LEAD_FILTERS: LeadFilter[] = [
   },
   {
     id: 'has_contact',
-    group: 'contact',
+    group: 'reach',
     // Part of the neutral default scoring in lead-score.ts: whatever you sell, a firm you
     // cannot reach is not a lead.
     label: { cs: 'Má telefon nebo e-mail', sk: 'Má telefón alebo e-mail', en: 'Has phone or e-mail' },
@@ -414,7 +556,7 @@ export const LEAD_FILTERS: LeadFilter[] = [
   },
   {
     id: 'no_contact',
-    group: 'contact',
+    group: 'reach',
     label: { cs: 'Bez telefonu i e-mailu', sk: 'Bez telefónu aj e-mailu', en: 'No phone or e-mail' },
     where: {
       AND: [
@@ -426,21 +568,21 @@ export const LEAD_FILTERS: LeadFilter[] = [
   },
   {
     id: 'has_phone',
-    group: 'contact',
+    group: 'reach',
     label: { cs: 'Má telefon', sk: 'Má telefón', en: 'Has phone' },
     where: { NOT: [{ phone: null }, { phone: '' }] },
     test: b => Boolean(b.phone),
   },
   {
     id: 'has_email',
-    group: 'contact',
+    group: 'reach',
     label: { cs: 'Má e-mail', sk: 'Má e-mail', en: 'Has e-mail' },
     where: { NOT: [{ email: null }, { email: '' }] },
     test: b => Boolean(b.email),
   },
   {
     id: 'no_social',
-    group: 'contact',
+    group: 'reach',
     /**
      * Named after the not-finding, exactly like `no_website` above — and for the same reason.
      * The chip prints how many rows it would leave, so on a run where nobody's homepage was
@@ -459,7 +601,7 @@ export const LEAD_FILTERS: LeadFilter[] = [
   },
   {
     id: 'no_web_has_fb',
-    group: 'web',
+    group: 'reach',
     /**
      * Firmy, které se dají oslovit přes Facebook, protože jinudy to nejde.
      *
@@ -480,67 +622,81 @@ export const LEAD_FILTERS: LeadFilter[] = [
   },
   {
     id: 'no_category',
-    group: 'company',
+    group: 'who',
     label: { cs: 'Bez uvedeného oboru', sk: 'Bez uvedeného odboru', en: 'No trade listed' },
     where: { OR: [{ category: null }, { category: '' }] },
     test: b => !b.category,
   },
   {
     id: 'new_firm',
-    group: 'company',
+    group: 'event',
     // The entry date in ARES is exact, so "founded in the last year" is one of the few things
     // we can state without hedging. It is the whole lead list for an accountant or a bookkeeper.
     label: { cs: 'Nová firma (do 1 roku)', sk: 'Nová firma (do 1 roka)', en: 'New firm (under 1 year)' },
+    source: 'ARES',
+    evidence: (b, l) => { const d = fmtDate(b.foundedAt, l); return d ? localized({ cs: `vznik ${d} · ARES`, sk: `vznik ${d} · ARES`, en: `founded ${d} · ARES` }, l) : null; },
     where: { foundedAt: { gt: foundedBefore(1) } },
     test: youngerThan(1),
     unknown: ageUnknown,
   },
   {
     id: 'new_firm_6m',
-    group: 'company',
+    group: 'event',
     // Užší varianta `new_firm`. Datum vzniku v ARESu je přesné, takže i tenhle půlrok je fakt,
     // ne odhad — a je to celý seznam pro účetní nebo pojišťováka, který chce být první.
     label: { cs: 'Nová firma (do 6 měsíců)', sk: 'Nová firma (do 6 mesiacov)', en: 'New firm (under 6 months)' },
+    source: 'ARES',
+    evidence: (b, l) => { const d = fmtDate(b.foundedAt, l); return d ? localized({ cs: `vznik ${d} · ARES`, sk: `vznik ${d} · ARES`, en: `founded ${d} · ARES` }, l) : null; },
     where: { foundedAt: { gt: foundedBefore(0.5) } },
     test: youngerThan(0.5),
     unknown: ageUnknown,
   },
   {
     id: 'established_3y',
-    group: 'company',
+    group: 'standing',
     label: { cs: 'Firma 3+ roky', sk: 'Firma 3+ roky', en: '3+ years old' },
+    source: 'ARES',
+    evidence: (b, l) => { const d = fmtDate(b.foundedAt, l); return d ? localized({ cs: `vznik ${d} · ARES`, sk: `vznik ${d} · ARES`, en: `founded ${d} · ARES` }, l) : null; },
     where: { foundedAt: { lte: foundedBefore(3) } },
     test: olderThan(3),
     unknown: ageUnknown,
   },
   {
     id: 'established_10y',
-    group: 'company',
+    group: 'standing',
     label: { cs: 'Firma 10+ let', sk: 'Firma 10+ rokov', en: '10+ years old' },
+    source: 'ARES',
+    evidence: (b, l) => { const d = fmtDate(b.foundedAt, l); return d ? localized({ cs: `vznik ${d} · ARES`, sk: `vznik ${d} · ARES`, en: `founded ${d} · ARES` }, l) : null; },
     where: { foundedAt: { lte: foundedBefore(10) } },
     test: olderThan(10),
     unknown: ageUnknown,
   },
   {
     id: 'vat_payer',
-    group: 'company',
+    group: 'standing',
     label: { cs: 'Plátce DPH', sk: 'Platiteľ DPH', en: 'VAT registered' },
+    source: 'ARES',
+    evidence: (b, l) => b.vatPayer === true ? localized({ cs: 'plátce DPH · ARES/MFČR', sk: 'platiteľ DPH · ARES/MFČR', en: 'VAT registered · ARES/MFČR' }, l) : null,
     where: { vatPayer: true },
     test: b => b.vatPayer === true,
     unknown: vatUnknown,
   },
   {
     id: 'vat_none',
-    group: 'company',
+    group: 'standing',
     label: { cs: 'Neplátce DPH', sk: 'Neplatiteľ DPH', en: 'Not VAT registered' },
+    source: 'ARES',
+    evidence: (b, l) => b.vatPayer === false ? localized({ cs: 'v registru plátců DPH není · ARES', sk: 'v registri platiteľov DPH nie je · ARES', en: 'not in the VAT register · ARES' }, l) : null,
     where: { vatPayer: false },
     test: b => b.vatPayer === false,
     unknown: vatUnknown,
   },
   {
     id: 'vat_unreliable',
-    group: 'company',
+    group: 'standing',
     label: { cs: 'Nespolehlivý plátce', sk: 'Nespoľahlivý platiteľ', en: 'Unreliable VAT payer' },
+    source: 'MFČR',
+    evidence: (b, l) => b.vatUnreliable === true ? localized({ cs: 'nespolehlivý plátce · MFČR', sk: 'nespoľahlivý platiteľ · MFČR', en: 'unreliable VAT payer · MFČR' }, l) : null,
     where: { vatUnreliable: true },
     test: b => b.vatUnreliable === true,
   },

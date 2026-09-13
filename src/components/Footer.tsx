@@ -26,6 +26,7 @@ const T = {
   support:  { cs: 'Podpora',   sk: 'Podpora',   en: 'Support' },
   contact:  { cs: 'Kontakt',   sk: 'Kontakt',   en: 'Contact' },
   legal:    { cs: 'Právní',    sk: 'Právne',    en: 'Legal' },
+  optout:   { cs: 'Nechci být v seznamu', sk: 'Nechcem byť v zozname', en: 'Remove me from the list' },
   privacy:  { cs: 'Ochrana údajů', sk: 'Ochrana údajov', en: 'Privacy' },
   terms:    { cs: 'Obchodní podmínky', sk: 'Obchodné podmienky', en: 'Terms of Service' },
   language: { cs: 'Jazyk',     sk: 'Jazyk',     en: 'Language' },
@@ -65,6 +66,7 @@ export function Footer({ locale }: { locale: string }) {
             <div className="space-y-2">
               <Link href={`/${locale}/privacy`} className="block text-sm text-ink-muted hover:text-ink">{t(T.privacy)}</Link>
               <Link href={`/${locale}/terms`} className="block text-sm text-ink-muted hover:text-ink">{t(T.terms)}</Link>
+              <Link href={`/${locale}/optout`} className="block text-sm text-ink-muted hover:text-ink">{t(T.optout)}</Link>
             </div>
           </div>
           <div>
