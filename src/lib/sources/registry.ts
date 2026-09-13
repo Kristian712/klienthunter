@@ -39,7 +39,7 @@ export function registryCanServe(q: Pick<RegistryQuery, 'industry' | 'region'>):
 }
 
 /** NACE kódy všech oborů v dotazu (`a + b` = sjednocení). Pro „všechny obory" prázdné = bez filtru. */
-function naceCodesFor(industry: string): string[] {
+export function naceCodesFor(industry: string): string[] {
   const codes = splitIndustries(industry).flatMap(part => resolveNiche(part).nace);
   return Array.from(new Set(codes.filter(c => !USELESS_NACE.has(c))));
 }
@@ -49,7 +49,7 @@ function naceCodesFor(industry: string): string[] {
  * `49410` a firma s `49410` na kód `4941`, takže se hledá oběma směry: prefix kódu i kratší
  * prefixy, které kód obsahuje.
  */
-function naceWhere(codes: string[]) {
+export function naceWhere(codes: string[]) {
   const shorter = new Set<string>();
   for (const code of codes) for (let len = 2; len < code.length; len++) shorter.add(code.slice(0, len));
   return {

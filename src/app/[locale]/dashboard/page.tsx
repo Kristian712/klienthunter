@@ -7,6 +7,7 @@ import { Search, ArrowRight, Crown, Clock, BarChart3, Upload, Trash2, Bookmark, 
 import { clearUser } from '@/lib/client-auth';
 import { industryLabel } from '@/lib/search-options';
 import { formatDate } from '@/lib/format-date';
+import { NewFirmsDigest } from '@/components/NewFirmsDigest';
 
 interface Search {
   id: string; query: string; region: string; createdAt: string;
@@ -171,6 +172,9 @@ export default function DashboardPage() {
           <ArrowRight size={18} className="ml-auto text-ink-faint group-hover:text-accent transition-colors" />
         </Link>
       </div>
+
+      {/* Denní dávka: kolik firem v kraji uživatele nově vzniklo, bez hledání. Viz lib/digest.ts. */}
+      {user && <NewFirmsDigest locale={locale} isAdmin={user.isAdmin} />}
 
       {/* Uložená hledání: kombinace, ke které se uživatel vrací, a kolik je v ní nového od minula. */}
       {saved.length > 0 && (

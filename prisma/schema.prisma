@@ -52,6 +52,10 @@ model User {
   // The trade of the firms they are looking for — feeds the search query.
   targetIndustry   String?
   targetRegion     String?
+  /// Denní dávka: nejmladší datum vzniku, které uživatel v kartě „Nové firmy v kraji" už viděl.
+  /// Firmy s pozdějším vznikem jsou „nové od minule". Datum, ne čas návštěvy — index se plní
+  /// dvakrát měsíčně a čas návštěvy by neřekl nic.
+  digestFoundedAt  DateTime?
   targetCity       String?
   // Ids from LEAD_FILTERS. The share of these a firm meets is its score, so an
   // empty list is meaningful: it means "score by the neutral default".
