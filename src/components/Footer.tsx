@@ -89,12 +89,13 @@ export function Footer({ locale }: { locale: string }) {
         </div>
 
         <div className="border-t border-line mt-10 pt-6 flex flex-col md:flex-row justify-between gap-2 text-xs text-ink-faint">
-          {/* Jméno, IČO a sídlo na každé stránce: § 435 obč. zák. je u podnikatele chce na webu,
-              ne jen schované v podmínkách. */}
+          {/* Jméno a IČO na každé stránce. Sídlo majitel z patičky vyndal (13. 9. 2026) — zůstává
+              v obchodních podmínkách a v zásadách ochrany údajů, které patička odkazuje; § 435
+              obč. zák. chce údaje „v rámci informací zpřístupňovaných veřejnosti", ne nutně
+              v patičce. */}
           <span>
             © 2026 KlientHunter · {OPERATOR.name}
             {OPERATOR.ico && ` · IČO ${OPERATOR.ico}`}
-            {OPERATOR.address && ` · ${OPERATOR.address}`}
           </span>
           <span>{t(T.sources)}</span>
         </div>

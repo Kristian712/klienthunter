@@ -129,6 +129,7 @@ const T = {
   current:   { cs: 'Váš tarif',            sk: 'Váš tarif',             en: 'Your plan' },
   recommended: { cs: 'Doporučujeme',       sk: 'Odporúčame',            en: 'Recommended' },
   manage:    { cs: 'Spravovat předplatné', sk: 'Spravovať predplatné',  en: 'Manage subscription' },
+  unlimitedCard: { cs: 'Neomezený přístup — není co kupovat', sk: 'Neobmedzený prístup — nie je čo kupovať', en: 'Unlimited access — nothing to buy' },
   unlimited: { cs: 'Máte neomezený přístup, tarify se vás netýkají.',
                sk: 'Máte neobmedzený prístup, tarify sa vás netýkajú.',
                en: 'You have unlimited access; plans do not apply to you.' },
@@ -357,7 +358,15 @@ export default function PricingPage() {
       );
     }
 
-    if (unlimited) return null;
+    // Admin a VIP nic nekupují — Checkout by jim založil předplatné, které nepotřebují. Prázdné
+    // místo po tlačítku ale vypadalo jako chyba, tak tu stojí, proč tlačítko není.
+    if (unlimited) {
+      return (
+        <span className="mt-6 inline-flex rounded-full border border-line px-3 py-1.5 text-xs text-ink-faint">
+          {t(T.unlimitedCard)}
+        </span>
+      );
+    }
 
     const isCurrent = currentPlan === plan;
     // Aktivní předplatné se mění v portálu; druhý Checkout by založil druhé předplatné.
@@ -543,15 +552,19 @@ export default function PricingPage() {
                     )}
                   </div>
 
-                  <ul className="mt-7 space-y-3 border-t border-line pt-6">
-                    {lines(plan).map((line, j) => (
-                      <li key={j} className="flex items-start gap-2.5 text-sm text-ink-muted">
-                        <Check size={14} className="shrink-0 mt-0.5 text-ink" />
-                        {line}
-                      </li>
-                    ))}
-                  </ul>
-                  <p className="mt-4 text-xs leading-relaxed text-ink-faint">{t(T.webNote)}</p>
+                  {/* Výčet a věta o webu v jednom potomkovi: karta je subgrid se šesti řádky
+                      a sedmý potomek by se do žádného řádku nevešel — kreslil se přes výčet. */}
+                  <div className="mt-7 border-t border-line pt-6">
+                    <ul className="space-y-3">
+                      {lines(plan).map((line, j) => (
+                        <li key={j} className="flex items-start gap-2.5 text-sm text-ink-muted">
+                          <Check size={14} className="shrink-0 mt-0.5 text-ink" />
+                          {line}
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="mt-5 text-xs leading-relaxed text-ink-faint">{t(T.webNote)}</p>
+                  </div>
                 </div>
               );
             })}
