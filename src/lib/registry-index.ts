@@ -35,7 +35,8 @@ const RES_HEADER = ['ICO', 'OKRESLAU', 'DDATVZN', 'DDATZAN', 'ZPZAN', 'DDATPAKT'
  * přes hlavičku Range (server ji podporuje): každý kus má vlastní limit času a tři pokusy,
  * takže jeden zaseklý požadavek nepoloží celý import.
  */
-const RANGE_BYTES = 48 * 1024 * 1024;
+/** 16 MB: v produkci jde stažení ~0,8 MB/s, takže kus trvá ~20 s a hlídání času po kusu má smysl. */
+const RANGE_BYTES = 16 * 1024 * 1024;
 const RANGE_TIMEOUT_MS = 90_000;
 
 /**
@@ -252,7 +253,8 @@ export async function runRegistryImport(opts: {
     // stihla říct, kde skončila. Další běh naváže od začátku dalšího kusu.
     if (Date.now() > opts.deadlineMs) {
       await flush();
-      progress.cursorByte = consumedBytes;
+      // Od začátku nedokončeného řádku, ne od dalšího kusu — jinak by ten jeden řádek propadl.
+      progress.cursorByte = consumedBytes - Buffer.byteLength(carry);
       stopped = true;
       break;
     }

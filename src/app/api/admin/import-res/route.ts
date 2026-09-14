@@ -7,7 +7,8 @@ import { registryFeedStatus } from '@/lib/registry-feed';
 export const dynamic = 'force-dynamic';
 /** Celých 300 s: stažení 543 MB dumpu a čtvrt milionu zápisů. Když to nestačí, běh naváže. */
 export const maxDuration = 300;
-const HEADROOM_MS = 30_000;
+/** Rezerva pod stropem funkce: poslední kus (~20 s) plus zápis a odpověď. 30 s nestačilo — Vercel běh uťal dřív, než stihl odpovědět. */
+const HEADROOM_MS = 75_000;
 
 /** Stav indexu a posledního běhu — pro admina. */
 export async function GET(req: NextRequest) {
