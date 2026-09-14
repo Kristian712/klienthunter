@@ -1,4 +1,5 @@
-import { Readable } from 'node:stream';
+import https from 'node:https';
+import type { Readable } from 'node:stream';
 import Papa from 'papaparse';
 import { prisma } from './db';
 import { REGISTRY_INDEX_MONTHS } from './registry-index-config';
@@ -22,6 +23,80 @@ export const RES_URL = 'https://opendata.csu.gov.cz/soubory/od/od_org03/res_data
 export const RES_ATTRIBUTION = 'Registr ekonomických subjektů, Český statistický úřad, CC BY 4.0';
 
 const BATCH = 1_000;
+
+/**
+ * Stažení po rozsazích, nekomprimované.
+ *
+ * Změřeno 14. 9. 2026: server ČSÚ posílá soubor gzipovaný, jakmile to klient dovolí (a `fetch`
+ * to dovoluje sám), a ten proud po pár desítkách MB zamrzá — 41 MB za 8 minut, pak nic. Bez
+ * komprese jede 4–5 MB/s. Proto `Accept-Encoding: identity` a soubor po kusech `RANGE_BYTES`
+ * přes hlavičku Range (server ji podporuje): každý kus má vlastní limit času a tři pokusy,
+ * takže jeden zaseklý požadavek nepoloží celý import.
+ */
+const RANGE_BYTES = 48 * 1024 * 1024;
+const RANGE_TIMEOUT_MS = 90_000;
+
+/**
+ * Jeden HTTP rozsah přes `node:https`, ne přes `fetch`.
+ *
+ * Změřeno 14. 9. 2026: `fetch` (undici) na tomhle serveru po dvou rozsazích zamrzne — třetí
+ * a další požadavek neodpoví ani za 60 s, zatímco curl i `https.get` táž data stáhnou za
+ * 12–30 s. Každý rozsah má vlastní spojení (`Connection: close`) a celý se načte do paměti,
+ * aby se při chybě opakoval od začátku kusu a spotřebitel nedostal půlku dvakrát.
+ */
+function getRange(url: string, from: number, to: number): Promise<Uint8Array> {
+  return new Promise((resolve, reject) => {
+    const req = https.get(url, {
+      headers: { 'Accept-Encoding': 'identity', Range: `bytes=${from}-${to}`, Connection: 'close' },
+      timeout: RANGE_TIMEOUT_MS,
+    }, res => {
+      if (res.statusCode !== 206) { res.resume(); reject(new Error(`ČSÚ RES: Range HTTP ${res.statusCode}`)); return; }
+      const parts: Buffer[] = [];
+      res.on('data', (c: Buffer) => parts.push(c));
+      res.on('end', () => {
+        const buf = Buffer.concat(parts);
+        if (buf.length !== to - from + 1) reject(new Error(`ČSÚ RES: kus ${from}-${to} má ${buf.length} B`));
+        else resolve(new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength));
+      });
+      res.on('error', reject);
+    });
+    req.on('timeout', () => req.destroy(new Error('ČSÚ RES: timeout rozsahu')));
+    req.on('error', reject);
+  });
+}
+
+function headLength(url: string): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const req = https.request(url, { method: 'HEAD', headers: { 'Accept-Encoding': 'identity', Connection: 'close' }, timeout: 30_000 }, res => {
+      res.resume();
+      const len = Number(res.headers['content-length']);
+      if (res.statusCode !== 200 || !len) reject(new Error(`ČSÚ RES: HEAD HTTP ${res.statusCode}`));
+      else resolve(len);
+    });
+    req.on('timeout', () => req.destroy(new Error('ČSÚ RES: timeout HEAD')));
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+async function* fetchInRanges(url: string): AsyncGenerator<Uint8Array> {
+  const total = await headLength(url);
+  for (let from = 0; from < total; from += RANGE_BYTES) {
+    const to = Math.min(from + RANGE_BYTES, total) - 1;
+    let lastErr: unknown = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        yield await getRange(url, from, to);
+        lastErr = null;
+        break;
+      } catch (err) {
+        lastErr = err;
+        await new Promise(r => setTimeout(r, 1_000 * (attempt + 1)));
+      }
+    }
+    if (lastErr) throw lastErr;
+  }
+}
 
 interface ResRow {
   ICO: string; DDATVZN: string; DDATZAN: string; DDATPAKT: string; FORMA: string;
@@ -62,14 +137,10 @@ export async function runRegistryImport(opts: {
 }): Promise<ImportProgress> {
   const startedAt = new Date();
   const cutoff = cutoffDate(startedAt);
-  let stream: Readable;
-  if (opts.input) {
-    stream = opts.input;
-  } else {
-    const res = await fetch(RES_URL, { headers: { 'Accept-Encoding': 'gzip, deflate' } });
-    if (!res.ok || !res.body) throw new Error(`ČSÚ RES: HTTP ${res.status}`);
-    stream = Readable.fromWeb(res.body as never);
-  }
+  // Webový proud z `fetch` se čte přímo přes `for await` — `Readable.fromWeb` se po zápisu
+  // do databáze jednou zasekl (proces spal, žádná data, žádná chyba). Lokální soubor je Node
+  // Readable, ten async iteraci umí taky.
+  const stream: AsyncIterable<Buffer | Uint8Array | string> = opts.input ?? fetchInRanges(RES_URL);
 
   const progress: ImportProgress = { scanned: 0, kept: 0, cursorIco: opts.resumeFrom ?? null, done: false };
   let batch: Array<{ ico: string; foundedAt: Date; legalForm: string; nace: string | null; employeeCategory: string | null; district: string; municipality: number | null; registryUpdatedAt: Date | null; importedAt: Date }> = [];
@@ -132,7 +203,7 @@ export async function runRegistryImport(opts: {
     }
   };
 
-  for await (const chunk of stream as AsyncIterable<Buffer | Uint8Array | string>) {
+  for await (const chunk of stream) {
     const text = carry + (typeof chunk === 'string' ? chunk : decoder.decode(chunk, { stream: true }));
     // Řez jen na konci řádku, který není uvnitř pole s uvozovkami. Jedním průchodem: parita
     // uvozovek se počítá průběžně, ne opakovaným děleným řetězce — první verze tohle dělala
