@@ -98,6 +98,8 @@ model Search {
   /// Uložená kombinace filtrů (id z lead-filters.ts) a scénář — obnoví se při otevření.
   filters   String[] @default([])
   scenario  String?
+  /// Okresy (LAU 1) uvnitř kraje, když uživatel zúžil výběr ve skládačce. Prázdné = celý kraj.
+  districts String[] @default([])
   /// Kořen (pojmenované hledání), ke kterému tenhle běh patří. NULL = samostatný běh nebo kořen.
   savedId   String?
   /// Kdy uživatel kořen naposledy otevřel — od toho se počítá „nové od minule".

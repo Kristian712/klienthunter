@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { activeAccount, sessionFrom } from '@/lib/auth';
 import { isPaying, markClaims, orderSalt } from '@/lib/claims';
 import { withoutOptouts } from '@/lib/optout';
+import { naceLabel } from '@/lib/nace-codes';
 import { markNew, searchMeta } from '@/lib/saved-search';
 import { prisma } from '@/lib/db';
 import { cityOf, resolveFilters } from '@/lib/lead-filters';
@@ -61,7 +62,8 @@ export async function GET(
     const marked = await markClaims(visible, payload.userId, Boolean(account && isPaying(account)));
     const meta = await searchMeta(params.id, payload.userId);
     const withNew = await markNew(meta, payload.userId, marked);
-    return NextResponse.json({ results: withNew, total: withNew.length, salt: orderSalt(payload.userId), search: meta });
+    const labeled = withNew.map(r => ({ ...r, categoryLabel: naceLabel(r.category) }));
+    return NextResponse.json({ results: labeled, total: labeled.length, salt: orderSalt(payload.userId), search: meta });
   } catch (err) {
     console.error('/api/searches/[id]/results:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

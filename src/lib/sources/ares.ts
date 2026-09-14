@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { resolveNiche, USELESS_NACE } from '../nace-map';
 import { subAreasFor } from './ares-areas';
-import type { DiscoverySource, RawLead } from './types';
+import type { DiscoveryOptions, DiscoverySource, RawLead } from './types';
 
 const BASE = 'https://ares.gov.cz/ekonomicke-subjekty-v-be/rest';
 const PAGE = 100;
@@ -188,7 +188,9 @@ async function collect(
   if (!first.tooMany) return out;
 
   let stillTooMany = false;
-  for (const forms of SPLIT_FORMS) {
+  // Dotaz už omezený na právní formu se podle formy nerozpadá — zbývá jen rozpad po částech města.
+  const splits = base.pravniForma ? [base.pravniForma] : SPLIT_FORMS;
+  for (const forms of splits) {
     if (out.length >= limit || Date.now() >= until) break;
     const split = await drain({ ...base, pravniForma: forms });
     if (split.tooMany) stillTooMany = true;
@@ -208,7 +210,7 @@ async function collect(
     const areaFilter: AresFilter = { ...base, sidlo: { kodMestskeCastiObvodu: area } };
     const area1 = await drain(areaFilter);
     if (!area1.tooMany) continue;
-    for (const forms of SPLIT_FORMS) {
+    for (const forms of splits) {
       if (out.length >= limit || Date.now() >= until) break;
       await drain({ ...areaFilter, pravniForma: forms });
     }
@@ -228,18 +230,20 @@ export const aresSource: DiscoverySource = {
   id: 'ares',
   label: 'ARES (veřejný registr)',
 
-  async search(niche: string, city: string, limit: number): Promise<RawLead[]> {
+  async search(niche: string, city: string, limit: number, opts?: DiscoveryOptions): Promise<RawLead[]> {
     const { nace, keywords } = resolveNiche(niche);
     const sidlo = city ? { textovaAdresa: city } : undefined;
+    // Právní forma ze skládačky jde rovnou do dotazu — ARES ji umí a výsledek je pak o to užší.
+    const pravniForma = opts?.legalForms?.length ? [...opts.legalForms] : undefined;
     const until = Date.now() + SEARCH_BUDGET_MS;
     // Kam se dá ustoupit, když ARES řekne, že by výsledek byl přes tisíc řádků. U menších měst
     // je to prázdné pole — tam se to nestává.
     const subAreas = city ? subAreasFor(city) : [];
 
     const strands: Promise<AresSubject[]>[] = [];
-    if (nace.length) strands.push(collect({ czNace: nace, sidlo }, limit, until, subAreas));
+    if (nace.length) strands.push(collect({ czNace: nace, sidlo, pravniForma }, limit, until, subAreas));
     for (const kw of keywords.slice(0, 2)) {
-      strands.push(collect({ obchodniJmeno: kw, sidlo }, Math.ceil(limit / 2), until, subAreas));
+      strands.push(collect({ obchodniJmeno: kw, sidlo, pravniForma }, Math.ceil(limit / 2), until, subAreas));
     }
 
     const batches = await Promise.all(strands);

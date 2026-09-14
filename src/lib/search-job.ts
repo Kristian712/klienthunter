@@ -4,7 +4,7 @@ import { enrichAndVerify, mergeLeads } from './lead-pipeline';
 import { fillCoordinates } from './ruian';
 import { CZ_STAGES } from './search-options';
 import { ALL_INDUSTRIES, isAllIndustries, splitIndustries } from './industries';
-import { registryWindowDays } from './lead-filters';
+import { SOLE_TRADER_FORMS, indexConstraints, registryWindowDays } from './lead-filters';
 import { scenarioById } from './scenarios';
 import { discoverAll, type RawLead } from './sources';
 import { notifySearchDone } from './webhook';
@@ -26,6 +26,12 @@ import { createSearchQuota } from './web-search-quota';
  * a nepřekročí strop funkce (300 s na Hobby plánu). Job, který se z běhu nikdy nevrátí, uklidí
  * `sweepStaleJobs()` níž.
  */
+
+/**
+ * Právní formy „obchodní společnosti" pro dotaz do ARESu: v.o.s., s.r.o., k.s., a.s., družstvo
+ * a organizační složky zahraničních firem. Index má „cokoli kromě 100/101", tady se musí vyjmenovat.
+ */
+const COMPANY_FORMS = ['111', '112', '113', '121', '205', '421', '424'];
 
 /** Po kolika firmách se zapisuje do databáze. */
 const BATCH = 25;
@@ -86,13 +92,19 @@ export async function runSearchJob(jobId: string): Promise<void> {
    */
   const search = await prisma.search.findUnique({
     where: { id: job.searchId },
-    select: { filters: true, scenario: true, savedId: true },
+    select: { filters: true, scenario: true, savedId: true, districts: true },
   });
   const root = search?.savedId
-    ? await prisma.search.findUnique({ where: { id: search.savedId }, select: { filters: true, scenario: true } })
+    ? await prisma.search.findUnique({ where: { id: search.savedId }, select: { filters: true, scenario: true, districts: true } })
     : null;
   const criteria = root ?? search;
-  const windowDays = registryWindowDays([...(criteria?.filters ?? []), ...scenarioById(criteria?.scenario).filters]);
+  const filterIds = [...(criteria?.filters ?? []), ...scenarioById(criteria?.scenario).filters];
+  const windowDays = registryWindowDays(filterIds);
+  const districts = criteria?.districts ?? [];
+  // Právní forma zužuje i dotaz do ARESu (filtr `pravniForma`), ne jen index — ať uživatel,
+  // který chce jen s.r.o., nedostane pět set živnostníků a z nich po prořezání dvacet firem.
+  const cons = indexConstraints(filterIds);
+  const legalForms = cons.soleTrader && !cons.company ? SOLE_TRADER_FORMS : cons.company && !cons.soleTrader ? COMPANY_FORMS : undefined;
 
   try {
     const deadlineAt = Date.now() + NETWORK_BUDGET_MS;
@@ -158,7 +170,8 @@ export async function runSearchJob(jobId: string): Promise<void> {
       const batches: RawLead[][][] = [];
       for (const part of parts) {
         batches.push(await discoverAll(part, city, perPart, {
-          registry: windowDays ? { industry: part, region: stage.value, windowDays, limit: perPart } : undefined,
+          registry: windowDays ? { industry: part, region: stage.value, windowDays, limit: perPart, filters: filterIds, districts } : undefined,
+          legalForms,
         }));
       }
       const osmLeads = batches.flatMap(b => b[1]);

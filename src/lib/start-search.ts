@@ -41,6 +41,8 @@ export async function startSearch(opts: {
   /** Jen informativní otisk v okamžiku spuštění; čte se vždy kořen (`searchMeta`). */
   filters?: string[];
   scenario?: string | null;
+  /** Okresy (LAU 1) ze skládačky; platí jen pro hledání přes index. */
+  districts?: string[];
 }): Promise<StartSearchResult> {
   // „Všechny obory" umí jen index z ČSÚ, a ten potřebuje filtr podle vzniku (lib/industries.ts).
   // Bez něj by běh šel do ARESu bez NACE a ten ho odmítne — lepší říct to hned než po minutě.
@@ -78,6 +80,7 @@ export async function startSearch(opts: {
       savedId: opts.savedId ?? null,
       filters: opts.filters ?? [],
       scenario: opts.scenario ?? null,
+      districts: opts.districts ?? [],
     },
   });
 

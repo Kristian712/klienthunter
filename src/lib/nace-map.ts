@@ -154,6 +154,10 @@ const MIN_SUBSTRING = 4;
  * výsledek než špatný — hádaný NACE kód by tiše vrátil jiné řemeslo.
  */
 export function resolveNiche(industry: string): NicheQuery {
+  // Skládačka: obor zadaný přímo kódem CZ-NACE (`nace:73110`). Žádná slova do názvu — uživatel
+  // řekl přesně, co chce, a hádání by to jen rozmělnilo.
+  const byCode = /^nace:(\d{2,5})$/i.exec(industry.trim());
+  if (byCode) return { nace: [byCode[1]], keywords: [], osm: [], yield: 'unknown' };
   const exact = NICHE_MAP[industry.toLowerCase()];
   if (exact) return exact;
 

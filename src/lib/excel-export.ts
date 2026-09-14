@@ -2,6 +2,7 @@ import * as XLSX from 'xlsx';
 import { BusinessResult } from '@prisma/client';
 import { leadReason } from './lead-reason';
 import { websiteAudit } from './website-audit';
+import { naceLabel } from './nace-codes';
 import { localized } from './lead-filters';
 import { reachScore } from './reach-score';
 import { resolveStatus, type WebsiteStatus } from './website-status';
@@ -84,7 +85,8 @@ export function exportRow(b: BusinessResult, criteria: readonly string[] | null 
     leadReason(b, criteria, locale),
     // Věta do nabídky („Web působí zastarale (42/100): bez HTTPS…"), stejná jako na řádku.
     websiteAudit(b, locale)?.sentence ?? '',
-    b.category || '',
+    // Kód i název: „73110 Činnosti reklamních agentur" — kód pro stroje, název pro lidi.
+    b.category ? `${b.category} ${naceLabel(b.category) ?? ''}`.trim() : '',
     b.source,
   ];
 }

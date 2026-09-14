@@ -92,11 +92,16 @@ export interface TradeLicence {
   since?: string;
 }
 
+export interface DiscoveryOptions {
+  /** Kódy právní formy, na které se má dotaz omezit (ARES `pravniForma`). Prázdné = všechny. */
+  legalForms?: readonly string[];
+}
+
 export interface DiscoverySource {
   id: string;
   label: string;
   /** Never throws — a failing source must degrade the result, not break the search. */
-  search(niche: string, city: string, limit: number): Promise<RawLead[]>;
+  search(niche: string, city: string, limit: number, opts?: DiscoveryOptions): Promise<RawLead[]>;
 }
 
 export interface EnrichmentSource {

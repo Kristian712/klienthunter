@@ -17,7 +17,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     const search = await prisma.search.findFirst({
       where: { id: params.id, userId: payload.userId },
-      select: { id: true, query: true, region: true, savedId: true, filters: true, scenario: true, saved: { select: { id: true, filters: true, scenario: true } } },
+      select: { id: true, query: true, region: true, savedId: true, filters: true, scenario: true, districts: true, saved: { select: { id: true, filters: true, scenario: true, districts: true } } },
     });
     if (!search) return NextResponse.json({ error: 'Not found' }, { status: 404 });
     // Import CSV nemá co spouštět znovu — řádky přinesl uživatel, ne rejstřík.
@@ -31,6 +31,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       savedId: root.id,
       filters: root.filters,
       scenario: root.scenario,
+      districts: root.districts,
     });
     if (!started.ok) {
       const message = started.code === 'PLAN_LIMIT' ? 'Search limit reached for your plan'

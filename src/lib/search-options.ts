@@ -296,6 +296,8 @@ export const INDUSTRIES: Record<string, { group: string; items: { value: string;
 export function industryLabel(value: string, locale: string): string {
   // Víc oborů naráz a „všechny obory" — viz lib/industries.ts.
   if (isAllIndustries(value)) return localized(ALL_INDUSTRIES_LABEL, locale);
+  // Obor zadaný kódem NACE. Název kódu nese číselník na serveru (lib/nace-codes.ts); tady jen kód.
+  if (/^nace:\d{2,5}$/i.test(value)) return `NACE ${value.slice(5)}`;
   const parts = splitIndustries(value);
   if (parts.length > 1) return parts.map(p => industryLabel(p, locale)).join(INDUSTRY_SEP);
   const lists = [INDUSTRIES[locale], INDUSTRIES.cs, INDUSTRIES.en].filter(Boolean);

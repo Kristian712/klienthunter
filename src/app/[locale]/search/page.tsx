@@ -9,6 +9,8 @@ import {
   FileText, Table2, PhoneCall, ShieldCheck, Share2,
 } from 'lucide-react';
 import { CRM_FORMATS } from '@/lib/crm-export';
+import { SearchComposer } from '@/components/SearchComposer';
+import { PLAN_LIMITS } from '@/lib/plans';
 import { LEAD_FILTERS, GROUP_LABELS, GROUP_ORDER, employeeLabel, matchesAll, localized, registryWindowDays, type FilterGroup } from '@/lib/lead-filters';
 import { leadReason } from '@/lib/lead-reason';
 import { reachHint, reachScore } from '@/lib/reach-score';
@@ -818,6 +820,20 @@ export default function SearchPage() {
    * bez omezení oboru. Do API jde jeden řetězec (`joinIndustries`), viz lib/industries.ts.
    */
   const [industries, setIndustries]       = useState<string[]>([]);
+  /** Okresy ze skládačky (LAU 1). Prázdné = celý kraj. */
+  const [districts, setDistricts]         = useState<string[]>([]);
+  /** Názvy NACE kódů vybraných ve skládačce — číselník je na serveru, sem přijde jen vybraný název. */
+  const [naceNames, setNaceNames]         = useState<Record<string, string>>({});
+  const [naceQuery, setNaceQuery]         = useState('');
+  const [naceItems, setNaceItems]         = useState<Array<{ code: string; name: string; level: number }>>([]);
+  useEffect(() => {
+    const q = naceQuery.trim();
+    if (q.length < 2) { setNaceItems([]); return; }
+    const timer = setTimeout(() => {
+      fetch(`/api/nace?q=${encodeURIComponent(q)}`).then(r => (r.ok ? r.json() : { items: [] })).then(d => setNaceItems(d.items ?? [])).catch(() => setNaceItems([]));
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [naceQuery]);
   const [customIndustry, setCustomIndustry] = useState('');
   /** Text v našeptávači oborů. Prázdný, dokud uživatel nezačne psát. */
   const [industryQuery, setIndustryQuery] = useState('');
@@ -826,6 +842,20 @@ export default function SearchPage() {
   const [industryActive, setIndustryActive] = useState(-1);
   /** Id ze SCENARIOS. Předvyplní se podle profese z onboardingu, uživatel ho může přepnout. */
   const [scenario, setScenario]           = useState('all');
+  /**
+   * Scénář je přednastavení, ne zámek: kliknutí zapne jeho filtry, jakékoli sáhnutí na filtry ho
+   * odpojí. Který scénář „platí", se proto nečte ze stavu, ale z toho, co je opravdu zapnuté.
+   */
+  const applyScenario = (id: string) => {
+    dirtyRef.current = true;
+    setScenario(id);
+    setActive(prev => {
+      const next = new Set(prev);
+      for (const sc of SCENARIOS) for (const f of sc.filters) next.delete(f);
+      for (const f of scenarioById(id).filters) next.add(f);
+      return next;
+    });
+  };
   /** Nabídka „CRM" u exportu; zavírá se kliknutím mimo. */
   const [crmMenu, setCrmMenu]             = useState(false);
   const crmMenuRef = useRef<HTMLDivElement>(null);
@@ -972,7 +1002,11 @@ export default function SearchPage() {
     if (p.targetIndustry) setIndustries(i => (i.length ? i : [p.targetIndustry!]));
     // Scénář je jen výchozí hodnota přepínače; jakmile s ním uživatel hnul, profil ho nepřebíjí.
     if (p.profession && SCENARIO_BY_PROFESSION[p.profession]) {
-      setScenario(sc => (sc === 'all' ? SCENARIO_BY_PROFESSION[p.profession!] : sc));
+      const def = SCENARIO_BY_PROFESSION[p.profession];
+      setScenario(sc => (sc === 'all' ? def : sc));
+      // Scénář je přednastavení = jeho filtry musí být opravdu zapnuté, ne jen vybraný chip:
+      // do hledání jde to, co je v `active`. U uloženého hledání se nic nepřidává.
+      if (!savedLockRef.current && !dirtyRef.current) setActive(prev => new Set([...Array.from(prev), ...scenarioById(def).filters]));
     }
   }
 
@@ -1043,6 +1077,12 @@ export default function SearchPage() {
    */
   const effectiveIndustry = industries.length ? joinIndustries(industries) : industryQuery.trim() || customIndustry;
   const allPicked = industries.length === 1 && isAllIndustries(industries[0]);
+  /** Scénář, jehož filtry jsou všechny zapnuté; `custom`, když uživatel kombinaci rozbil. */
+  const effectiveScenario = (() => {
+    const hit = SCENARIOS.filter(sc => sc.filters.length > 0).find(sc => sc.filters.every(f => active.has(f)));
+    if (hit) return hit.id;
+    return scenario === 'all' ? 'all' : 'custom';
+  })();
   /** „Všechny obory" bez filtru podle vzniku nejde spustit — index z ČSÚ hledá jen podle data. */
   const allBlocked = allPicked && registryWindowDays([...Array.from(active), ...scenarioById(scenario).filters]) === null;
 
@@ -1116,11 +1156,13 @@ export default function SearchPage() {
     return best;
   })();
 
-  const toggle = (id: string) => {
+  const toggle = (id: string, on?: boolean) => {
     dirtyRef.current = true;
     setActive(prev => {
       const next = new Set(prev);
-      if (!next.delete(id)) next.add(id);
+      if (on === true) next.add(id);
+      else if (on === false) next.delete(id);
+      else if (!next.delete(id)) next.add(id);
       return next;
     });
   };
@@ -1374,8 +1416,10 @@ export default function SearchPage() {
         body: JSON.stringify({
           region: effectiveRegion,
           industry: effectiveIndustry,
-          filters: [...scenarioById(scenario).filters, ...(presetsOn ? presetIds : [])],
-          scenario,
+          // Co je zapnuté ve skládačce — scénář i profil už jsou uvnitř `active`.
+          filters: Array.from(active),
+          scenario: effectiveScenario === 'custom' ? null : effectiveScenario,
+          districts,
         }),
       });
       if (!res.ok) {
@@ -1412,7 +1456,7 @@ export default function SearchPage() {
 
       // Scénář se promítne hned, jako předem zapnuté filtry. Uživatel je pak vidí mezi
       // ostatními chipy a může je vypnout — nic se před ním neschovává.
-      setActive(new Set([...scenarioById(scenario).filters, ...(presetsOn ? presetIds : [])]));
+      // Aktivní filtry zůstávají, jak si je uživatel poskládal — dřív se tu přepisovaly scénářem.
 
       // Ukázka pro nepřihlášené doběhne rovnou v odpovědi — pět řádků, není co sledovat.
       if (data.demo) {
@@ -1535,14 +1579,22 @@ export default function SearchPage() {
               <button
                 key={sc.id}
                 type="button"
-                onClick={() => { dirtyRef.current = true; setScenario(sc.id); }}
-                className={scenario === sc.id ? 'chip-active' : 'chip'}
+                onClick={() => applyScenario(sc.id)}
+                aria-pressed={effectiveScenario === sc.id}
+                className={effectiveScenario === sc.id ? 'chip-active' : 'chip'}
               >
                 {localized(sc.label, locale)}
               </button>
             ))}
+            {effectiveScenario === 'custom' && (
+              <span className="chip-active cursor-default" title={localized({ cs: 'Kombinace, kterou jste si poskládali sami. Scénář je jen přednastavení.', sk: 'Kombinácia, ktorú ste si poskladali sami. Scenár je len prednastavenie.', en: 'A combination you built yourself. A scenario is only a preset.' }, locale)}>
+                {localized({ cs: 'Vlastní kombinace', sk: 'Vlastná kombinácia', en: 'Custom combination' }, locale)}
+              </span>
+            )}
             <p className="w-full text-[11px] text-ink-faint leading-snug mt-0.5">
-              {localized(scenarioById(scenario).hint, locale)}
+              {effectiveScenario === 'custom'
+                ? localized({ cs: 'Scénář je jen přednastavení — kliknutím na něj se filtry zase složí podle něj.', sk: 'Scenár je len prednastavenie — kliknutím naň sa filtre zase zložia podľa neho.', en: 'A scenario is only a preset — click one to set the filters back to it.' }, locale)
+                : localized(scenarioById(effectiveScenario).hint, locale)}
             </p>
           </div>
 
@@ -1601,7 +1653,9 @@ export default function SearchPage() {
                 <div className="flex flex-wrap items-center gap-1.5 mb-2">
                   {industries.map(value => (
                     <span key={value} className="chip-active inline-flex items-center gap-1 pr-1.5">
-                      {value === ALL_INDUSTRIES ? localized(ALL_INDUSTRIES_LABEL, locale) : industryLabelFor(value, locale)}
+                      {value === ALL_INDUSTRIES ? localized(ALL_INDUSTRIES_LABEL, locale)
+                        : value.startsWith('nace:') ? `${value.slice(5)} ${naceNames[value.slice(5)] ?? 'NACE'}`
+                        : industryLabelFor(value, locale)}
                       <button type="button" onClick={() => setIndustries(prev => prev.filter(v => v !== value))}
                         className="rounded-full p-0.5 hover:bg-ink/10" aria-label={`${localized(S.removeIndustry, locale)}: ${industryLabelFor(value, locale)}`}>
                         <X size={12} />
@@ -1719,6 +1773,31 @@ export default function SearchPage() {
                 )}
               </div>
 
+              {/* Obor přímo kódem CZ-NACE, pro toho, kdo ho zná. Číselník je na serveru (/api/nace). */}
+              {!allPicked && (
+                <div className="relative mt-2">
+                  <input
+                    className="input py-1.5 text-xs"
+                    value={naceQuery}
+                    onChange={e => setNaceQuery(e.target.value)}
+                    placeholder={isCs ? 'Nebo kód či název CZ-NACE, např. 73110 nebo „reklamní"' : 'Or a CZ-NACE code or name, e.g. 73110'}
+                    aria-label="CZ-NACE"
+                  />
+                  {naceItems.length > 0 && (
+                    <ul className="absolute z-20 left-0 right-0 mt-1 max-h-56 overflow-y-auto bg-surface-muted border border-line-strong rounded-lg shadow-pop">
+                      {naceItems.map(it => (
+                        <li key={it.code}>
+                          <button type="button" className="w-full text-left px-3 py-1.5 text-xs hover:bg-ink/[0.06]"
+                            onClick={() => { addIndustry(`nace:${it.code}`); setNaceNames(m => ({ ...m, [it.code]: it.name })); setNaceQuery(''); setNaceItems([]); }}>
+                            <span className="font-mono text-ink-faint mr-2">{it.code}</span>{it.name}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+
             </div>
 
             {/* Odsazení o výšku popisku: sloupec s tlačítkem žádný nemá, a bez toho by tlačítko
@@ -1743,6 +1822,19 @@ export default function SearchPage() {
           </div>
 
           {/* Pod mřížkou, ne v ní: uvnitř sloupce tahle věta rozhodila zarovnání polí. */}
+          {/* Skládačka podmínek před spuštěním — dvě skupiny: zužuje výběr (index) a prořezává nalezené. */}
+          <SearchComposer
+            locale={locale}
+            region={effectiveRegion}
+            industry={effectiveIndustry}
+            active={active}
+            toggle={toggle}
+            districts={districts}
+            setDistricts={next => { dirtyRef.current = true; setDistricts(next); }}
+            presetIds={presetsOn ? presetIds : []}
+            limit={PLAN_LIMITS[(userPlan as keyof typeof PLAN_LIMITS)]?.resultsPerSearch ?? PLAN_LIMITS.FREE.resultsPerSearch}
+          />
+
           {yieldNote && (
             <p className="text-[11px] text-ink-faint mt-2 leading-snug max-w-2xl">{yieldNote}</p>
           )}

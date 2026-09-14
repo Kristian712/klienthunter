@@ -2,7 +2,7 @@ import axios from 'axios';
 import { resolveNiche } from '../nace-map';
 import { CRAWLER_UA } from '../robots';
 import { normalizeCzPhone } from './site-contacts';
-import type { DiscoverySource, RawLead } from './types';
+import type { DiscoveryOptions, DiscoverySource, RawLead } from './types';
 
 /**
  * The main instance and one mirror.
@@ -130,7 +130,7 @@ export const osmSource: DiscoverySource = {
   id: 'osm',
   label: 'OpenStreetMap',
 
-  async search(niche: string, city: string, limit: number): Promise<RawLead[]> {
+  async search(niche: string, city: string, limit: number, _opts?: DiscoveryOptions): Promise<RawLead[]> {
     const { osm } = resolveNiche(niche);
     if (osm.length === 0) return [];
 

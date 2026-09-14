@@ -105,6 +105,23 @@ export function employeesKnown(b: FilterableLead): boolean {
  */
 export type FilterGroup = 'who' | 'event' | 'standing' | 'reach';
 
+export type FilterScope = 'index' | 'row';
+export const SCOPE_TEXT: Record<FilterScope, { title: { cs: string; sk?: string; en: string }; note: { cs: string; sk?: string; en: string } }> = {
+  index: {
+    title: { cs: 'Zužuje výběr', sk: 'Zužuje výber', en: 'Narrows the search' },
+    note:  { cs: 'Hledá se v celém kraji z indexu ČSÚ, výsledek je úplný (firmy do 5 let od vzniku). Čísla u voleb říkají, kolik firem podmínce odpovídá.',
+             sk: 'Hľadá sa v celom kraji z indexu ČSÚ, výsledok je úplný (firmy do 5 rokov od vzniku). Čísla pri voľbách hovoria, koľko firiem podmienke zodpovedá.',
+             en: 'Searches the whole region from the CZSO index; the result is complete (firms up to 5 years old). The numbers say how many firms match.' },
+  },
+  row: {
+    title: { cs: 'Prořezává nalezené', sk: 'Prerezáva nájdené', en: 'Prunes what was found' },
+    note:  { cs: 'Ověřuje se u každé stažené firmy. Nechá jen ty z nalezených, které podmínku splní — celý kraj neprohledá a počet dopředu neznáme.',
+             sk: 'Overuje sa pri každej stiahnutej firme. Nechá len tie z nájdených, ktoré podmienku splnia — celý kraj neprehľadá a počet vopred nepoznáme.',
+             en: 'Checked on every downloaded firm. Keeps only those found that pass — it does not search the whole region and the count is not known in advance.' },
+  },
+};
+export const scopeOf = (f: { scope?: FilterScope }): FilterScope => f.scope ?? 'row';
+
 /**
  * Slovak falls back to Czech rather than English. Every label here is understood by a Slovak
  * reader, and a half-Slovak half-English screen looks broken in a way half-Czech does not.
@@ -148,6 +165,22 @@ export interface LeadFilter {
   kind?: 'bool' | 'select' | 'range' | 'date';
   /** Odkud filtr bere odpověď. */
   source?: FilterSource;
+  /**
+   * Kde filtr působí — a to je pro uživatele ta nejdůležitější informace o něm.
+   *
+   *  - `index`  zužuje výběr PŘED stahováním: pole jsou v indexu ČSÚ (kraj, okres, právní forma,
+   *             NACE, vznik, zaměstnanci), takže hledání projde celý kraj a výsledek je úplný
+   *             (v okně indexu, viz `REGISTRY_INDEX_MONTHS`). Index umí spočítat, kolik firem
+   *             podmínce odpovídá, ještě než se něco spustí.
+   *  - `row`    prořezává nalezené: zjišťuje se u každé stažené firmy (DPH, insolvence, web,
+   *             telefon, e-mail…). Nechá jen ty z nalezených, které podmínku splní — celý kraj
+   *             neprohledá a počet dopředu nikdo nezná.
+   *
+   * Bez hodnoty = `row`. UI obě skupiny kreslí zvlášť a druhé píše větu o tom, co dělá; jinak
+   * by si uživatel myslel, že „neplátce DPH v kraji" prohledal kraj, když jen profiltroval
+   * pět set stažených firem.
+   */
+  scope?: FilterScope;
   /**
    * Čím se filtr u téhle firmy opírá — krátký text pro řádek výsledku, např. „vznik 14. 9. 2026 ·
    * ARES". Když důkaz není (data chybí), vrací null a UI nic netvrdí. Poučení z detekce webu:
@@ -205,7 +238,7 @@ export function hasReachChannel(b: FilterableLead): boolean {
  * výčet forem: číselník ARESu má přes sto položek a nový spolek nebo evropská společnost nemá
  * propadnout sítem jen proto, že jsme na ni zapomněli.
  */
-const SOLE_TRADER_FORMS = ['100', '101'];
+export const SOLE_TRADER_FORMS = ['100', '101'];
 
 function isCompany(b: FilterableLead): boolean {
   return Boolean(b.legalForm) && !SOLE_TRADER_FORMS.includes(b.legalForm!);
@@ -277,6 +310,7 @@ export const NEW_FIRM_WINDOW_DAYS: Record<string, number> = {
   new_firm_90d: 90,
   new_firm_6m: 183,
   new_firm: 366,
+  new_firm_5y: 1826,
 };
 export function registryWindowDays(filterIds: readonly string[]): number | null {
   const days = filterIds.map(id => NEW_FIRM_WINDOW_DAYS[id]).filter((d): d is number => d !== undefined);
@@ -292,6 +326,7 @@ const vatUnknown = (b: FilterableLead) => b.vatPayer === null || b.vatPayer === 
 export const LEAD_FILTERS: LeadFilter[] = [
   {
     id: 'sole_trader',
+    scope: 'index',
     group: 'who',
     kind: 'bool',
     source: 'ARES',
@@ -303,6 +338,7 @@ export const LEAD_FILTERS: LeadFilter[] = [
   },
   {
     id: 'company_form',
+    scope: 'index',
     group: 'who',
     kind: 'bool',
     source: 'ARES',
@@ -319,6 +355,7 @@ export const LEAD_FILTERS: LeadFilter[] = [
      * „bez zaměstnanců" — je to mezera, a ve výsledku se ukazuje jako „počet neuveden".
      */
     id: 'has_employees',
+    scope: 'index',
     group: 'who',
     kind: 'bool',
     source: 'RES',
@@ -333,6 +370,7 @@ export const LEAD_FILTERS: LeadFilter[] = [
   },
   {
     id: 'no_employees',
+    scope: 'index',
     group: 'who',
     kind: 'bool',
     source: 'RES',
@@ -658,6 +696,7 @@ export const LEAD_FILTERS: LeadFilter[] = [
   },
   {
     id: 'no_category',
+    scope: 'index',
     group: 'who',
     label: { cs: 'Bez uvedeného oboru', sk: 'Bez uvedeného odboru', en: 'No trade listed' },
     where: { OR: [{ category: null }, { category: '' }] },
@@ -665,6 +704,7 @@ export const LEAD_FILTERS: LeadFilter[] = [
   },
   {
     id: 'new_firm',
+    scope: 'index',
     group: 'event',
     // The entry date in ARES is exact, so "founded in the last year" is one of the few things
     // we can state without hedging. It is the whole lead list for an accountant or a bookkeeper.
@@ -677,6 +717,7 @@ export const LEAD_FILTERS: LeadFilter[] = [
   },
   {
     id: 'new_firm_6m',
+    scope: 'index',
     group: 'event',
     // Užší varianta `new_firm`. Datum vzniku v ARESu je přesné, takže i tenhle půlrok je fakt,
     // ne odhad — a je to celý seznam pro účetní nebo pojišťováka, který chce být první.
@@ -689,6 +730,7 @@ export const LEAD_FILTERS: LeadFilter[] = [
   },
   {
     id: 'new_firm_90d',
+    scope: 'index',
     group: 'event',
     label: { cs: 'Nová firma (do 90 dnů)', sk: 'Nová firma (do 90 dní)', en: 'New firm (under 90 days)' },
     hint: REGISTRY_HINT,
@@ -700,6 +742,7 @@ export const LEAD_FILTERS: LeadFilter[] = [
   },
   {
     id: 'new_firm_30d',
+    scope: 'index',
     group: 'event',
     label: { cs: 'Nová firma (do 30 dnů)', sk: 'Nová firma (do 30 dní)', en: 'New firm (under 30 days)' },
     hint: REGISTRY_HINT,
@@ -707,6 +750,22 @@ export const LEAD_FILTERS: LeadFilter[] = [
     evidence: (b, l) => { const d = fmtDate(b.foundedAt, l); return d ? localized({ cs: `vznik ${d} · ARES`, sk: `vznik ${d} · ARES`, en: `founded ${d} · ARES` }, l) : null; },
     where: { foundedAt: { gt: foundedDaysAgo(30) } },
     test: youngerThanDays(30),
+    unknown: ageUnknown,
+  },
+  {
+    id: 'new_firm_5y',
+    group: 'event',
+    scope: 'index',
+    // Celé okno indexu. Není to „událost" v pravém smyslu — je to přepínač: s ním se hledá
+    // v celém kraji z indexu (úplně, s počty), bez něj v ARESu po krajském městě.
+    label: { cs: 'Vznik do 5 let', sk: 'Vznik do 5 rokov', en: 'Founded within 5 years' },
+    hint: { cs: 'Zapne hledání v celém kraji z indexu ČSÚ. Bez okna podle vzniku se hledá v ARESu jen po krajském městě a bez počtů dopředu.',
+            sk: 'Zapne hľadanie v celom kraji z indexu ČSÚ. Bez okna podľa vzniku sa hľadá v ARESe len po krajskom meste a bez počtov vopred.',
+            en: 'Turns on whole-region search from the CZSO index. Without a founding window the search runs in ARES by regional capital only, with no counts up front.' },
+    source: 'ARES',
+    evidence: (b, l) => { const d = fmtDate(b.foundedAt, l); return d ? localized({ cs: `vznik ${d} · ARES`, sk: `vznik ${d} · ARES`, en: `founded ${d} · ARES` }, l) : null; },
+    where: { foundedAt: { gt: foundedDaysAgo(1826) } },
+    test: youngerThanDays(1826),
     unknown: ageUnknown,
   },
   {
@@ -748,6 +807,18 @@ export const LEAD_FILTERS: LeadFilter[] = [
     where: { vatPayer: false },
     test: b => b.vatPayer === false,
     unknown: vatUnknown,
+  },
+  {
+    id: 'vat_reliable_only',
+    group: 'standing',
+    label: { cs: 'Vyřadit nespolehlivé plátce', sk: 'Vyradiť nespoľahlivých platiteľov', en: 'Exclude unreliable VAT payers' },
+    source: 'MFČR',
+    hint: { cs: 'Nespolehlivý plátce je veřejný příznak finanční správy. Firmy bez příznaku i neplátci projdou.',
+            sk: 'Nespoľahlivý platiteľ je verejný príznak finančnej správy. Firmy bez príznaku aj neplatitelia prejdú.',
+            en: 'An unreliable VAT payer is a public tax-office flag. Firms without the flag and non-payers pass.' },
+    evidence: (b, l) => b.vatUnreliable === false ? localized({ cs: 'bez příznaku nespolehlivosti · MFČR', sk: 'bez príznaku nespoľahlivosti · MFČR', en: 'no unreliability flag · MFČR' }, l) : null,
+    where: { NOT: { vatUnreliable: true } },
+    test: b => b.vatUnreliable !== true,
   },
   {
     id: 'vat_unreliable',
@@ -799,4 +870,21 @@ export function cityOf(address?: string | null): string | undefined {
   if (!last) return undefined;
   const city = last.replace(/^\d{3}\s?\d{2}\s+/, '').trim();
   return city || undefined;
+}
+
+/**
+ * Co z aktivních filtrů umí index zúžit ještě před stahováním. Čte to registrový zdroj
+ * (lib/sources/registry.ts) i počty pro skládačku (/api/index/counts). Protichůdné volby
+ * (živnostník i společnost naráz) dají prázdný průnik — stejně jako by dal AND u řádků.
+ */
+export function indexConstraints(filterIds: readonly string[]) {
+  const ids = new Set(filterIds);
+  return {
+    soleTrader: ids.has('sole_trader'),
+    company: ids.has('company_form'),
+    hasEmployees: ids.has('has_employees'),
+    noEmployees: ids.has('no_employees'),
+    noCategory: ids.has('no_category'),
+    windowDays: registryWindowDays(filterIds),
+  };
 }

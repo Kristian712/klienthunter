@@ -5,6 +5,7 @@ import { aresResSource } from './ares-res';
 import { dphSource } from './dph';
 import { registryCanServe, registryDiscover, type RegistryQuery } from './registry';
 import type { DiscoverySource, EnrichmentSource, RawLead } from './types';
+export type { DiscoveryOptions } from './types';
 export type { TradeLicence } from './types';
 
 export type { RawLead, DiscoverySource, EnrichmentSource } from './types';
@@ -33,7 +34,7 @@ export async function discoverAll(
   niche: string,
   city: string,
   limit: number,
-  opts: { registry?: RegistryQuery } = {},
+  opts: { registry?: RegistryQuery; legalForms?: readonly string[] } = {},
 ): Promise<RawLead[][]> {
   return Promise.all(
     DISCOVERY_SOURCES.map(s => {
@@ -42,7 +43,7 @@ export async function discoverAll(
       if (s.id === 'ares' && opts.registry && registryCanServe(opts.registry)) {
         return registryDiscover(opts.registry).catch(() => [] as RawLead[]);
       }
-      return s.search(niche, city, limit).catch(() => [] as RawLead[]);
+      return s.search(niche, city, limit, { legalForms: opts.legalForms }).catch(() => [] as RawLead[]);
     }),
   );
 }
