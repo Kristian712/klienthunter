@@ -147,15 +147,22 @@ export async function runRegistryImport(opts: {
   let skippingUntil = opts.resumeFrom ?? null;
   let stopped = false;
 
+  /**
+   * Zápis po `BATCH` řádcích, ať je kus textu jakkoli velký. V produkci chodí data po 48MB
+   * rozsazích (~300 tisíc řádků), a první verze zapisovala celý kus naráz — Postgres odmítl
+   * 165 385 vázaných proměnných v jednom dotazu (strop 32 767). Lokální soubor chodí po 64 KB,
+   * tam se to neukázalo.
+   */
   const flush = async () => {
-    if (batch.length === 0) return;
-    const rows = batch; batch = [];
-    // Nahradit, ne slučovat: řádek indexu je snímek registru, ne něco, co bychom sami doplňovali.
-    await prisma.registrySubject.deleteMany({ where: { ico: { in: rows.map(r => r.ico) } } });
-    await prisma.registrySubject.createMany({ data: rows, skipDuplicates: true });
-    progress.kept += rows.length;
-    progress.cursorIco = rows[rows.length - 1].ico;
-    if (opts.onProgress) await opts.onProgress(progress);
+    while (batch.length > 0) {
+      const rows = batch.splice(0, BATCH);
+      // Nahradit, ne slučovat: řádek indexu je snímek registru, ne něco, co bychom sami doplňovali.
+      await prisma.registrySubject.deleteMany({ where: { ico: { in: rows.map(r => r.ico) } } });
+      await prisma.registrySubject.createMany({ data: rows, skipDuplicates: true });
+      progress.kept += rows.length;
+      progress.cursorIco = rows[rows.length - 1].ico;
+      if (opts.onProgress) await opts.onProgress(progress);
+    }
   };
 
   const consume = (r: ResRow) => {
