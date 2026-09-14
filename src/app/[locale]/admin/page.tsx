@@ -286,9 +286,7 @@ export default function AdminPage() {
       <div className="border-b border-line">
         <div className="max-w-6xl mx-auto px-4 py-8 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-accent/10 border border-accent/30 flex items-center justify-center">
-              <Shield size={20} className="text-accent" />
-            </div>
+            <span className="icon-tile icon-tile--standing h-10 w-10"><Shield size={18} /></span>
             <div>
               <h1 className="text-xl font-bold text-ink">Admin panel</h1>
               <p className="text-ink-faint text-xs">{isCs ? 'Správa uživatelů a invite kódů' : 'User and invite code management'}</p>
@@ -317,15 +315,15 @@ export default function AdminPage() {
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           {[
-            { label: isCs ? 'Uživatelů' : 'Users',      value: stats.total,       icon: <Users size={18} />  },
-            { label: isCs ? 'VIP'        : 'VIP',        value: stats.vip,         icon: <Crown size={18} />  },
-            { label: isCs ? 'Adminů'     : 'Admins',     value: stats.admins,      icon: <Shield size={18} /> },
-            { label: isCs ? 'Volné kódy' : 'Free codes', value: stats.unusedCodes, icon: <Ticket size={18} /> },
+            { label: isCs ? 'Uživatelů' : 'Users',      value: stats.total,       icon: <Users size={16} />,  tile: 'who' },
+            { label: isCs ? 'VIP'        : 'VIP',        value: stats.vip,         icon: <Crown size={16} />,  tile: 'event' },
+            { label: isCs ? 'Adminů'     : 'Admins',     value: stats.admins,      icon: <Shield size={16} />, tile: 'standing' },
+            { label: isCs ? 'Volné kódy' : 'Free codes', value: stats.unusedCodes, icon: <Ticket size={16} />, tile: 'reach' },
           ].map(s => (
             <div key={s.label} className="card">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-medium text-ink-faint">{s.label}</span>
-                <span className="p-1.5 rounded-lg text-ink-muted bg-ink/[0.06]">{s.icon}</span>
+                <span className={`icon-tile icon-tile--${s.tile}`}>{s.icon}</span>
               </div>
               <span className="text-3xl font-bold text-ink tnum">{s.value}</span>
             </div>
@@ -511,7 +509,7 @@ export default function AdminPage() {
             {/* Generate form */}
             <div className="card">
               <h2 className="font-semibold text-ink mb-4 flex items-center gap-2">
-                <Plus size={16} className="text-ink-faint" />
+                <span className="icon-tile icon-tile--reach h-7 w-7"><Plus size={14} /></span>
                 {isCs ? 'Vygenerovat nové kódy' : 'Generate new codes'}
               </h2>
               <form onSubmit={generateCodes} className="grid sm:grid-cols-5 gap-3 items-end">

@@ -2093,7 +2093,9 @@ export default function SearchPage() {
                 return (
                   <div
                     key={b.id}
-                    className="row stagger flex items-start gap-4 py-5 pl-4 pr-1 border-l-[3px]"
+                    // Firmy nad prahem mají kromě hrany i jemný gradient zleva — v seznamu pěti set
+                    // řádků je to to jediné, čím oko najde ty, kterým se má volat první.
+                    className={`row stagger flex items-start gap-4 py-5 pl-4 pr-1 border-l-[3px] ${good ? 'bg-gradient-to-r from-accent/[0.05] to-transparent' : ''}`}
                     style={{
                       '--i': Math.min(i, 20),
                       borderLeftColor: good ? 'rgb(var(--accent))' : 'transparent',
@@ -2140,7 +2142,7 @@ export default function SearchPage() {
                           <span className="badge-red" title="ARES">{localized(S.insolvency, locale)}</span>
                         )}
                         {b.isNew && (
-                          <span className="badge-accent" title={localized(S.newTip, locale)}>
+                          <span className="badge-warm" title={localized(S.newTip, locale)}>
                             <Sparkles size={10} />{localized(S.newBadge, locale)}
                           </span>
                         )}
