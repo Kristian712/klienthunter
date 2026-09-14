@@ -84,8 +84,10 @@ export async function buildDigest(userId: string): Promise<Digest> {
   ]);
   if (!agg._max.foundedAt) return empty;
 
-  // Obor bez NACE (volný text) se v indexu nenajde — pak platí čísla za všechny obory.
-  const mineCodes = codes.length ? codes : [];
+  // Obor bez NACE (volný text) se v indexu nenajde — pak platí čísla za všechny obory. Totéž,
+  // když v oboru za celé okno nevznikla ani jedna firma (zubaři v kraji za měsíc): prázdná
+  // ukázka by vypadala jako chyba, tak se ukážou nejnovější firmy bez ohledu na obor.
+  const mineCodes = codes.length && totalMine > 0 ? codes : [];
   const newSinceLast = user?.digestFoundedAt
     ? await prisma.registrySubject.count({ where: { ...scopeWhere(nuts3, since, mineCodes), foundedAt: { gt: user.digestFoundedAt } } })
     : null;
