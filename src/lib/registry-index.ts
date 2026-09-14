@@ -87,44 +87,76 @@ export async function runRegistryImport(opts: {
     if (opts.onProgress) await opts.onProgress(progress);
   };
 
-  await new Promise<void>((resolve, reject) => {
-    Papa.parse<ResRow>(stream, {
-      header: true,
-      skipEmptyLines: true,
-      step: (result, parser) => {
-        if (stopped) return;
-        const r = result.data;
-        progress.scanned++;
-        if (skippingUntil && r.ICO <= skippingUntil) return;
-        skippingUntil = null;
-        if (r.DDATZAN) return;
-        const founded = parseDate(r.DDATVZN);
-        if (!founded || founded < cutoff) return;
-        batch.push({
-          ico: r.ICO.padStart(8, '0'),
-          foundedAt: founded,
-          legalForm: r.FORMA || '',
-          nace: r.NACE || null,
-          employeeCategory: r.KATPO || null,
-          district: r.OKRESLAU || '',
-          municipality: r.ICZUJ ? Number(r.ICZUJ) : null,
-          registryUpdatedAt: parseDate(r.DDATPAKT),
-          importedAt: startedAt,
-        });
-        if (batch.length >= BATCH) {
-          parser.pause();
-          flush()
-            .then(() => {
-              if (Date.now() > opts.deadlineMs) { stopped = true; parser.abort(); resolve(); }
-              else parser.resume();
-            })
-            .catch(reject);
-        }
-      },
-      complete: () => { flush().then(() => resolve()).catch(reject); },
-      error: reject,
+  const consume = (r: ResRow) => {
+    progress.scanned++;
+    if (skippingUntil && r.ICO <= skippingUntil) return;
+    skippingUntil = null;
+    if (r.DDATZAN) return;
+    const founded = parseDate(r.DDATVZN);
+    if (!founded || founded < cutoff) return;
+    batch.push({
+      ico: r.ICO.padStart(8, '0'),
+      foundedAt: founded,
+      legalForm: r.FORMA || '',
+      nace: r.NACE || null,
+      employeeCategory: r.KATPO || null,
+      district: r.OKRESLAU || '',
+      municipality: r.ICZUJ ? Number(r.ICZUJ) : null,
+      registryUpdatedAt: parseDate(r.DDATPAKT),
+      importedAt: startedAt,
     });
-  });
+  };
+
+  /**
+   * Čtení po kusech přes `for await`, ne přes `step` + `pause()/resume()` knihovny.
+   *
+   * Původní verze pozastavovala parser při každém zápisu do databáze. Lokálně prošla, v produkci
+   * (Node 24 na Vercelu) skončila na „Maximum call stack size exceeded" — obnovování proudu se
+   * tam zanořovalo. Tady čtení brzdí samo `await` zápisu; kus textu se rozřeže na celé řádky
+   * (neúplný poslední řádek se přenáší dál, lichý počet uvozovek znamená otevřené pole) a ty se
+   * dají parseru jako hotový blok. Žádné zpětné volání, žádné zanoření.
+   */
+  const decoder = new TextDecoder('utf-8');
+  let carry = '';
+  /** Parita uvozovek na konci `carry`: 1 = jsme uvnitř pole s uvozovkami, které pokračuje. */
+  let carryParity = 0;
+  let header: string[] | null = null;
+  const parseBlock = (text: string) => {
+    if (!text) return;
+    const parsed = Papa.parse<string[]>(text, { header: false, skipEmptyLines: true });
+    for (const cells of parsed.data) {
+      if (!header) { header = cells; continue; }
+      const r = {} as Record<string, string>;
+      header.forEach((h, i) => { r[h] = cells[i] ?? ''; });
+      consume(r as unknown as ResRow);
+    }
+  };
+
+  for await (const chunk of stream as AsyncIterable<Buffer | Uint8Array | string>) {
+    const text = carry + (typeof chunk === 'string' ? chunk : decoder.decode(chunk, { stream: true }));
+    // Řez jen na konci řádku, který není uvnitř pole s uvozovkami. Jedním průchodem: parita
+    // uvozovek se počítá průběžně, ne opakovaným děleným řetězce — první verze tohle dělala
+    // od konce po řádcích a na kusu s lichým počtem uvozovek se zacyklila do kvadratického času.
+    let parity = carryParity;
+    let cut = -1;
+    for (let i = carry.length; i < text.length; i++) {
+      const ch = text.charCodeAt(i);
+      if (ch === 34) parity ^= 1;
+      else if (ch === 10 && parity === 0) cut = i;
+    }
+    if (cut < 0) { carry = text; carryParity = parity; continue; }
+    parseBlock(text.slice(0, cut));
+    carry = text.slice(cut + 1);
+    carryParity = parity;
+    if (batch.length >= BATCH) {
+      await flush();
+      if (Date.now() > opts.deadlineMs) { stopped = true; break; }
+    }
+  }
+  if (!stopped) {
+    parseBlock(carry + decoder.decode());
+    await flush();
+  }
 
   if (!stopped) {
     // Úplný průchod: co tenhle běh nepotvrdil, v registru už není (nebo vypadlo z okna).
