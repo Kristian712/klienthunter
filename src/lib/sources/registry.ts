@@ -18,6 +18,13 @@ import type { RawLead } from './types';
  * Co index dává navíc oproti ARESu: opravdu celý kraj (okres = LAU 1, kraj = prvních pět
  * znaků), ne jen krajské město. Co nedává: firmy bez NACE se podle názvu nenajdou, protože
  * index žádná jména nemá — a mít nemá.
+ *
+ * Insolvence (etapa 6, rozhodnuto 14. 9. 2026): ISIR se nepoužívá jako zdroj seznamu a nikdy
+ * se nesahá na fyzické osoby v oddlužení — to je hranice od majitele. Veřejná služba ISIR
+ * (isir_public_ws) navíc vůbec nenese IČO, jen události řízení podle spisové značky, a služba
+ * pro ČÚZK vrací i rodná čísla. Příznak „v insolvenčním rejstříku" proto bereme jedině z ARESu
+ * (`seznamRegistraci.stavZdrojeIr`) u firem, které už z indexu vyšly — `inInsolvency` na řádku,
+ * filtry `no_insolvency` / `in_insolvency` a srážka ve skóre. Nic víc ISIR nepřidá.
  */
 
 /** ARES má limit 500 dotazů za minutu; osm souběžných po 130 ms dává asi 460. */
