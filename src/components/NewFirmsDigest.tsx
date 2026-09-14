@@ -15,17 +15,17 @@ import type { Digest } from '@/lib/digest';
  *
  * Čísla jdou z indexu ČSÚ bez hledání; tlačítko založí skutečné hledání (index → ARES →
  * kontakty → skóre), takže seznam s telefony je jedno kliknutí daleko. Karta říká, kam index
- * sahá — „dnes" tu nestojí, dokud nebude denní feed z ARESu.
+ * sahá: dump ČSÚ dvakrát měsíčně plus denní dávky změn z ARESu (lib/registry-feed.ts).
  */
 const T = {
   title:    { cs: 'Nové firmy ve vašem kraji', sk: 'Nové firmy vo vašom kraji', en: 'New firms in your region' },
   window:   { cs: 'vznik za posledních {n} dní', sk: 'vznik za posledných {n} dní', en: 'founded in the last {n} days' },
-  until:    { cs: 'index ČSÚ sahá do {d}', sk: 'index ČSÚ siaha do {d}', en: 'the CZSO index reaches {d}' },
+  until:    { cs: 'nejnovější vznik v indexu {d}', sk: 'najnovší vznik v indexe {d}', en: 'newest founding in the index {d}' },
   all:      { cs: 'všechny obory', sk: 'všetky odbory', en: 'all trades' },
   newBadge: { cs: '{n} nových od vaší poslední návštěvy', sk: '{n} nových od vašej poslednej návštevy', en: '{n} new since your last visit' },
-  nothingNew: { cs: 'Od vaší poslední návštěvy nic nového — index se obnovuje dvakrát měsíčně.',
-                sk: 'Od vašej poslednej návštevy nič nové — index sa obnovuje dvakrát mesačne.',
-                en: 'Nothing new since your last visit — the index refreshes twice a month.' },
+  nothingNew: { cs: 'Od vaší poslední návštěvy nic nového. Index se doplňuje každý den z ARESu.',
+                sk: 'Od vašej poslednej návštevy nič nové. Index sa dopĺňa každý deň z ARESu.',
+                en: 'Nothing new since your last visit. The index is topped up daily from ARES.' },
   latest:   { cs: 'Nejnovější', sk: 'Najnovšie', en: 'Latest' },
   open:     { cs: 'Otevřít jako hledání', sk: 'Otvoriť ako hľadanie', en: 'Open as a search' },
   opening:  { cs: 'Zakládám hledání…', sk: 'Zakladám hľadanie…', en: 'Starting the search…' },

@@ -9,6 +9,8 @@ interface RegistryStatus {
   months: number;
   stats: { rows: number; bytes: number; oldest: string | null; newest: string | null };
   last: { startedAt: string; status: string; scanned: number; kept: number; cursorIco: string | null; error: string | null } | null;
+  /** Denní feed změn z ARESu (etapa 4): poslední zpracovaná dávka a kolik firem z něj index nese. */
+  feed: { last: { batchNo: number; releasedAt: string; inserted: number; deleted: number; processedAt: string } | null; fromFeed: number };
 }
 
 interface AdminUser {
@@ -55,6 +57,8 @@ export default function AdminPage() {
   const [registry, setRegistry]       = useState<RegistryStatus | null>(null);
   const [importing, setImporting]     = useState(false);
   const [importNote, setImportNote]   = useState<string | null>(null);
+  const [syncing, setSyncing]         = useState(false);
+  const [syncNote, setSyncNote]       = useState<string | null>(null);
   const [loadingUsers, setLoadingUsers] = useState(true);
   /** Načtení selhalo — prázdný panel by tvrdil, že v databázi nikdo není. */
   const [loadFailed, setLoadFailed]   = useState(false);
@@ -147,6 +151,28 @@ export default function AdminPage() {
    * Import běží uvnitř jednoho HTTP dotazu až 5 minut. Když skončí `done: false`, funkce
    * vypršela dřív, než dump došel do konce — další kliknutí naváže od posledního IČO.
    */
+  /** Denní feed ARESu ručně — totéž, co spouští cron ve 4:30 UTC. */
+  const runFeed = async () => {
+    setSyncing(true); setSyncNote(null);
+    try {
+      const r = await fetch('/api/cron/registry-feed', { method: 'POST' });
+      const d = await r.json().catch(() => null);
+      if (!r.ok) setSyncNote(isCs ? 'Synchronizace selhala — podrobnosti v logu serveru.' : 'Sync failed — see server log.');
+      else {
+        const res = d?.result;
+        setSyncNote(isCs
+          ? `Zpracováno ${res?.processed?.length ?? 0} dávek: +${res?.inserted ?? 0} firem, −${res?.deleted ?? 0}${res?.pending ? `, ${res.pending} dávek zbývá na příště` : ''}.`
+          : `Processed ${res?.processed?.length ?? 0} batches: +${res?.inserted ?? 0} firms, −${res?.deleted ?? 0}${res?.pending ? `, ${res.pending} batches left for next time` : ''}.`);
+      }
+    } catch (err) {
+      console.error('admin/registry-feed:', err);
+      setSyncNote(isCs ? 'Spojení se přerušilo.' : 'Connection dropped.');
+    } finally {
+      setSyncing(false);
+      fetchRegistry(); fetchDbSize();
+    }
+  };
+
   const runImport = async () => {
     setImporting(true); setImportNote(null);
     try {
@@ -368,6 +394,24 @@ export default function AdminPage() {
               {registry.last?.error ? ` (${registry.last.error})` : ''}
             </p>
             {importNote && <p className="text-xs text-ink mt-1">{importNote}</p>}
+
+            {/* Denní feed z ARESu: doplňuje firmy mezi dvěma dumpy ČSÚ. Cron 4:30 UTC (vercel.json), tady ručně. */}
+            <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-line pt-3">
+              <span className="text-xs font-medium text-ink-faint">{isCs ? 'Denní feed ARES' : 'Daily ARES feed'}</span>
+              <span className="text-xs text-ink-muted tnum">
+                {registry.feed?.last
+                  ? (isCs
+                    ? `poslední dávka ${registry.feed.last.batchNo} z ${formatDate(registry.feed.last.releasedAt, locale)} · z feedu ${registry.feed.fromFeed.toLocaleString('cs-CZ')} firem`
+                    : `last batch ${registry.feed.last.batchNo} of ${formatDate(registry.feed.last.releasedAt, locale)} · ${registry.feed.fromFeed.toLocaleString('en-GB')} firms from the feed`)
+                  : (isCs ? 'ještě neběžel — cron běží denně 4:30 UTC, potřebuje CRON_SECRET ve Vercelu' : 'not run yet — the cron runs daily at 4:30 UTC and needs CRON_SECRET in Vercel')}
+              </span>
+              <button type="button" onClick={runFeed} disabled={syncing}
+                className="btn-outline text-xs py-1.5 px-3 ml-auto disabled:opacity-60">
+                <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
+                {syncing ? (isCs ? 'Stahuji…' : 'Syncing…') : (isCs ? 'Stáhnout novinky z ARESu' : 'Pull ARES updates')}
+              </button>
+            </div>
+            {syncNote && <p className="text-xs text-ink mt-1">{syncNote}</p>}
           </div>
         )}
 

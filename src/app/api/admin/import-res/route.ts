@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { activeAccount, sessionFrom } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { REGISTRY_INDEX_MONTHS, registryIndexStats, runRegistryImport } from '@/lib/registry-index';
+import { registryFeedStatus } from '@/lib/registry-feed';
 
 export const dynamic = 'force-dynamic';
 /** Celých 300 s: stažení 543 MB dumpu a čtvrt milionu zápisů. Když to nestačí, běh naváže. */
@@ -14,11 +15,12 @@ export async function GET(req: NextRequest) {
   if (!payload) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const me = await activeAccount(payload.userId);
   if (!me?.isAdmin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  const [stats, last] = await Promise.all([
+  const [stats, last, feed] = await Promise.all([
     registryIndexStats(),
     prisma.registryImport.findFirst({ orderBy: { startedAt: 'desc' } }),
+    registryFeedStatus(),
   ]);
-  return NextResponse.json({ months: REGISTRY_INDEX_MONTHS, stats, last });
+  return NextResponse.json({ months: REGISTRY_INDEX_MONTHS, stats, last, feed });
 }
 
 /**

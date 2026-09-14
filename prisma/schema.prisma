@@ -354,10 +354,28 @@ model RegistrySubject {
   registryUpdatedAt DateTime?
   /// Který import řádek naposledy viděl. Co běh nepotvrdí, se po jeho dokončení smaže.
   importedAt       DateTime
+  /// Kdy jsme firmu poprvé viděli v denní dávce změn z ARESu (etapa 4). NULL = přišla až
+  /// z dumpu ČSÚ. Podle toho se pozná „nová od včera" dřív, než ji má ČSÚ ve svém souboru.
+  firstSeenAt      DateTime?
 
   @@index([district, foundedAt])
+  @@index([firstSeenAt])
   @@index([nace, foundedAt])
   @@index([importedAt])
+}
+
+/// Zpracované denní dávky změn z ARESu (etapa 4). Jeden řádek na dávku, aby se žádná
+/// nezpracovala dvakrát a bylo vidět, kde synchronizace stojí.
+model RegistryFeedBatch {
+  /// `ros` — Registr osob (vznik a zánik subjektů). Jiné zdroje zatím nečteme.
+  source      String
+  batchNo     Int
+  releasedAt  DateTime
+  inserted    Int      @default(0)
+  deleted     Int      @default(0)
+  processedAt DateTime @default(now())
+
+  @@id([source, batchNo])
 }
 
 /// Průběh importu RES: jeden řádek na běh. Dump je řazený podle IČO, takže přerušený běh

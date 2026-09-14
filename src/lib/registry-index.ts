@@ -128,7 +128,12 @@ export async function runRegistryImport(opts: {
 
   if (!stopped) {
     // Úplný průchod: co tenhle běh nepotvrdil, v registru už není (nebo vypadlo z okna).
-    await prisma.registrySubject.deleteMany({ where: { importedAt: { lt: startedAt } } });
+    // Firmy z denního feedu ARESu (etapa 4) mladší než 60 dní se nechávají: ČSÚ je má v dumpu
+    // až s odstupem a mazat je by znamenalo, že „nová od včera" po importu zmizí.
+    const keepSince = new Date(startedAt.getTime() - 60 * 24 * 60 * 60 * 1000);
+    await prisma.registrySubject.deleteMany({
+      where: { importedAt: { lt: startedAt }, OR: [{ firstSeenAt: null }, { firstSeenAt: { lt: keepSince } }] },
+    });
     progress.done = true;
     progress.cursorIco = null;
   }
