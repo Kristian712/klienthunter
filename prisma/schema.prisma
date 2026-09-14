@@ -390,6 +390,9 @@ model RegistryImport {
   status      String    @default("running")
   /// Poslední zapsané IČO — odkud navázat po vypršení funkce.
   cursorIco   String?
+  /// Bajt v dumpu, od kterého má navazující běh stahovat (začátek kusu s posledním zápisem).
+  /// Bez něj navazování stahovalo celý soubor znovu od nuly — u 543 MB minuty navíc.
+  cursorByte  Int?
   /// Kolik řádků dumpu běh přečetl a kolik jich splnilo okno.
   scanned     Int       @default(0)
   kept        Int       @default(0)

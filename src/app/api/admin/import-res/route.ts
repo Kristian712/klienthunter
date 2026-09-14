@@ -44,20 +44,21 @@ export async function POST(req: NextRequest) {
     where: { status: 'running', cursorIco: { not: null } },
     orderBy: { startedAt: 'desc' },
   });
-  const run = await prisma.registryImport.create({ data: { cursorIco: interrupted?.cursorIco ?? null } });
+  const run = await prisma.registryImport.create({ data: { cursorIco: interrupted?.cursorIco ?? null, cursorByte: interrupted?.cursorByte ?? null } });
   if (interrupted) await prisma.registryImport.update({ where: { id: interrupted.id }, data: { status: 'failed', error: 'timeout, navázáno' } });
 
   try {
     const progress = await runRegistryImport({
       deadlineMs: Date.now() + maxDuration * 1000 - HEADROOM_MS,
       resumeFrom: interrupted?.cursorIco ?? null,
+      resumeByte: interrupted?.cursorByte ?? null,
       onProgress: async p => {
-        await prisma.registryImport.update({ where: { id: run.id }, data: { scanned: p.scanned, kept: p.kept, cursorIco: p.cursorIco } });
+        await prisma.registryImport.update({ where: { id: run.id }, data: { scanned: p.scanned, kept: p.kept, cursorIco: p.cursorIco, cursorByte: p.cursorByte } });
       },
     });
     await prisma.registryImport.update({
       where: { id: run.id },
-      data: { status: progress.done ? 'done' : 'running', finishedAt: progress.done ? new Date() : null, scanned: progress.scanned, kept: progress.kept, cursorIco: progress.cursorIco },
+      data: { status: progress.done ? 'done' : 'running', finishedAt: progress.done ? new Date() : null, scanned: progress.scanned, kept: progress.kept, cursorIco: progress.cursorIco, cursorByte: progress.cursorByte },
     });
     const stats = await registryIndexStats();
     return NextResponse.json({ progress, stats });

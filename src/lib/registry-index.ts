@@ -23,6 +23,8 @@ export const RES_URL = 'https://opendata.csu.gov.cz/soubory/od/od_org03/res_data
 export const RES_ATTRIBUTION = 'Registr ekonomických subjektů, Český statistický úřad, CC BY 4.0';
 
 const BATCH = 1_000;
+/** Hlavička dumpu (ověřeno 13. 9. 2026). Potřebná při navázání uprostřed souboru, kde už neprojde parserem. */
+const RES_HEADER = ['ICO', 'OKRESLAU', 'DDATVZN', 'DDATZAN', 'ZPZAN', 'DDATPAKT', 'FORMA', 'ROSFORMA', 'KATPO', 'NACE', 'NACE2025', 'ICZUJ', 'FIRMA', 'CISS2010', 'KODADM', 'TEXTADR', 'PSC', 'OBEC_TEXT', 'COBCE_TEXT', 'ULICE_TEXT', 'TYPCDOM', 'CDOM', 'COR', 'DATPLAT', 'PRIZNAK'];
 
 /**
  * Stažení po rozsazích, nekomprimované.
@@ -79,9 +81,12 @@ function headLength(url: string): Promise<number> {
   });
 }
 
-async function* fetchInRanges(url: string): AsyncGenerator<Uint8Array> {
+async function* fetchInRanges(url: string, startByte = 0): AsyncGenerator<Uint8Array> {
   const total = await headLength(url);
-  for (let from = 0; from < total; from += RANGE_BYTES) {
+  // Navázání uprostřed souboru: kus se rozřeže na řádky až od prvního konce řádku (viz `carry`
+  // ve volajícím) — a řádky před kurzorem IČO se stejně přeskočí, takže začátek kusu nemusí
+  // sedět na hranici řádku.
+  for (let from = startByte; from < total; from += RANGE_BYTES) {
     const to = Math.min(from + RANGE_BYTES, total) - 1;
     let lastErr: unknown = null;
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -119,6 +124,8 @@ export interface ImportProgress {
   scanned: number;
   kept: number;
   cursorIco: string | null;
+  /** Začátek kusu dumpu (bajt), ve kterém proběhl poslední zápis — odtud navazuje další běh. */
+  cursorByte: number | null;
   done: boolean;
 }
 
@@ -131,6 +138,8 @@ export interface ImportProgress {
 export async function runRegistryImport(opts: {
   deadlineMs: number;
   resumeFrom?: string | null;
+  /** Bajt, od kterého stahovat (viz `ImportProgress.cursorByte`). */
+  resumeByte?: number | null;
   /** Místo stažení z ČSÚ číst z tohoto streamu (lokální kopie dumpu při ladění). */
   input?: Readable;
   onProgress?: (p: ImportProgress) => Promise<void>;
@@ -140,9 +149,13 @@ export async function runRegistryImport(opts: {
   // Webový proud z `fetch` se čte přímo přes `for await` — `Readable.fromWeb` se po zápisu
   // do databáze jednou zasekl (proces spal, žádná data, žádná chyba). Lokální soubor je Node
   // Readable, ten async iteraci umí taky.
-  const stream: AsyncIterable<Buffer | Uint8Array | string> = opts.input ?? fetchInRanges(RES_URL);
+  const startByte = opts.input ? 0 : Math.max(0, opts.resumeByte ?? 0);
+  const stream: AsyncIterable<Buffer | Uint8Array | string> = opts.input ?? fetchInRanges(RES_URL, startByte);
 
-  const progress: ImportProgress = { scanned: 0, kept: 0, cursorIco: opts.resumeFrom ?? null, done: false };
+  const progress: ImportProgress = { scanned: 0, kept: 0, cursorIco: opts.resumeFrom ?? null, cursorByte: startByte || null, done: false };
+  /** Kde v souboru začíná právě zpracovávaný kus (pro `cursorByte`). */
+  let chunkStart = startByte;
+  let consumedBytes = startByte;
   let batch: Array<{ ico: string; foundedAt: Date; legalForm: string; nace: string | null; employeeCategory: string | null; district: string; municipality: number | null; registryUpdatedAt: Date | null; importedAt: Date }> = [];
   let skippingUntil = opts.resumeFrom ?? null;
   let stopped = false;
@@ -156,6 +169,7 @@ export async function runRegistryImport(opts: {
   const flush = async () => {
     while (batch.length > 0) {
       const rows = batch.splice(0, BATCH);
+      progress.cursorByte = chunkStart;
       // Nahradit, ne slučovat: řádek indexu je snímek registru, ne něco, co bychom sami doplňovali.
       await prisma.registrySubject.deleteMany({ where: { ico: { in: rows.map(r => r.ico) } } });
       await prisma.registrySubject.createMany({ data: rows, skipDuplicates: true });
@@ -167,8 +181,12 @@ export async function runRegistryImport(opts: {
 
   const consume = (r: ResRow) => {
     progress.scanned++;
-    if (skippingUntil && r.ICO <= skippingUntil) return;
-    skippingUntil = null;
+    if (skippingUntil) {
+      // Při navázání uprostřed souboru je první řádek kusu useknutý a jeho „IČO" je zbytek
+      // jiného sloupce — takový řádek nesmí kurzor zrušit, jinak by se řádky před ním zapsaly znovu.
+      if (!/^\d{1,8}$/.test(r.ICO) || r.ICO.padStart(8, '0') <= skippingUntil) return;
+      skippingUntil = null;
+    }
     if (r.DDATZAN) return;
     const founded = parseDate(r.DDATVZN);
     if (!founded || founded < cutoff) return;
@@ -198,7 +216,7 @@ export async function runRegistryImport(opts: {
   let carry = '';
   /** Parita uvozovek na konci `carry`: 1 = jsme uvnitř pole s uvozovkami, které pokračuje. */
   let carryParity = 0;
-  let header: string[] | null = null;
+  let header: string[] | null = startByte > 0 ? RES_HEADER : null;
   const parseBlock = (text: string) => {
     if (!text) return;
     const parsed = Papa.parse<string[]>(text, { header: false, skipEmptyLines: true });
@@ -211,6 +229,8 @@ export async function runRegistryImport(opts: {
   };
 
   for await (const chunk of stream) {
+    chunkStart = consumedBytes;
+    consumedBytes += typeof chunk === 'string' ? Buffer.byteLength(chunk) : chunk.length;
     const text = carry + (typeof chunk === 'string' ? chunk : decoder.decode(chunk, { stream: true }));
     // Řez jen na konci řádku, který není uvnitř pole s uvozovkami. Jedním průchodem: parita
     // uvozovek se počítá průběžně, ne opakovaným děleným řetězce — první verze tohle dělala
@@ -226,15 +246,24 @@ export async function runRegistryImport(opts: {
     parseBlock(text.slice(0, cut));
     carry = text.slice(cut + 1);
     carryParity = parity;
-    if (batch.length >= BATCH) {
+    if (batch.length >= BATCH) await flush();
+    // Čas se hlídá po každém kusu, ne jen po zápisu: první stovky MB dumpu jsou starší firmy
+    // mimo okno, takže se tam nezapisuje — a bez téhle kontroly funkce vypršela dřív, než
+    // stihla říct, kde skončila. Další běh naváže od začátku dalšího kusu.
+    if (Date.now() > opts.deadlineMs) {
       await flush();
-      if (Date.now() > opts.deadlineMs) { stopped = true; break; }
+      progress.cursorByte = consumedBytes;
+      stopped = true;
+      break;
     }
   }
   if (!stopped) {
     parseBlock(carry + decoder.decode());
     await flush();
   }
+  // Při navázání uprostřed souboru je první řádek kusu useknutý: parser ho vezme jako
+  // nesmysl s jiným počtem sloupců a `consume` ho zahodí přes chybějící datum vzniku. Hlavička
+  // se při navázání neobjeví — proto se `header` doplní z konstantní podoby dumpu.
 
   if (!stopped) {
     // Úplný průchod: co tenhle běh nepotvrdil, v registru už není (nebo vypadlo z okna).
@@ -246,6 +275,7 @@ export async function runRegistryImport(opts: {
     });
     progress.done = true;
     progress.cursorIco = null;
+    progress.cursorByte = null;
   }
   return progress;
 }
