@@ -24,6 +24,9 @@ export interface SearchMeta {
   origin: string | null;
   /** Kolik dřívějších běhů kořen má — bez nich nemá „nové" s čím srovnávat. */
   earlierRuns: number;
+  /** Obor (`*` = všechny) a kraj, se kterými hledání běželo — formulář je po otevření převezme. */
+  query: string;
+  region: string;
 }
 
 /** Metadata běhu i jeho kořene. `null`, když hledání není uživatele. */
@@ -32,7 +35,8 @@ export async function searchMeta(searchId: string, userId: string): Promise<Sear
     where: { id: searchId, userId },
     select: {
       id: true, name: true, filters: true, scenario: true, savedId: true, lastOpenedAt: true, createdAt: true, origin: true,
-      saved: { select: { id: true, name: true, filters: true, scenario: true, lastOpenedAt: true, origin: true } },
+      query: true, region: true,
+      saved: { select: { id: true, name: true, filters: true, scenario: true, lastOpenedAt: true, origin: true, query: true, region: true } },
     },
   });
   if (!s) return null;
@@ -52,6 +56,8 @@ export async function searchMeta(searchId: string, userId: string): Promise<Sear
     lastOpenedAt: root.lastOpenedAt,
     origin: root.origin,
     earlierRuns,
+    query: root.query,
+    region: root.region,
   };
 }
 

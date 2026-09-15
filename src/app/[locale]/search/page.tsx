@@ -21,7 +21,7 @@ import { websiteAudit } from '@/lib/website-audit';
 import { YIELD_NOTE, yieldFor } from '@/lib/nace-map';
 import { SCENARIOS, SCENARIO_BY_PROFESSION, scenarioById } from '@/lib/scenarios';
 import { EMPTY_PROFILE, industriesFor, presetFiltersFor, type UserProfile } from '@/lib/profile';
-import { ALL_INDUSTRIES, ALL_INDUSTRIES_LABEL, MAX_INDUSTRIES, isAllIndustries, joinIndustries } from '@/lib/industries';
+import { ALL_INDUSTRIES, ALL_INDUSTRIES_LABEL, MAX_INDUSTRIES, isAllIndustries, joinIndustries, splitIndustries } from '@/lib/industries';
 import { isWholeCz, nuts3ForRegion } from '@/lib/regions-nuts';
 import { compareRanked, type ClaimMark } from '@/lib/claim-order';
 
@@ -29,6 +29,8 @@ import { compareRanked, type ClaimMark } from '@/lib/claim-order';
 interface SavedMeta {
   id: string; name: string | null; filters: string[]; scenario: string | null;
   rootId: string; rootName: string | null; lastOpenedAt: string | null; earlierRuns: number;
+  /** Obor (`*` = všechny) a kraj hledání; starší odpovědi je nemusí mít. */
+  query?: string; region?: string;
   /** `profile` = výchozí kombinace z dotazníku, `user` = uživatelova vlastní. */
   origin: string | null;
 }
@@ -1050,6 +1052,18 @@ export default function SearchPage() {
     setPresetsOn(false);
     setActive(new Set(normalizeFilters(meta.filters)));
     if (meta.scenario) setScenario(meta.scenario);
+    // Kraj a obor z hledání, ne z profilu: dřív formulář po otevření hledání bez oboru ukázal obor
+    // z profilu („Zubař") a další klik na Vyhledat by hledal něco jiného, než je na obrazovce.
+    if (meta.region) {
+      const known = REGIONS.some(g => g.items.some(r => r.value === meta.region));
+      setRegion(known ? meta.region : '__custom__');
+      if (!known) setCustomRegion(meta.region);
+    }
+    if (meta.query && meta.query !== 'CSV import') {
+      setIndustries(isAllIndustries(meta.query) ? [] : splitIndustries(meta.query));
+      setIndustryQuery('');
+      setCustomIndustry('');
+    }
     if (meta.rootName) {
       fetch(`/api/searches/${meta.id}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ opened: true }),
@@ -1127,8 +1141,9 @@ export default function SearchPage() {
     const preset = presetFiltersFor(p);
     // U uloženého hledání se přednastavení nepřidává vůbec (viz `savedLockRef`).
     if (preset.length > 0 && presetsOn && !savedLockRef.current) setActive(prev => new Set([...Array.from(prev), ...preset]));
-    if (p.targetRegion)   setRegion(r => r || p.targetRegion!);
-    if (p.targetIndustry) setIndustries(i => (i.length ? i : [p.targetIndustry!]));
+    // Otevřené hledání má vlastní kraj a obor (applySavedMeta); profil je nepřepisuje.
+    if (p.targetRegion && !savedLockRef.current)   setRegion(r => r || p.targetRegion!);
+    if (p.targetIndustry && !savedLockRef.current) setIndustries(i => (i.length ? i : [p.targetIndustry!]));
     // Scénář je jen výchozí hodnota přepínače; jakmile s ním uživatel hnul, profil ho nepřebíjí.
     if (p.profession && SCENARIO_BY_PROFESSION[p.profession]) {
       const def = SCENARIO_BY_PROFESSION[p.profession];
