@@ -34,7 +34,28 @@ async function main() {
   } finally {
     await prisma.$disconnect();
   }
-  execSync('npx prisma migrate deploy', { stdio: 'inherit' });
+  /**
+   * Migrace přes přímé spojení, ne přes pooler.
+   *
+   * 15. 9. 2026 spadly dva buildy na P1002: `migrate deploy` čeká na advisory lock
+   * (`pg_advisory_lock`) a přes PgBouncer u Neonu (host `…-pooler…`) ho nedostane — pooler
+   * vrací pokaždé jiné spojení. Přímý host je tentýž bez `-pooler`; když majitel nastaví
+   * `DATABASE_URL_UNPOOLED`, má přednost. Aplikace sama dál používá pooler.
+   */
+  const direct = process.env.DATABASE_URL_UNPOOLED
+    ?? process.env.DATABASE_URL?.replace(/(-pooler)(?=\.[a-z0-9-]+\.aws\.neon\.tech)/, '');
+  const env = { ...process.env, ...(direct ? { DATABASE_URL: direct } : {}) };
+  // Zámek může držet souběžný build (dvě nasazení za sebou) — pak se to za chvíli povede.
+  for (let attempt = 1; ; attempt++) {
+    try {
+      execSync('npx prisma migrate deploy', { stdio: 'inherit', env });
+      return;
+    } catch (err) {
+      if (attempt >= 3) throw err;
+      console.warn(`migrate: pokus ${attempt} selhal, za 20 s znovu`);
+      await new Promise(r => setTimeout(r, 20_000));
+    }
+  }
 }
 
 main().catch(err => {
