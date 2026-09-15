@@ -216,7 +216,7 @@ export function normalizeName(name: string | undefined): string {
 }
 
 /** Industry words that must never be the sole reason to merge two records. */
-const GENERIC_TOKENS = new Set([
+export const GENERIC_TOKENS = new Set([
   'instalater', 'elektrikar', 'autoservis', 'kadernictvi', 'restaurace', 'kavarna',
   'pekarna', 'reznictvi', 'zamecnictvi', 'kominictvi', 'uklid', 'uklidova', 'servis',
   'studio', 'salon', 'nails', 'nail', 'brno', 'praha', 'ostrava', 'firma', 'company',

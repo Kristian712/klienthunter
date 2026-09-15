@@ -10,6 +10,7 @@ import { scenarioById } from './scenarios';
 import { discoverAll, type RawLead } from './sources';
 import { notifySearchDone } from './webhook';
 import { createSearchQuota } from './web-search-quota';
+import { fetchAdvertisers, indexAdvertisers, matchAdvertiser, metaAdsEnabled } from './sources/meta-ads';
 
 /**
  * Hledání, které běží po odeslání odpovědi.
@@ -207,6 +208,25 @@ export async function runSearchJob(jobId: string): Promise<void> {
         seenPlace.add(c.placeId);
         return true;
       });
+      /**
+       * Kdo z nalezených platí za reklamu na Meta. Inzerenti pro město jdou z cache nebo z API
+       * (nejvýš pár volání, rozpočet 20 s), párují se podle domény nebo názvu. Bez tokenu se
+       * nic neděje a řádky zůstanou bez údaje — což UI čte jako „nevíme", ne „neinzeruje".
+       */
+      if (metaAdsEnabled() && merged.length > 0) {
+        try {
+          const advertisers = await fetchAdvertisers(city, Math.min(deadlineAt, Date.now() + 20_000));
+          if (advertisers.length) {
+            const idx = indexAdvertisers(advertisers);
+            for (const c of merged) {
+              const hit = matchAdvertiser({ name: c.name, website: c.signals.claimedUrl }, idx);
+              if (hit) c.ads = { pageId: hit.pageId, pageName: hit.pageName, since: hit.since, count: hit.count, linkDomain: hit.linkDomain, reach: hit.reach };
+            }
+          }
+        } catch (err) {
+          console.warn('search-job meta-ads:', err);
+        }
+      }
       const known = merged.flatMap(c => { const p = prior.get(firmKeyOf(c)); return p ? [{ c, prior: p }] : []; });
       const candidates = merged.filter(c => !prior.has(firmKeyOf(c)));
 

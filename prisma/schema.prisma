@@ -233,6 +233,17 @@ model BusinessResult {
   /// Čím firma prošla do výsledků: `nace` (kód oboru v rejstříku), `name` (slovo v názvu
   /// při hledání v ARESu), `osm` (štítek v OpenStreetMap). NULL u starších řádků a importu.
   matchedBy     String?
+  /// Inzerent z Meta Knihovny reklam spárovaný s firmou (viz sources/meta-ads.ts). NULL = nespárováno,
+  /// což neznamená, že firma neinzeruje. Ukládá se jen stránka, doména odkazu, počet a začátek —
+  /// žádné texty reklam.
+  adsPageId     String?
+  adsPageName   String?
+  adsSince      DateTime?
+  adsCount      Int?
+  /// Doména, kam reklamy vedou (z `ad_creative_link_captions`). NULL = reklamy nevedou na web.
+  adsLinkDomain String?
+  /// `eu_total_reach` nejsilnější reklamy — odhad dosahu v EU, jediný náznak rozpočtu.
+  adsReach      Int?
   facebookUrl   String?
   instagramUrl  String?
   linkedInUrl   String?
@@ -365,6 +376,24 @@ model RegistryFeedBatch {
   processedAt DateTime @default(now())
 
   @@id([source, batchNo])
+}
+
+/// Inzerent z Meta Knihovny reklam (Ad Library API), agregovaný na stránku, ne na reklamu —
+/// texty a kreativy se neukládají. Cache na dotaz (město) sedm dní, viz sources/meta-ads.ts.
+model MetaAdvertiser {
+  /// Hledaný výraz (město malými písmeny), pod kterým inzerent přišel.
+  query       String
+  pageId      String
+  pageName    String
+  /// Plátce z údajů pro EU (DSA) — často právní název firmy, klíč k ARESu.
+  payer       String?
+  linkDomain  String?
+  adCount     Int
+  firstSeenAt DateTime?
+  reach       Int?
+  fetchedAt   DateTime @default(now())
+
+  @@id([query, pageId])
 }
 
 /// Průběh importu RES: jeden řádek na běh. Dump je řazený podle IČO, takže přerušený běh

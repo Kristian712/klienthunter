@@ -56,13 +56,16 @@ const T = {
   legalSole: { cs: ' · živnostníci', sk: ' · živnostníci', en: ' · sole traders' },
   legalCo:   { cs: ' · obchodní společnosti', sk: ' · obchodné spoločnosti', en: ' · companies' },
   preset:    { cs: 'profil', sk: 'profil', en: 'profile' },
+  metaLocked: { cs: 'Vyžaduje přístup k Meta Ad Library API — v tomhle nasazení není nastavený token (META_AD_LIBRARY_TOKEN). Bez něj appka neví, kdo inzeruje.',
+                sk: 'Vyžaduje prístup k Meta Ad Library API — v tomto nasadení nie je nastavený token (META_AD_LIBRARY_TOKEN). Bez neho appka nevie, kto inzeruje.',
+                en: 'Needs Meta Ad Library API access — this deployment has no token set (META_AD_LIBRARY_TOKEN). Without it the app cannot tell who advertises.' },
   noCountArs:{ cs: 'bez indexu se počty neukazují', sk: 'bez indexu sa počty neukazujú', en: 'no counts without the index' },
 };
 
 const INDEX_ONLY = new Set(['has_employees', 'no_employees']);
 
 export function SearchComposer({
-  locale, region, industry, active, toggle, districts, setDistricts, presetIds, limit,
+  locale, region, industry, active, toggle, districts, setDistricts, presetIds, limit, metaAds = true,
 }: {
   locale: string;
   region: string;
@@ -74,6 +77,8 @@ export function SearchComposer({
   presetIds: string[];
   /** Strop výsledků z tarifu. */
   limit: number;
+  /** Je nastavený token Meta Ad Library API? Bez něj jsou filtry `ads_*` zamčené s vysvětlením. */
+  metaAds?: boolean;
 }) {
   const t = (x: { cs: string; sk?: string; en: string }) => localized(x, locale);
   const [open, setOpen] = useState(false);
@@ -132,9 +137,11 @@ export function SearchComposer({
   const chip = (f: LeadFilter, onClick: () => void, withCount: boolean) => {
     const on = active.has(f.id);
     const n = withCount ? countFor(f) : null;
+    // Zdroj bez klíče: chip zůstane vidět (ať je funkce k nalezení), ale nejde zapnout a říká proč.
+    const locked = f.source === 'Meta' && !metaAds && !on;
     return (
-      <button key={f.id} type="button" onClick={onClick} aria-pressed={on}
-        title={f.hint ? localized(f.hint, locale) : undefined}
+      <button key={f.id} type="button" onClick={onClick} aria-pressed={on} disabled={locked}
+        title={locked ? t(T.metaLocked) : f.hint ? localized(f.hint, locale) : undefined}
         className={on ? 'chip-active' : 'chip'}>
         {localized(f.label, locale)}
         {n !== null && <span className={`tnum ${on ? 'text-accent-ink/70' : 'text-ink-faint'}`}>{n.toLocaleString(locale === 'en' ? 'en-GB' : 'cs-CZ')}</span>}

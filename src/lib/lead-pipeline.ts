@@ -1,5 +1,6 @@
 import { createRobotsCache } from './robots';
 import { ENRICHMENT_SOURCES, contactPageUrl, extractContacts, type MatchedBy, type RawLead, type TradeLicence } from './sources';
+import type { AdsSignal } from './sources/meta-ads';
 import { splitIndustries } from './industries';
 import { resolveNiche } from './nace-map';
 import {
@@ -126,6 +127,8 @@ export interface Candidate {
   registryUpdatedAt?: Date;
   /** Čím firma prošla do výsledků — viz `RawLead.matchedBy`. */
   matchedBy?: MatchedBy;
+  /** Spárovaný inzerent z Meta Knihovny reklam (sources/meta-ads.ts). Doplňuje search-job. */
+  ads?: AdsSignal;
   signals: WebsiteSignals;
 }
 

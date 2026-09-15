@@ -69,6 +69,9 @@ export const EXPORT_COLUMNS = [
   { key: 'insolvency', cs: 'V insolvenci',         sk: 'V insolvencii',        en: 'In insolvency' },
   { key: 'registryAt', cs: 'Změna v rejstříku',    sk: 'Zmena v registri',     en: 'Registry updated' },
   { key: 'webNote',    cs: 'Web – doklad',         sk: 'Web – doklad',         en: 'Website evidence' },
+  { key: 'adsMeta',    cs: 'Inzeruje na Meta od',  sk: 'Inzeruje na Meta od',  en: 'Advertises on Meta since' },
+  { key: 'adsCount',   cs: 'Reklam na Meta',       sk: 'Reklám na Meta',       en: 'Meta ads' },
+  { key: 'adsDomain',  cs: 'Reklamy vedou na',     sk: 'Reklamy vedú na',      en: 'Ads link to' },
   { key: 'source',     cs: 'Zdroj',                sk: 'Zdroj',                en: 'Source' },
 ] as const;
 
@@ -126,6 +129,10 @@ export function exportRow(b: BusinessResult, criteria: readonly string[] | null 
     vatLabel(b.inInsolvency, locale),
     isoDay(b.registryUpdatedAt),
     b.websiteEvidence || '',
+    // Meta: prázdno = nespárováno (ne „neinzeruje"); spárovaná firma bez domény = reklamy nevedou na web.
+    b.adsPageId ? (isoDay(b.adsSince) || localized(YES, locale)) : '',
+    b.adsPageId ? (b.adsCount ?? '') : '',
+    b.adsPageId ? (b.adsLinkDomain ?? localized({ cs: 'nevedou na web', sk: 'nevedú na web', en: 'no website' }, locale)) : '',
     b.source,
   ];
 }
@@ -156,6 +163,7 @@ export function exportToExcel(
     { wch: 38 }, { wch: 12 }, { wch: 12 }, { wch: 18 }, { wch: 7 },
     { wch: 14 }, { wch: 70 }, { wch: 60 }, { wch: 20 },
     { wch: 11 }, { wch: 18 }, { wch: 10 }, { wch: 60 }, { wch: 10 }, { wch: 12 }, { wch: 50 },
+    { wch: 14 }, { wch: 8 }, { wch: 22 },
     { wch: 16 },
   ];
 

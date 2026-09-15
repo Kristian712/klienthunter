@@ -60,6 +60,8 @@ export default function AdminPage() {
   /** „Zatím žádná žádost" se smí říct až po odpovědi — před ní to byla domněnka. */
   const [optoutsLoaded, setOptoutsLoaded] = useState(false);
   const [payments, setPayments]       = useState<UnmatchedPayment[]>([]);
+  /** Meta Knihovna reklam: token a cache inzerentů (viz /api/admin/meta-ads). */
+  const [metaAds, setMetaAds]         = useState<{ enabled: boolean; advertisers: number; queries: number; lastFetchedAt: string | null } | null>(null);
   const [resolving, setResolving]     = useState<string | null>(null);
   /** Velikost databáze — Neon free má 0,5 GB a index z ČSÚ (etapa 3) se dimenzuje podle zbytku. */
   const [dbSize, setDbSize]           = useState<{ bytes: number; tables: Array<{ name: string; bytes: number; rows: number }> } | null>(null);
@@ -186,7 +188,13 @@ export default function AdminPage() {
       .then(d => { if (d?.stats) setRegistry(d); })
       .catch(err => console.error('admin/import-res:', err));
   }, []);
-  useEffect(() => { fetchDbSize(); fetchRegistry(); }, [fetchDbSize, fetchRegistry]);
+  const fetchMetaAds = useCallback(() => {
+    fetch('/api/admin/meta-ads')
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (d && typeof d.enabled === 'boolean') setMetaAds(d); })
+      .catch(err => console.error('admin/meta-ads:', err));
+  }, []);
+  useEffect(() => { fetchDbSize(); fetchRegistry(); fetchMetaAds(); }, [fetchDbSize, fetchRegistry, fetchMetaAds]);
 
   /**
    * Import běží uvnitř jednoho HTTP dotazu až 5 minut. Když skončí `done: false`, funkce
@@ -403,7 +411,7 @@ export default function AdminPage() {
             </div>
           </div>
           {/* Obnovit = všechno, co panel ukazuje: i žádosti, velikost databáze a stav indexu. */}
-          <button onClick={() => { fetchUsers(); fetchCodes(); fetchOptouts(); fetchPayments(); fetchDbSize(); fetchRegistry(); }}
+          <button onClick={() => { fetchUsers(); fetchCodes(); fetchOptouts(); fetchPayments(); fetchDbSize(); fetchRegistry(); fetchMetaAds(); }}
             className="btn-ghost">
             <RefreshCw size={14} />{isCs ? 'Obnovit' : 'Refresh'}
           </button>
@@ -489,6 +497,24 @@ export default function AdminPage() {
             <p className="text-xs text-ink-faint mt-2 tnum">
               {dbSize.tables.slice(0, 5).map(t => `${t.name} ${mb(t.bytes)} (${t.rows.toLocaleString(isCs ? 'cs-CZ' : 'en-GB')})`).join(' · ')}
             </p>
+          </div>
+        )}
+
+        {/* Meta Knihovna reklam: bezplatné API, ale bez osobně ověřeného tokenu neexistuje. */}
+        {metaAds && (
+          <div className="card mb-6 text-sm">
+            <div className="flex items-baseline gap-3 flex-wrap">
+              <span className="text-xs font-medium text-ink-faint">{isCs ? 'Meta Knihovna reklam' : 'Meta Ad Library'}</span>
+              <span className="text-xs text-ink-muted tnum">
+                {metaAds.enabled
+                  ? (isCs
+                    ? `token nastaven · ${metaAds.advertisers.toLocaleString('cs-CZ')} inzerentů z ${metaAds.queries} měst v cache${metaAds.lastFetchedAt ? ` · naposledy ${formatDate(metaAds.lastFetchedAt, locale)}` : ''}`
+                    : `token set · ${metaAds.advertisers.toLocaleString('en-GB')} advertisers from ${metaAds.queries} towns cached${metaAds.lastFetchedAt ? ` · last ${formatDate(metaAds.lastFetchedAt, locale)}` : ''}`)
+                  : (isCs
+                    ? 'token chybí — filtry „Inzeruje na Meta" jsou pro uživatele zamčené. Nastavte META_AD_LIBRARY_TOKEN ve Vercelu (postup v .env.example).'
+                    : 'no token — the “Advertises on Meta” filters are locked for users. Set META_AD_LIBRARY_TOKEN in Vercel (steps in .env.example).')}
+              </span>
+            </div>
           </div>
         )}
 

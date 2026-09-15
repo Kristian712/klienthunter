@@ -6,8 +6,9 @@ import { useTranslations, useLocale } from 'next-intl';
 import {
   Search, Globe, Users, ExternalLink, Check, Bookmark, RefreshCw, Sparkles,
   Mail, MapPin, X, Clock, ChevronDown,
-  FileText, Table2, PhoneCall, ShieldCheck, Share2, Phone,
+  FileText, Table2, PhoneCall, ShieldCheck, Share2, Phone, Megaphone,
 } from 'lucide-react';
+import { googleAdsTransparencyUrl } from '@/lib/sources/meta-ads';
 import { CRM_FORMATS } from '@/lib/crm-export';
 import { formatDate } from '@/lib/format-date';
 import { SearchComposer } from '@/components/SearchComposer';
@@ -100,6 +101,13 @@ interface BusinessResult {
   contactFoundAt?: string | null;
   /** `nace` = obor podle kódu v rejstříku, `name` = slovo v názvu, `osm` = štítek v mapě. */
   matchedBy?: string | null;
+  /** Inzerent z Meta Knihovny reklam spárovaný s firmou; NULL = nespárováno, ne „neinzeruje". */
+  adsPageId?: string | null;
+  adsPageName?: string | null;
+  adsSince?: string | null;
+  adsCount?: number | null;
+  adsLinkDomain?: string | null;
+  adsReach?: number | null;
   /** IČO nebo `osm:<placeId>` — klíč pro nároky a míchání pořadí (lib/claim-order.ts). */
   firmKey?: string;
   /** `other` = jiný účet firmu nedávno oslovil (skóre pro řazení klesá), `mine` = já. */
@@ -328,6 +336,11 @@ function LockedContacts({ locale }: { locale: string }) {
   );
 }
 
+/** Doména z adresy webu pro odkaz do Ads Transparency Center; bez protokolu a `www`. */
+function hostOfUrl(url: string): string {
+  try { return new URL(url.startsWith('http') ? url : `https://${url}`).hostname.replace(/^www\./, ''); } catch { return url; }
+}
+
 /** „1 provozovna / 2 provozovny / 5 provozoven", nula slovy. */
 function premisesLabel(n: number, locale: string): string {
   if (n === 0) return localized(S.premises0, locale);
@@ -549,6 +562,22 @@ const S = {
   vatBadTip:  { cs: 'Finanční správa firmu vede jako nespolehlivého plátce DPH', sk: 'Finančná správa firmu vedie ako nespoľahlivého platiteľa DPH', en: 'The tax office lists the firm as an unreliable VAT payer' },
   icoTip:     { cs: 'IČO z veřejného rejstříku ARES', sk: 'IČO z verejného registra ARES', en: 'Company ID from the public ARES register' },
   origSource: { cs: 'Původní zdroj záznamu', sk: 'Pôvodný zdroj záznamu', en: 'Original source of the record' },
+  adsBadge:   { cs: 'Inzeruje na Meta', sk: 'Inzeruje na Meta', en: 'Advertises on Meta' },
+  metaLocked: { cs: 'Vyžaduje přístup k Meta Ad Library API — v tomhle nasazení není nastavený token (META_AD_LIBRARY_TOKEN).',
+                sk: 'Vyžaduje prístup k Meta Ad Library API — v tomto nasadení nie je nastavený token (META_AD_LIBRARY_TOKEN).',
+                en: 'Needs Meta Ad Library API access — this deployment has no token set (META_AD_LIBRARY_TOKEN).' },
+  adsTipWeb:  { cs: 'Stránka „{p}" má v Knihovně reklam Meta {n} aktivních reklam, vedou na {d}.',
+                sk: 'Stránka „{p}" má v Knižnici reklám Meta {n} aktívnych reklám, vedú na {d}.',
+                en: 'Page “{p}” has {n} active ads in the Meta Ad Library, linking to {d}.' },
+  adsTipNoWeb: { cs: 'Stránka „{p}" má v Knihovně reklam Meta {n} aktivních reklam a žádná nevede na web.',
+                 sk: 'Stránka „{p}" má v Knižnici reklám Meta {n} aktívnych reklám a žiadna nevedie na web.',
+                 en: 'Page “{p}” has {n} active ads in the Meta Ad Library and none links to a website.' },
+  adsNoWebBadge: { cs: 'reklamy bez webu', sk: 'reklamy bez webu', en: 'ads without a website' },
+  adsLibrary: { cs: 'Otevřít v Knihovně reklam', sk: 'Otvoriť v Knižnici reklám', en: 'Open in the Ad Library' },
+  googleAds:  { cs: 'Inzeruje na Googlu?', sk: 'Inzeruje na Googli?', en: 'Advertises on Google?' },
+  googleAdsTip: { cs: 'Otevře Google Ads Transparency Center pro doménu firmy. Google k tomu nemá API, takže appka odpověď nezná — podíváte se sami.',
+                  sk: 'Otvorí Google Ads Transparency Center pre doménu firmy. Google k tomu nemá API, takže appka odpoveď nepozná — pozriete sa sami.',
+                  en: 'Opens the Google Ads Transparency Center for the firm’s domain. Google has no API for it, so the app does not know the answer — you look yourself.' },
   // Provozovny z RŽP: nula je odpověď („bez provozovny"), NULL = neptali jsme se a nepíše se nic.
   premises0: { cs: 'bez provozovny', sk: 'bez prevádzky', en: 'no premises' },
   premisesTip: { cs: 'Provozovny s aktivním živnostenským oprávněním · RŽP', sk: 'Prevádzky s aktívnym živnostenským oprávnením · RŽP', en: 'Premises with an active trade licence · trade register' },
@@ -944,6 +973,11 @@ export default function SearchPage() {
    */
   const [active, setActive]               = useState<Set<string>>(new Set(['working']));
   const [profile, setProfile] = useState<UserProfile>(EMPTY_PROFILE);
+  /** Co je v nasazení zapnuté (`/api/features`): bez tokenu Meta jsou filtry `ads_*` zamčené. */
+  const [metaAds, setMetaAds] = useState(true);
+  useEffect(() => {
+    fetch('/api/features').then(r => (r.ok ? r.json() : null)).then(d => { if (d) setMetaAds(Boolean(d.metaAds)); }).catch(err => console.error('features:', err));
+  }, []);
   const [showOnboarding, setShowOnboarding] = useState(false);
   /**
    * Nenásilná nabídka dotazníku pro účty, které ho nikdy nedostaly. Dřív se jim otevřel blokující
@@ -1656,17 +1690,23 @@ export default function SearchPage() {
             <span className="w-full md:w-auto md:mr-1 text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
               {localized({ cs: 'Scénář', sk: 'Scenár', en: 'Scenario' }, locale)}
             </span>
-            {SCENARIOS.map(sc => (
+            {SCENARIOS.map(sc => {
+              // Scénář, který stojí jen na zdroji bez klíče (Meta), je zamčený stejně jako jeho chipy.
+              const locked = !metaAds && sc.filters.length > 0 && sc.filters.every(id => LEAD_FILTERS.find(f => f.id === id)?.source === 'Meta');
+              return (
               <button
                 key={sc.id}
                 type="button"
                 onClick={() => applyScenario(sc.id)}
                 aria-pressed={effectiveScenario === sc.id}
+                disabled={locked}
+                title={locked ? localized(S.metaLocked, locale) : undefined}
                 className={effectiveScenario === sc.id ? 'chip-active' : 'chip'}
               >
                 {localized(sc.label, locale)}
               </button>
-            ))}
+              );
+            })}
             {effectiveScenario === 'custom' && (
               <span className="chip-active cursor-default" title={localized({ cs: 'Kombinace, kterou jste si poskládali sami. Scénář je jen přednastavení.', sk: 'Kombinácia, ktorú ste si poskladali sami. Scenár je len prednastavenie.', en: 'A combination you built yourself. A scenario is only a preset.' }, locale)}>
                 {localized({ cs: 'Vlastní kombinace', sk: 'Vlastná kombinácia', en: 'Custom combination' }, locale)}
@@ -1913,6 +1953,7 @@ export default function SearchPage() {
             setDistricts={next => { dirtyRef.current = true; setDistricts(next); }}
             presetIds={presetsOn ? presetIds : []}
             limit={PLAN_LIMITS[(userPlan as keyof typeof PLAN_LIMITS)]?.resultsPerSearch ?? PLAN_LIMITS.FREE.resultsPerSearch}
+            metaAds={metaAds}
           />
 
           {yieldNote && (
@@ -2356,6 +2397,23 @@ export default function SearchPage() {
                         <SocialLinks b={b} locale={locale} />
                         {b.ico && (
                           <span className="badge" title={localized(S.icoTip, locale)}>IČO {b.ico}</span>
+                        )}
+                        {/* Meta Knihovna reklam: platí za reklamu. Odkaz vede na veřejnou stránku
+                            inzerenta v Knihovně, kde si uživatel reklamy prohlédne sám. */}
+                        {b.adsPageId && (
+                          <a href={`https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=CZ&view_all_page_id=${encodeURIComponent(b.adsPageId)}`}
+                             target="_blank" rel="noopener noreferrer" className="badge-warm"
+                             title={localized(b.adsLinkDomain ? S.adsTipWeb : S.adsTipNoWeb, locale).replace('{p}', b.adsPageName ?? '').replace('{n}', String(b.adsCount ?? 0)).replace('{d}', b.adsLinkDomain ?? '') + ' ' + localized(S.adsLibrary, locale)}>
+                            <Megaphone size={10} />{localized(S.adsBadge, locale)}{!b.adsLinkDomain && ` · ${localized(S.adsNoWebBadge, locale)}`}
+                          </a>
+                        )}
+                        {/* Google Ads Transparency Center nemá API — jen odkaz podle domény, odpověď si uživatel přečte sám. */}
+                        {!isDemo && (b.website || b.adsLinkDomain) && (
+                          <a href={googleAdsTransparencyUrl(b.adsLinkDomain ?? hostOfUrl(b.website ?? ''))}
+                             target="_blank" rel="noopener noreferrer" className="badge text-ink-faint hover:text-ink"
+                             title={localized(S.googleAdsTip, locale)}>
+                            <ExternalLink size={10} />{localized(S.googleAds, locale)}
+                          </a>
                         )}
 
                         {/* Kde jsem s touhle firmou. Select, ne pět chipů — pět tlačítek na

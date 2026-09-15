@@ -70,6 +70,16 @@ export const SCENARIOS: Scenario[] = [
     filters: ['insecure_website'],
   },
   {
+    id: 'ads_no_web',
+    label: { cs: 'Platí za reklamu, web nemá', sk: 'Platí za reklamu, web nemá', en: 'Pays for ads, has no website' },
+    hint: {
+      cs: 'Firmy z Meta Knihovny reklam, jejichž reklamy nevedou na web a my jsme web nenašli. Vyžaduje přístup k Ad Library API; spárování s inzerentem se povede jen u části firem.',
+      sk: 'Firmy z Meta Knižnice reklám, ktorých reklamy nevedú na web a my sme web nenašli. Vyžaduje prístup k Ad Library API; spárovanie s inzerentom sa podarí len pri časti firiem.',
+      en: 'Firms from the Meta Ad Library whose ads do not link to a website and where we found none. Needs Ad Library API access; matching succeeds only for some firms.',
+    },
+    filters: ['ads_no_web'],
+  },
+  {
     id: 'new',
     label: { cs: 'Nové firmy', sk: 'Nové firmy', en: 'New firms' },
     hint: {

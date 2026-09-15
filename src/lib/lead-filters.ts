@@ -62,10 +62,17 @@ export interface FilterableLead {
   inInsolvency?: boolean | null;
   nace?: string[] | null;
   registryUpdatedAt?: Date | string | null;
+  /** Inzerent z Meta Knihovny reklam spárovaný s firmou. NULL = nespárováno, ne „neinzeruje". */
+  adsPageId?: string | null;
+  adsSince?: Date | string | null;
+  adsCount?: number | null;
+  /** Doména, kam reklamy vedou. NULL u spárované firmy = reklamy nevedou na web. */
+  adsLinkDomain?: string | null;
+  adsReach?: number | null;
 }
 
 /** Zdroj, o který se filtr opírá — vypisuje se u každého doložení. */
-export type FilterSource = 'ARES' | 'RŽP' | 'RES' | 'MFČR' | 'OSM' | 'web';
+export type FilterSource = 'ARES' | 'RŽP' | 'RES' | 'MFČR' | 'OSM' | 'web' | 'Meta';
 
 const DATE_LOCALE: Record<string, string> = { cs: 'cs-CZ', sk: 'sk-SK', en: 'en-GB' };
 function fmtDate(value: Date | string | null | undefined, locale: string): string | null {
@@ -296,6 +303,22 @@ function youngerThanDays(days: number) {
  */
 // Šance na kontakt je změřená (14. 9. 2026, 300 nových firem): telefon nebo e-mail u 11 % všech,
 // u obchodních společností 19 %, u živnostníků v dopravě 3 %. Píše se míň, než vyšlo.
+const META_HINT = {
+  cs: 'Z Meta Knihovny reklam (bezplatné API, v EU jsou veřejné všechny reklamy z posledního roku). Firma se s inzerentem páruje podle domény webu nebo názvu — nespárovaná firma neznamená, že neinzeruje. Cílovou adresu reklamy API nedává; ví se jen, jestli reklama vede na nějaký web.',
+  sk: 'Z Meta Knižnice reklám (bezplatné API, v EÚ sú verejné všetky reklamy z posledného roka). Firma sa s inzerentom páruje podľa domény webu alebo názvu — nespárovaná firma neznamená, že neinzeruje. Cieľovú adresu reklamy API nedáva; vie sa len, či reklama vedie na nejaký web.',
+  en: 'From the Meta Ad Library (free API; in the EU every ad from the last year is public). A firm is matched to an advertiser by website domain or name — an unmatched firm does not mean it does not advertise. The API gives no landing URL; only whether an ad links to some website.',
+};
+
+/** „inzeruje na Meta od 4. 3. 2026 · 3 reklamy · Knihovna reklam" */
+function adsEvidence(b: FilterableLead, l: string): string | null {
+  if (!b.adsPageId) return null;
+  const n = b.adsCount ?? 0;
+  const d = fmtDate(b.adsSince, l);
+  const ads = l === 'en' ? `${n} ${n === 1 ? 'ad' : 'ads'}` : `${n} ${n === 1 ? 'reklama' : n < 5 ? 'reklamy' : 'reklam'}`;
+  const since = d ? (l === 'en' ? ` since ${d}` : ` od ${d}`) : '';
+  return localized({ cs: `inzeruje na Meta${since} · ${ads} · Knihovna reklam`, sk: `inzeruje na Meta${since} · ${ads} · Knižnica reklám`, en: `advertises on Meta${since} · ${ads} · Ad Library` }, l);
+}
+
 const REGISTRY_HINT = {
   cs: 'Firmy podle data vzniku hledáme v indexu z RES ČSÚ — v celém kraji, ne jen v krajském městě. Jméno a sídlo doplní ARES. Index se obnovuje dvakrát měsíčně. Telefon nebo e-mail se u nové firmy dohledá zhruba u každé desáté, u obchodních společností asi u každé páté — zbytek ještě žádný web ani mapový záznam nemá.',
   sk: 'Firmy podľa dátumu vzniku hľadáme v indexe z RES ČSÚ — v celom kraji, nie len v krajskom meste. Meno a sídlo doplní ARES. Index sa obnovuje dvakrát mesačne. Telefón alebo e-mail sa pri novej firme dohľadá zhruba pri každej desiatej, pri obchodných spoločnostiach asi pri každej piatej — zvyšok ešte žiadny web ani mapový záznam nemá.',
@@ -641,6 +664,52 @@ export const LEAD_FILTERS: LeadFilter[] = [
       ],
     },
     test: b => !b.phone && !b.email,
+  },
+  /**
+   * Meta Knihovna reklam (sources/meta-ads.ts). Trojice stojí na spárování firmy s inzerentem,
+   * které se povede jen u části firem — proto `unknown` u všech nespárovaných: skóre je
+   * nepenalizuje a UI o nich netvrdí, že neinzerují.
+   */
+  {
+    id: 'ads_meta',
+    group: 'event',
+    label: { cs: 'Inzeruje na Meta', sk: 'Inzeruje na Meta', en: 'Advertises on Meta' },
+    source: 'Meta',
+    hint: META_HINT,
+    where: { adsPageId: { not: null } },
+    test: b => Boolean(b.adsPageId),
+    unknown: b => !b.adsPageId,
+    evidence: adsEvidence,
+  },
+  {
+    id: 'ads_no_web',
+    group: 'reach',
+    label: { cs: 'Inzeruje, ale reklama nevede na web', sk: 'Inzeruje, ale reklama nevedie na web', en: 'Advertises, but the ad leads nowhere on the web' },
+    source: 'Meta',
+    hint: {
+      cs: 'Platí za reklamu na Facebooku či Instagramu, žádná z jejích reklam nevede na web a my jsme web nenašli. Nejlepší lead pro tvůrce webů: marketing už si platí.',
+      sk: 'Platí za reklamu na Facebooku či Instagrame, žiadna z jej reklám nevedie na web a my sme web nenašli. Najlepší lead pre tvorcu webov: marketing si už platí.',
+      en: 'Pays for Facebook or Instagram ads, none of them links to a website and we found none. The best lead for a web developer: they already pay for marketing.',
+    },
+    where: { AND: [{ adsPageId: { not: null } }, { adsLinkDomain: null }, { NOT: STATUS_HAS }] },
+    test: b => Boolean(b.adsPageId) && !b.adsLinkDomain && webStatusOf(b) !== 'HAS',
+    unknown: b => !b.adsPageId,
+    evidence: (b, l) => b.adsPageId && !b.adsLinkDomain ? localized({ cs: 'reklamy nevedou na web · Knihovna reklam Meta', sk: 'reklamy nevedú na web · Knižnica reklám Meta', en: 'ads do not link to a website · Meta Ad Library' }, l) : null,
+  },
+  {
+    id: 'ads_dated_web',
+    group: 'reach',
+    label: { cs: 'Inzeruje a web působí zastarale', sk: 'Inzeruje a web pôsobí zastaralo', en: 'Advertises and the website looks dated' },
+    source: 'Meta',
+    hint: {
+      cs: 'Platí za reklamu a její ověřený web propadl v auditu (bez HTTPS, bez mobilní verze, starý kód). Peníze na marketing má, web je brzdí.',
+      sk: 'Platí za reklamu a jej overený web prepadol v audite (bez HTTPS, bez mobilnej verzie, starý kód). Peniaze na marketing má, web ju brzdí.',
+      en: 'Pays for ads and its verified website failed the audit (no HTTPS, no mobile version, old code). Has a marketing budget, the site holds it back.',
+    },
+    where: { adsPageId: { not: null }, websiteIsOld: true },
+    test: b => Boolean(b.adsPageId) && Boolean(b.websiteIsOld),
+    unknown: b => !b.adsPageId || webStatusOf(b) !== 'HAS',
+    evidence: adsEvidence,
   },
   {
     id: 'has_phone',

@@ -6,6 +6,13 @@ import { contactPageUrl, extractContacts } from './sources';
 import { socialFromUrl } from './website-status';
 import type { VerifiedCandidate } from './lead-pipeline';
 import { withoutOptouts } from './optout';
+import type { AdsSignal } from './sources/meta-ads';
+
+/** Sloupce inzerenta z Meta — stejné pro nový i přenesený řádek. Bez spárování zůstávají NULL. */
+function adsColumns(ads: AdsSignal | undefined) {
+  if (!ads) return {};
+  return { adsPageId: ads.pageId, adsPageName: ads.pageName, adsSince: ads.since, adsCount: ads.count, adsLinkDomain: ads.linkDomain, adsReach: ads.reach };
+}
 
 /**
  * The last step of both a search and a CSV import: turn verdicts into rows.
@@ -83,6 +90,7 @@ export async function persistResults(
         // staršího řádku; tady jde jen o firmy, které se sondovaly teď — u nich je to teď.
         contactFoundAt:  c.source !== 'csv' && (row.phone || row.email) ? new Date() : null,
         matchedBy:       c.matchedBy,
+        ...adsColumns(c.ads),
         hasWebsite:      verdict.status === 'HAS',
         websiteEvidence: verdict.evidence,
         facebookUrl:     checks?.facebookUrl  ?? c.facebookUrl  ?? social.fb,
@@ -193,6 +201,7 @@ export async function persistFromPrior(
       leadScore:       leadScore(row, criteria),
       contactFoundAt:  prior.contactFoundAt ?? prior.createdAt,
       matchedBy:       c.matchedBy,
+      ...adsColumns(c.ads),
     };
   });
   if (data.length === 0) return 0;
