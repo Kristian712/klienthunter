@@ -1593,7 +1593,26 @@ export default function SearchPage() {
       // Adresa je teď odkaz na tenhle běh. Kdo kartu zavře a otevře ji znovu, uvidí totéž.
       window.history.replaceState({}, '', `${window.location.pathname}?job=${data.jobId}`);
     } catch {
-      setError(localized(S.errNetwork, locale));
+      /**
+       * Spojení padlo, ale hledání se na serveru možná založilo (odpověď se ztratila cestou).
+       * Než říct „zkuste znovu" — a založit tím druhý běh, který se počítá do limitu — zkusí se
+       * najít job z poslední minuty se stejným krajem a oborem a připojit se k němu.
+       */
+      const attached = await fetch('/api/jobs', { credentials: 'include' })
+        .then(r => (r.ok ? r.json() : null))
+        .then((d: { jobs?: Array<JobState & { region?: string; industry?: string; createdAt?: string }> } | null) => {
+          const recent = (d?.jobs ?? []).find(j =>
+            j.region === effectiveRegion && j.industry === effectiveIndustry &&
+            j.createdAt && Date.now() - new Date(j.createdAt).getTime() < 120_000);
+          if (!recent) return false;
+          setIsDemo(false);
+          setSearchId(recent.searchId);
+          setJob({ ...recent, stageIndex: recent.stageIndex ?? 0, stageCount: recent.stageCount ?? 1, stageLabel: recent.stageLabel ?? null });
+          window.history.replaceState({}, '', `${window.location.pathname}?job=${recent.id}`);
+          return true;
+        })
+        .catch(() => false);
+      if (!attached) setError(localized(S.errNetwork, locale));
     } finally {
       setLoading(false);
       setLoadingMsg('');
