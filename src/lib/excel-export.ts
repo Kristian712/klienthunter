@@ -3,7 +3,8 @@ import { BusinessResult } from '@prisma/client';
 import { leadReason } from './lead-reason';
 import { websiteAudit } from './website-audit';
 import { naceLabel } from './nace-codes';
-import { localized } from './lead-filters';
+import { employeeLabel, localized } from './lead-filters';
+import type { TradeLicence } from './sources';
 import { reachScore } from './reach-score';
 import { resolveStatus, type WebsiteStatus } from './website-status';
 
@@ -60,8 +61,38 @@ export const EXPORT_COLUMNS = [
   { key: 'reason',     cs: 'Proč oslovit',         sk: 'Prečo osloviť',        en: 'Why contact' },
   { key: 'audit',      cs: 'Audit webu',           sk: 'Audit webu',           en: 'Website audit' },
   { key: 'category',   cs: 'Kategorie',            sk: 'Kategória',            en: 'Category' },
+  // Rejstříková pole, která se do 15. 9. 2026 ukládala a v exportu chyběla.
+  { key: 'founded',    cs: 'Vznik',                sk: 'Vznik',                en: 'Founded' },
+  { key: 'employees',  cs: 'Zaměstnanci (RES)',    sk: 'Zamestnanci (RES)',    en: 'Employees (RES)' },
+  { key: 'premises',   cs: 'Aktivní provozovny',   sk: 'Aktívne prevádzky',    en: 'Active premises' },
+  { key: 'trades',     cs: 'Živnosti',             sk: 'Živnosti',             en: 'Trade licences' },
+  { key: 'insolvency', cs: 'V insolvenci',         sk: 'V insolvencii',        en: 'In insolvency' },
+  { key: 'registryAt', cs: 'Změna v rejstříku',    sk: 'Zmena v registri',     en: 'Registry updated' },
+  { key: 'webNote',    cs: 'Web – doklad',         sk: 'Web – doklad',         en: 'Website evidence' },
   { key: 'source',     cs: 'Zdroj',                sk: 'Zdroj',                en: 'Source' },
 ] as const;
+
+/** `YYYY-MM-DD`, ať se sloupec dá v Excelu řadit; prázdno, když datum není. */
+function isoDay(value: Date | string | null | undefined): string {
+  if (!value) return '';
+  const d = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
+}
+
+/** RŽP posílá druh živnosti jako písmeno (`druhZivnosti`): L volná, R řemeslná, V vázaná, K koncesovaná. */
+const TRADE_KIND: Record<string, string> = { L: 'volná', R: 'řemeslná', V: 'vázaná', K: 'koncesovaná' };
+
+/** „Hostinská činnost (řemeslná, od 2019-03-01); Výroba…" — jedna buňka, středník mezi živnostmi. */
+export function tradesText(trades: unknown): string {
+  if (!Array.isArray(trades)) return '';
+  return (trades as TradeLicence[])
+    .filter(t => t && t.subject)
+    .map(t => {
+      const extra = [t.kind ? TRADE_KIND[t.kind] ?? t.kind : '', t.since ? `od ${t.since}` : ''].filter(Boolean).join(', ');
+      return extra ? `${t.subject} (${extra})` : t.subject!;
+    })
+    .join('; ');
+}
 
 /** Hodnoty jednoho řádku v pořadí `EXPORT_COLUMNS`. Sdílí to XLSX i CSV, aby se nerozešly. */
 export function exportRow(b: BusinessResult, criteria: readonly string[] | null | undefined, locale: string): Array<string | number> {
@@ -87,6 +118,14 @@ export function exportRow(b: BusinessResult, criteria: readonly string[] | null 
     websiteAudit(b, locale)?.sentence ?? '',
     // Kód i název: „73110 Činnosti reklamních agentur" — kód pro stroje, název pro lidi.
     b.category ? `${b.category} ${naceLabel(b.category) ?? ''}`.trim() : '',
+    isoDay(b.foundedAt),
+    // `000` i NULL = neuvedeno → prázdná buňka, stejná konvence jako u DPH.
+    b.employeeCategory && b.employeeCategory !== '000' ? employeeLabel(b.employeeCategory, locale) : '',
+    b.activePremises ?? '',
+    tradesText(b.trades),
+    vatLabel(b.inInsolvency, locale),
+    isoDay(b.registryUpdatedAt),
+    b.websiteEvidence || '',
     b.source,
   ];
 }
@@ -115,7 +154,9 @@ export function exportToExcel(
     { wch: 30 }, { wch: 10 }, { wch: 18 }, { wch: 28 }, { wch: 35 },
     { wch: 30 }, { wch: 34 }, { wch: 10 }, { wch: 38 }, { wch: 38 },
     { wch: 38 }, { wch: 12 }, { wch: 12 }, { wch: 18 }, { wch: 7 },
-    { wch: 14 }, { wch: 70 }, { wch: 60 }, { wch: 20 }, { wch: 16 },
+    { wch: 14 }, { wch: 70 }, { wch: 60 }, { wch: 20 },
+    { wch: 11 }, { wch: 18 }, { wch: 10 }, { wch: 60 }, { wch: 10 }, { wch: 12 }, { wch: 50 },
+    { wch: 16 },
   ];
 
   const wb = XLSX.utils.book_new();

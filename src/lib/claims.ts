@@ -26,7 +26,7 @@ export async function recordClaim(userId: string, row: { ico?: string | null; pl
   const firmKey = firmKeyOf(row);
   await prisma.claim.upsert({
     where: { firmKey_userId: { firmKey, userId } },
-    create: { firmKey, userId, source: 'tag' },
+    create: { firmKey, userId },
     update: { createdAt: new Date() },
   });
 }

@@ -93,9 +93,6 @@ export async function persistResults(
         // Computed here rather than on read so the number a user sorted by yesterday is the
         // same number today — and so the database can order by it.
         leadScore:       leadScore(row, criteria),
-        // Ratings, review counts and opening hours came only from Google Places, which had to
-        // go for licensing reasons. The columns stay for the rows written before that.
-        reviewCount:     0,
         category:        c.category,
         source:          c.source,
       },
@@ -194,7 +191,6 @@ export async function persistFromPrior(
       websiteScore:    prior.websiteScore,
       websiteAgeNote:  prior.websiteAgeNote,
       leadScore:       leadScore(row, criteria),
-      reviewCount:     0,
       contactFoundAt:  prior.contactFoundAt ?? prior.createdAt,
       matchedBy:       c.matchedBy,
     };

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useLocale } from 'next-intl';
-import { Crown, Shield, Users, RefreshCw, Ticket, Plus, Trash2, Copy, Check, Clock, Link2 } from 'lucide-react';
+import { Crown, Shield, Users, RefreshCw, Ticket, Plus, Trash2, Copy, Check, Clock, Link2, CreditCard } from 'lucide-react';
 import { formatDate } from '@/lib/format-date';
 
 interface RegistryStatus {
@@ -38,6 +38,12 @@ const ROW_BTN_BLOCK = `${ROW_BTN} font-medium border-field text-ink-muted hover:
 // Paid plans and unused codes
 const BADGE_STRONG = 'badge border-field text-ink';
 
+/** Zaplacená platba ze Stripe bez účtu, ke kterému by patřila. Viz /api/admin/unmatched-payments. */
+interface UnmatchedPayment {
+  id: string; stripeCustomerId: string; stripeSubscriptionId: string | null;
+  email: string | null; note: string | null; createdAt: string;
+}
+
 interface Optout {
   id: string; firmKey: string; email: string | null; status: 'active' | 'confirmed' | 'rejected';
   note: string | null; createdAt: string; confirmedAt: string | null; reviewedAt: string | null;
@@ -53,6 +59,8 @@ export default function AdminPage() {
   const [optouts, setOptouts]         = useState<Optout[]>([]);
   /** „Zatím žádná žádost" se smí říct až po odpovědi — před ní to byla domněnka. */
   const [optoutsLoaded, setOptoutsLoaded] = useState(false);
+  const [payments, setPayments]       = useState<UnmatchedPayment[]>([]);
+  const [resolving, setResolving]     = useState<string | null>(null);
   /** Velikost databáze — Neon free má 0,5 GB a index z ČSÚ (etapa 3) se dimenzuje podle zbytku. */
   const [dbSize, setDbSize]           = useState<{ bytes: number; tables: Array<{ name: string; bytes: number; rows: number }> } | null>(null);
   /** Index firem z ČSÚ (etapa 3): kolik má řádků, kolik zabírá a jak dopadl poslední import. */
@@ -134,7 +142,37 @@ export default function AdminPage() {
     }
   }, []);
 
-  useEffect(() => { fetchUsers(); fetchCodes(); fetchOptouts(); }, [fetchUsers, fetchCodes, fetchOptouts]);
+  const fetchPayments = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/unmatched-payments');
+      if (!res.ok) throw new Error(`unmatched-payments ${res.status}`);
+      const d = await res.json();
+      setPayments(d.payments ?? []);
+    } catch (err) {
+      console.error('admin/unmatched-payments:', err);
+      setLoadFailed(true);
+    }
+  }, []);
+
+  useEffect(() => { fetchUsers(); fetchCodes(); fetchOptouts(); fetchPayments(); }, [fetchUsers, fetchCodes, fetchOptouts, fetchPayments]);
+
+  /** Odškrtnutí až po odpovědi serveru — kdyby se ztratilo, platba by zůstala nevyřešená potichu. */
+  const resolvePayment = async (id: string) => {
+    if (!confirm(isCs ? 'Označit platbu jako vyřešenou? Spárování účtu nebo vrácení peněz se dělá ve Stripe, tady se jen odškrtne.' : 'Mark this payment as resolved? Matching the account or refunding is done in Stripe; this only ticks it off.')) return;
+    setResolving(id);
+    try {
+      const res = await fetch('/api/admin/unmatched-payments', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }),
+      });
+      if (!res.ok) throw new Error(`resolve ${res.status}`);
+      setPayments(prev => prev.filter(p => p.id !== id));
+    } catch (err) {
+      console.error('admin/unmatched-payments resolve:', err);
+      alert(isCs ? 'Nepodařilo se uložit. Zkuste to znovu.' : 'Could not save. Try again.');
+    } finally {
+      setResolving(null);
+    }
+  };
 
   const fetchDbSize = useCallback(() => {
     fetch('/api/admin/db-size')
@@ -365,7 +403,7 @@ export default function AdminPage() {
             </div>
           </div>
           {/* Obnovit = všechno, co panel ukazuje: i žádosti, velikost databáze a stav indexu. */}
-          <button onClick={() => { fetchUsers(); fetchCodes(); fetchOptouts(); fetchDbSize(); fetchRegistry(); }}
+          <button onClick={() => { fetchUsers(); fetchCodes(); fetchOptouts(); fetchPayments(); fetchDbSize(); fetchRegistry(); }}
             className="btn-ghost">
             <RefreshCw size={14} />{isCs ? 'Obnovit' : 'Refresh'}
           </button>
@@ -382,6 +420,43 @@ export default function AdminPage() {
             <button className="btn-outline btn-sm" onClick={() => { void fetchUsers(); void fetchCodes(); }}>
               {isCs ? 'Zkusit znovu' : 'Try again'}
             </button>
+          </div>
+        )}
+
+        {/* Peníze, které někdo poslal a nic za ně nedostal: zákazník ve Stripe bez účtu u nás.
+            Karta je vidět jen když něco čeká — vyřešené řádky se skryjí. */}
+        {payments.length > 0 && (
+          <div className="card mb-6 border-ink">
+            <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+              <h2 className="font-semibold text-ink flex items-center gap-2">
+                <span className="icon-tile icon-tile--event h-7 w-7"><CreditCard size={14} /></span>
+                {isCs ? 'Nespárované platby' : 'Unmatched payments'} <span className="tnum text-ink-faint">{payments.length}</span>
+              </h2>
+              <span className="text-xs text-ink-faint">
+                {isCs ? 'Zaplaceno ve Stripe, ale bez účtu u nás. Spárujte nebo vraťte ve Stripe, pak odškrtněte.' : 'Paid in Stripe but no account here. Match or refund in Stripe, then tick off.'}
+              </span>
+            </div>
+            <div className="overflow-x-auto"><table className="w-full text-sm results-table">
+              <thead><tr>
+                <th>E-mail</th><th>Stripe customer</th><th>{isCs ? 'Předplatné' : 'Subscription'}</th><th>{isCs ? 'Poznámka' : 'Note'}</th><th>{isCs ? 'Přišlo' : 'Received'}</th><th></th>
+              </tr></thead>
+              <tbody>
+                {payments.map(p => (
+                  <tr key={p.id}>
+                    <td className="text-xs">{p.email || '—'}</td>
+                    <td className="font-mono text-xs">{p.stripeCustomerId}</td>
+                    <td className="font-mono text-xs">{p.stripeSubscriptionId || '—'}</td>
+                    <td className="text-xs">{p.note || '—'}</td>
+                    <td className="text-xs tnum">{formatDate(p.createdAt, locale)}</td>
+                    <td className="text-right">
+                      <button className={ROW_BTN_BLOCK} disabled={resolving === p.id} onClick={() => resolvePayment(p.id)}>
+                        <Check size={12} />{resolving === p.id ? (isCs ? 'Ukládám…' : 'Saving…') : (isCs ? 'Vyřešeno' : 'Resolved')}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table></div>
           </div>
         )}
 

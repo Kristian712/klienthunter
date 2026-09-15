@@ -71,8 +71,6 @@ interface BusinessResult {
   websiteIsOld: boolean;
   websiteScore: number;
   websiteAgeNote: string;
-  reviewCount: number;
-  rating?: number;
   googleMapsUrl?: string;
   source?: string;
   category?: string;
@@ -87,6 +85,8 @@ interface BusinessResult {
   legalForm?: string | null;
   /** Počet provozoven s aktivním živnostenským oprávněním. NULL = nezeptali jsme se. */
   activePremises?: number | null;
+  /** Živnosti z RŽP: druh, předmět, datum vzniku oprávnění. */
+  trades?: Array<{ kind?: string; subject?: string; since?: string }> | null;
   /** Rejstříková pole ukládaná od 13. 9. 2026; starší řádky je nemají. */
   employeeCategory?: string | null;
   inInsolvency?: boolean | null;
@@ -266,6 +266,10 @@ const CONTACT = {
   igTip:   { cs: 'Zpráva od neznámého účtu se schová do žádostí — nemusí si jí všimnout.',
              sk: 'Správa od neznámeho účtu sa schová do žiadostí — nemusia si ju všimnúť.',
              en: 'A message from an unknown account lands in requests and is easy to miss.' },
+  li:      { cs: 'Zpráva na LinkedInu', sk: 'Správa na LinkedIne', en: 'LinkedIn message' },
+  liTip:   { cs: 'Profil firmy, na který odkazuje její web. Zpráva jde správci stránky.',
+             sk: 'Profil firmy, na ktorý odkazuje jej web. Správa ide správcovi stránky.',
+             en: 'The company profile its own website links to. Messages reach the page admin.' },
   fb:      { cs: 'Zpráva na Facebooku', sk: 'Správa na Facebooku', en: 'Facebook message' },
   fbTip:   { cs: 'Stránku spravuje někdo z firmy; zpráva od cizího účtu často končí v žádostech.',
              sk: 'Stránku spravuje niekto z firmy; správa od cudzieho účtu často končí v žiadostiach.',
@@ -324,6 +328,14 @@ function LockedContacts({ locale }: { locale: string }) {
   );
 }
 
+/** „1 provozovna / 2 provozovny / 5 provozoven", nula slovy. */
+function premisesLabel(n: number, locale: string): string {
+  if (n === 0) return localized(S.premises0, locale);
+  if (locale === 'en') return `${n} ${n === 1 ? 'premises' : 'premises'}`;
+  if (locale === 'sk') return `${n} ${n === 1 ? 'prevádzka' : n < 5 ? 'prevádzky' : 'prevádzok'}`;
+  return `${n} ${n === 1 ? 'provozovna' : n < 5 ? 'provozovny' : 'provozoven'}`;
+}
+
 function ContactStrategy({ b, locale }: { b: BusinessResult; locale: string }) {
   const mobile = b.phone ? isCzMobile(b.phone) : false;
   const L = (x: { cs: string; sk?: string; en: string }) => localized(x, locale);
@@ -373,6 +385,12 @@ function ContactStrategy({ b, locale }: { b: BusinessResult; locale: string }) {
   if (b.hasFacebook && b.facebookUrl) {
     methods.push({ key: 'fb', icon: <FbIcon />, label: L(CONTACT.fb),
                    href: b.facebookUrl, tip: L(CONTACT.fbTip) });
+  }
+
+  // Odkaz z webu firmy — dosud jen jako ikonka mezi sítěmi, tady chyběl.
+  if (b.hasLinkedIn && b.linkedInUrl) {
+    methods.push({ key: 'li', icon: <LiIcon />, label: L(CONTACT.li),
+                   href: b.linkedInUrl, tip: L(CONTACT.liTip) });
   }
 
   if (b.email) {
@@ -527,6 +545,12 @@ const S = {
                    sk: 'Firma v zozname už bola, ale telefón ani e-mail pri nej doteraz nebol. Tentoraz sa dohľadal.',
                    en: 'The firm was already on the list, but had no phone or e-mail until now.' },
   contactFound: { cs: 'kontakt nalezen {d}', sk: 'kontakt nájdený {d}', en: 'contact found {d}' },
+  // Provozovny z RŽP: nula je odpověď („bez provozovny"), NULL = neptali jsme se a nepíše se nic.
+  premises0: { cs: 'bez provozovny', sk: 'bez prevádzky', en: 'no premises' },
+  premisesTip: { cs: 'Provozovny s aktivním živnostenským oprávněním · RŽP', sk: 'Prevádzky s aktívnym živnostenským oprávnením · RŽP', en: 'Premises with an active trade licence · trade register' },
+  tradesLabel: { cs: 'Živnosti:', sk: 'Živnosti:', en: 'Trade licences:' },
+  tradesMore: { cs: '+{n} dalších', sk: '+{n} ďalších', en: '+{n} more' },
+  registryChanged: { cs: 'záznam v rejstříku změněn {d}', sk: 'záznam v registri zmenený {d}', en: 'registry record updated {d}' },
   // Čím firma prošla do výsledků. U hledání v ARESu jsou dvě větve a jen ta podle NACE je jistá:
   // slovo v názvu sedí na obor zhruba u poloviny až dvou třetin firem (změřeno 14. 9. 2026).
   matchedNace: { cs: 'obor podle kódu NACE v rejstříku', sk: 'odbor podľa kódu NACE v registri', en: 'trade by NACE code in the registry' },
@@ -2298,6 +2322,11 @@ export default function SearchPage() {
                         {b.inInsolvency === true && (
                           <span className="badge-red" title="ARES">{localized(S.insolvency, locale)}</span>
                         )}
+                        {b.activePremises != null && (
+                          <span className="badge text-ink-faint" title={localized(S.premisesTip, locale)}>
+                            {premisesLabel(b.activePremises, locale)}
+                          </span>
+                        )}
                         {b.isNew && (
                           <span className="badge-warm" title={localized(S.newTip, locale)}>
                             <Sparkles size={10} />{localized(S.newBadge, locale)}
@@ -2385,6 +2414,26 @@ export default function SearchPage() {
                             <span className="text-ink-muted">{localized(S.provenBy, locale)}</span> {Array.from(new Set(proofs)).join(' · ')}
                           </p>
                         ) : null;
+                      })()}
+
+                      {/* Živnosti z RŽP a poslední změna v rejstříku — do 15. 9. 2026 se ukládaly a nikde neukazovaly. */}
+                      {(() => {
+                        // Předmět živnosti umí být odstavec („Silniční motorová doprava - nákladní vnitrostátní…");
+                        // do řádku jde zkrácený, celý je v bublině.
+                        const subjects = (b.trades ?? []).map(t => t.subject).filter((x): x is string => Boolean(x));
+                        const short = (x: string) => (x.length > 80 ? `${x.slice(0, 77).trimEnd()}…` : x);
+                        const changed = b.registryUpdatedAt ? formatDate(b.registryUpdatedAt, locale) : '';
+                        if (subjects.length === 0 && !changed) return null;
+                        return (
+                          <p className="text-[11px] text-ink-faint leading-relaxed mt-1" title={subjects.join(' · ')}>
+                            {subjects.length > 0 && (
+                              <><span className="text-ink-muted">{localized(S.tradesLabel, locale)}</span> {subjects.slice(0, 3).map(short).join(' · ')}
+                              {subjects.length > 3 && ` ${localized(S.tradesMore, locale).replace('{n}', String(subjects.length - 3))}`}</>
+                            )}
+                            {subjects.length > 0 && changed && ' · '}
+                            {changed && localized(S.registryChanged, locale).replace('{d}', changed)}
+                          </p>
+                        );
                       })()}
 
                       {/* Audit webu jednou větou — argument do nabídky. Dřív jen v bublině myši

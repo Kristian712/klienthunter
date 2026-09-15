@@ -256,7 +256,7 @@ export function OnboardingModal({ locale, initial, onDone }: Props) {
 
           {chosen && (
             <div className="mt-6 border-t border-line pt-5">
-              <RegionField draft={draft} patch={patch} locale={locale} withCity={false} />
+              <RegionField draft={draft} patch={patch} locale={locale} />
             </div>
           )}
         </div>

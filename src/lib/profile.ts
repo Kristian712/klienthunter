@@ -21,7 +21,6 @@ export interface UserProfile {
   clientType: string | null;
   targetIndustry: string | null;
   targetRegion: string | null;
-  targetCity: string | null;
   /** Ids from LEAD_FILTERS. */
   targetFilters: string[];
   onboardedAt: string | null;
@@ -35,7 +34,6 @@ export const EMPTY_PROFILE: UserProfile = {
   clientType: null,
   targetIndustry: null,
   targetRegion: null,
-  targetCity: null,
   targetFilters: [],
   onboardedAt: null,
 };

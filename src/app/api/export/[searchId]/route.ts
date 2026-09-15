@@ -8,7 +8,7 @@ import { crmTable, isCrmFormat } from '@/lib/crm-export';
 
 /**
  * Oddělovač sloupců. Excel v českém a slovenském Windows čte CSV podle systémového nastavení,
- * kde je desetinná čárka a oddělovač středník — s čárkou skončí všech devatenáct sloupců v jednom.
+ * kde je desetinná čárka a oddělovač středník — s čárkou skončí všechny sloupce v jednom.
  */
 const SEP = ';';
 

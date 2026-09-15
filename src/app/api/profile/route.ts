@@ -37,7 +37,6 @@ const UpdateSchema = z.object({
   clientType:     nullableText(40),
   targetIndustry: nullableText(120),
   targetRegion:   nullableText(120),
-  targetCity:     nullableText(120),
   // Unknown ids are rejected rather than dropped: they can only come from a tampered request,
   // and silently storing them would leave the profile lying about what it ranks by.
   targetFilters:  z.array(z.string()).max(LEAD_FILTERS.length)
@@ -52,7 +51,7 @@ const UpdateSchema = z.object({
 
 const PROFILE_SELECT = {
   profession: true, professionRaw: true, professionText: true, clientType: true, targetIndustry: true,
-  targetRegion: true, targetCity: true, targetFilters: true, onboardedAt: true,
+  targetRegion: true, targetFilters: true, onboardedAt: true,
   webhookUrl: true, webhookSecret: true,
 } as const;
 

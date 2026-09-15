@@ -11,8 +11,8 @@ import { touchOpened } from '@/lib/saved-search';
  *
  * The user is the only person who can throw these rows away, and GDPR says they must be able
  * to: a CSV import in particular is their own contact list sitting in our database. The
- * relations cascade (`BusinessResult.search` and `SavedResult.businessResult` in
- * `prisma/schema.prisma`), so one delete takes the whole tree with it.
+ * relation cascades (`BusinessResult.search` in `prisma/schema.prisma`), so one delete takes
+ * the whole tree with it.
  */
 export async function DELETE(
   req: NextRequest,

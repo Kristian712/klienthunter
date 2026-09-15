@@ -60,7 +60,6 @@ model User {
   webhookUrl       String?
   /// Tajemství pro podpis těla (HMAC-SHA256). Vzniká s adresou, uživatel ho vidí v profilu.
   webhookSecret    String?
-  targetCity       String?
   // Ids from LEAD_FILTERS. The share of these a firm meets is its score, so an
   // empty list is meaningful: it means "score by the neutral default".
   targetFilters    String[] @default([])
@@ -75,7 +74,6 @@ model User {
   claims           Claim[]
   passwordResets   PasswordReset[]
   leadTags         LeadTag[]
-  savedResults     SavedResult[]
   createdCodes     InviteCode[] @relation("CreatedCodes")
   usedCode         InviteCode[] @relation("UsedCode")
 }
@@ -243,16 +241,12 @@ model BusinessResult {
   websiteAgeNote String  @default("")
   // How good a sales opportunity this lead is, 0-100. See src/lib/lead-score.ts.
   leadScore     Int      @default(0)
-  reviewCount   Int      @default(0)
-  rating        Float?
   googleMapsUrl String?
   category      String?
   source        String   @default("google")
-  rawData       Json?
   createdAt     DateTime @default(now())
 
   search  Search        @relation(fields: [searchId], references: [id], onDelete: Cascade)
-  savedBy SavedResult[]
   tags    LeadTag[]
 }
 
@@ -269,19 +263,6 @@ model InviteCode {
 
   creator    User  @relation("CreatedCodes", fields: [createdBy], references: [id], onDelete: Cascade)
   usedByUser User? @relation("UsedCode",    fields: [usedBy],    references: [id], onDelete: SetNull)
-}
-
-model SavedResult {
-  id               String   @id @default(cuid())
-  userId           String
-  businessResultId String
-  note             String?
-  createdAt        DateTime @default(now())
-
-  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  businessResult BusinessResult @relation(fields: [businessResultId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, businessResultId])
 }
 
 /// Kolikrát z jedné (hashované) IP adresy přišel drahý anonymní požadavek.
@@ -323,8 +304,6 @@ model Claim {
   /// IČO, nebo `osm:<placeId>` u firem bez IČO — viz `firmKeyOf` v lib/claim-order.ts.
   firmKey   String
   userId    String
-  /// Zatím jen `tag`. Místo pro další zdroje, až budou (export vybraných řádků).
-  source    String
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)

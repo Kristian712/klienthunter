@@ -26,7 +26,6 @@ export interface ProfileDraft {
   customIndustry: string;
   region: string;
   customRegion: string;
-  city: string;
   criteria: string[];
 }
 
@@ -49,7 +48,6 @@ export function toDraft(profile: UserProfile): ProfileDraft {
     customIndustry: industryKnown ? '' : industry,
     region: regionKnown ? region : region ? CUSTOM : '',
     customRegion: regionKnown ? '' : region,
-    city: profile.targetCity ?? '',
     criteria: profile.targetFilters ?? [],
   };
 }
@@ -65,14 +63,13 @@ export function draftToPayload(draft: ProfileDraft) {
     clientType: professionById(draft.profession)?.followUp ? text(draft.clientType) : null,
     targetIndustry: draft.industry === CUSTOM ? text(draft.customIndustry) : text(draft.industry),
     targetRegion: draft.region === CUSTOM ? text(draft.customRegion) : text(draft.region),
-    targetCity: text(draft.city),
     targetFilters: draft.criteria,
   };
 }
 
 export const EMPTY_DRAFT: ProfileDraft = {
   profession: '', professionText: '', clientType: '', industry: '', customIndustry: '',
-  region: '', customRegion: '', city: '', criteria: [],
+  region: '', customRegion: '', criteria: [],
 };
 
 type Patch = (next: Partial<ProfileDraft>) => void;
@@ -100,8 +97,6 @@ const T = {
   regionPick:   { cs: '— Vyberte region —',          sk: '— Vyberte región —',           en: '— Select a region —' },
   regionOther:  { cs: 'Jiné město (zadat ručně)',    sk: 'Iné mesto (zadať ručne)',      en: 'Other (type manually)' },
   regionOwn:    { cs: 'Název města nebo oblasti…',   sk: 'Názov mesta alebo oblasti…',   en: 'City or area name…' },
-  cityQ:        { cs: 'Město (nepovinné)',           sk: 'Mesto (nepovinné)',            en: 'Town (optional)' },
-  cityHint:     { cs: 'Jen pro vaši poznámku — hledá se v celém kraji.', sk: 'Len pre vašu poznámku — hľadá sa v celom kraji.', en: 'For your own note — the search covers the whole region.' },
   criteriaQ:    { cs: 'Co má firma splňovat?',       sk: 'Čo má firma spĺňať?',          en: 'What should a firm meet?' },
   criteriaHint: { cs: 'Nepovinné. Podle toho výsledky seřadíme — čím víc toho firma splňuje, tím výš bude. Nic to neodfiltruje.',
                   sk: 'Nepovinné. Podľa toho výsledky zoradíme — čím viac toho firma spĺňa, tým vyššie bude. Nič to neodfiltruje.',
@@ -271,11 +266,7 @@ export function IndustryField({ draft, patch, locale }: FieldProps) {
   );
 }
 
-/**
- * `withCity` schová poznámkové pole s městem — dotazník po registraci chce jen kraj, ve kterém
- * se opravdu hledá; město je poznámka pro profil.
- */
-export function RegionField({ draft, patch, locale, withCity = true }: FieldProps & { withCity?: boolean }) {
+export function RegionField({ draft, patch, locale }: FieldProps) {
   return (
     <div>
       <p className="font-semibold">{localized(T.regionQ, locale)}</p>
@@ -311,18 +302,6 @@ export function RegionField({ draft, patch, locale, withCity = true }: FieldProp
         />
       )}
 
-      {withCity && (
-        <>
-          <p className="font-semibold mt-5">{localized(T.cityQ, locale)}</p>
-          <p className="text-sm text-ink-muted mt-1 mb-2">{localized(T.cityHint, locale)}</p>
-          <input
-            className="input"
-            value={draft.city}
-            onChange={e => patch({ city: e.target.value })}
-            maxLength={120}
-          />
-        </>
-      )}
     </div>
   );
 }

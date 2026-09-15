@@ -92,7 +92,7 @@ export interface RawLead {
 export type MatchedBy = 'nace' | 'name' | 'osm';
 
 export interface TradeLicence {
-  /** `druhZivnosti`: Ohlašovací volná, Ohlašovací řemeslná, Koncesovaná … */
+  /** `druhZivnosti` — písmeno: L volná, R řemeslná, V vázaná, K koncesovaná (změřeno na 2 666 živnostech, 15. 9. 2026). */
   kind?: string;
   /** `predmetPodnikani` */
   subject?: string;
