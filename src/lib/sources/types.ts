@@ -81,7 +81,15 @@ export interface RawLead {
   inInsolvency?: boolean;
   /** ARES `datumAktualizace` — poslední změna záznamu v rejstříku. */
   registryUpdatedAt?: Date;
+  /**
+   * Čím firma prošla do výsledků. `nace` = kód oboru v rejstříku, `name` = slovo z názvu
+   * oboru v obchodním jménu (jen hledání v ARESu; změřeno: ~47–68 % takových firem obor
+   * opravdu dělá), `osm` = štítek v OpenStreetMap. Uživatel to vidí u každé firmy.
+   */
+  matchedBy?: MatchedBy;
 }
+
+export type MatchedBy = 'nace' | 'name' | 'osm';
 
 export interface TradeLicence {
   /** `druhZivnosti`: Ohlašovací volná, Ohlašovací řemeslná, Koncesovaná … */

@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { resolveNiche, USELESS_NACE } from '../nace-map';
 import { subAreasFor } from './ares-areas';
-import type { DiscoveryOptions, DiscoverySource, RawLead } from './types';
+import type { DiscoveryOptions, DiscoverySource, MatchedBy, RawLead } from './types';
 
 const BASE = 'https://ares.gov.cz/ekonomicke-subjekty-v-be/rest';
 const PAGE = 100;
@@ -240,21 +240,23 @@ export const aresSource: DiscoverySource = {
     // je to prázdné pole — tam se to nestává.
     const subAreas = city ? subAreasFor(city) : [];
 
-    const strands: Promise<AresSubject[]>[] = [];
-    if (nace.length) strands.push(collect({ czNace: nace, sidlo, pravniForma }, limit, until, subAreas));
+    // Větev NACE jde první, takže firma, kterou najdou obě, se vede jako nalezená podle oboru.
+    const strands: { kind: MatchedBy; rows: Promise<AresSubject[]> }[] = [];
+    if (nace.length) strands.push({ kind: 'nace', rows: collect({ czNace: nace, sidlo, pravniForma }, limit, until, subAreas) });
     for (const kw of keywords.slice(0, 2)) {
-      strands.push(collect({ obchodniJmeno: kw, sidlo, pravniForma }, Math.ceil(limit / 2), until, subAreas));
+      strands.push({ kind: 'name', rows: collect({ obchodniJmeno: kw, sidlo, pravniForma }, Math.ceil(limit / 2), until, subAreas) });
     }
 
-    const batches = await Promise.all(strands);
+    const batches = await Promise.all(strands.map(s => s.rows));
 
     const seen = new Set<string>();
     const leads: RawLead[] = [];
-    for (const batch of batches) {
-      for (const subject of batch) {
+    for (let i = 0; i < batches.length; i++) {
+      for (const subject of batches[i]) {
         const lead = toLead(subject);
         if (!lead || seen.has(lead.ico!)) continue;
         seen.add(lead.ico!);
+        lead.matchedBy = strands[i].kind;
         leads.push(lead);
         if (leads.length >= limit) return leads;
       }

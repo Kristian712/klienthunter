@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { sessionFrom } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { firmKeyOf } from '@/lib/claim-order';
+import { contactHistory } from '@/lib/saved-search';
 
 /**
  * Odpověď závisí na cookie, takže staticky se vykreslit nedá. Bez tohohle to Next zkusí při
@@ -31,23 +32,29 @@ export async function GET(req: NextRequest) {
         .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
       const latest = runs[0];
       let newCount = 0;
+      // Firmy, které v seznamu už byly, ale kontakt u nich je poprvé (dohledávání zpětně).
+      let contactNewCount = 0;
       if (runs.length > 1) {
         const earlier = await prisma.businessResult.findMany({
           where: { searchId: { in: runs.slice(1).map(r => r.id) } },
-          select: { ico: true, placeId: true },
+          select: { ico: true, placeId: true, phone: true, email: true },
         });
-        const seen = new Set(earlier.map(firmKeyOf));
+        const { seen, hadContact } = contactHistory(earlier);
         const current = await prisma.businessResult.findMany({
           where: { searchId: latest.id, ...(root.lastOpenedAt ? { createdAt: { gt: root.lastOpenedAt } } : {}) },
-          select: { ico: true, placeId: true },
+          select: { ico: true, placeId: true, phone: true, email: true },
         });
-        newCount = current.filter(r => !seen.has(firmKeyOf(r))).length;
+        for (const r of current) {
+          const key = firmKeyOf(r);
+          if (!seen.has(key)) newCount++;
+          else if (!hadContact.has(key) && (r.phone || r.email)) contactNewCount++;
+        }
       }
       return {
         id: root.id, name: root.name, query: root.query, region: root.region,
         filters: root.filters, scenario: root.scenario, lastOpenedAt: root.lastOpenedAt, origin: root.origin,
         runs: runs.length, latestId: latest.id, latestAt: latest.createdAt, latestCount: latest._count.results,
-        newCount,
+        newCount, contactNewCount,
       };
     }));
 

@@ -1,5 +1,6 @@
 import { prisma } from './db';
-import { persistResults } from './lead-persist';
+import { PRIOR_SELECT, persistFromPrior, persistResults, type PriorRow } from './lead-persist';
+import { firmKeyOf } from './claim-order';
 import { enrichAndVerify, mergeLeads } from './lead-pipeline';
 import { fillCoordinates } from './ruian';
 import { CZ_STAGES } from './search-options';
@@ -139,6 +140,30 @@ export async function runSearchJob(jobId: string): Promise<void> {
     const seenIco = new Set(written.map(r => r.ico).filter((v): v is string => Boolean(v)));
     const seenPlace = new Set(written.map(r => r.placeId).filter((v): v is string => Boolean(v)));
 
+    /**
+     * Dohledávání kontaktů zpětně.
+     *
+     * Opakovaný běh uloženého hledání nezkouší znovu weby firem, u kterých už kontakt je —
+     * ty se opíšou (`persistFromPrior`) a sondy dostanou jen firmy bez kontaktu. Nejnovější
+     * řádek s kontaktem na firmu vyhrává. Bez kořene (první běh) je mapa prázdná a nic se nemění.
+     */
+    const prior = new Map<string, PriorRow>();
+    if (search?.savedId) {
+      const rows = await prisma.businessResult.findMany({
+        where: {
+          search: { userId: job.userId, OR: [{ id: search.savedId }, { savedId: search.savedId }], id: { not: job.searchId } },
+          OR: [{ phone: { not: null } }, { email: { not: null } }],
+        },
+        select: PRIOR_SELECT,
+        orderBy: { createdAt: 'desc' },
+      });
+      for (const r of rows) {
+        if (!r.phone && !r.email) continue;
+        const key = firmKeyOf(r);
+        if (!prior.has(key)) prior.set(key, r);
+      }
+    }
+
     const perStage = Math.ceil(job.targetCount / stages.length);
     let processed = job.processedCount;
     let total = written.length;
@@ -176,18 +201,20 @@ export async function runSearchJob(jobId: string): Promise<void> {
       }
       const osmLeads = batches.flatMap(b => b[1]);
       const aresLeads = batches.flatMap(b => b[0]);
-      const candidates = mergeLeads([osmLeads, aresLeads], room).filter(c => {
+      const merged = mergeLeads([osmLeads, aresLeads], room).filter(c => {
         if (seenIco.has(c.ico ?? '') || seenPlace.has(c.placeId)) return false;
         if (c.ico) seenIco.add(c.ico);
         seenPlace.add(c.placeId);
         return true;
       });
+      const known = merged.flatMap(c => { const p = prior.get(firmKeyOf(c)); return p ? [{ c, prior: p }] : []; });
+      const candidates = merged.filter(c => !prior.has(firmKeyOf(c)));
 
       // Počet nalezených firem známe dřív než jejich weby, a uživatel na něj kouká hned —
       // je to první číslo, ze kterého pozná, že se něco děje. Přičítá se, protože fází je víc.
       await prisma.searchJob.update({
         where: { id: jobId },
-        data: { foundCount: { increment: candidates.length } },
+        data: { foundCount: { increment: merged.length } },
       });
 
       /**
@@ -197,7 +224,15 @@ export async function runSearchJob(jobId: string): Promise<void> {
        * doplňovaly až potom, první dávky by na mapě chyběly. Stojí to jedno stažení na obec
        * (řádově desetiny sekundy) a selhání ČÚZK hledání nepoloží — firmy jen zůstanou bez bodu.
        */
-      await fillCoordinates(candidates);
+      await fillCoordinates(merged);
+
+      // Firmy s kontaktem z minula se zapíšou hned — bez sond, bez čekání na zbytek fáze.
+      if (known.length > 0) {
+        const copied = await persistFromPrior(job.searchId, known, user?.targetFilters);
+        processed += known.length;
+        total += copied;
+        await prisma.searchJob.update({ where: { id: jobId }, data: { processedCount: processed } });
+      }
 
       await enrichAndVerify(candidates, {
         // Dřív tu u „celé ČR" stálo `false`, protože se do jednoho průchodu měly vejít tisíce

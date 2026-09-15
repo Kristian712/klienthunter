@@ -56,24 +56,40 @@ export async function searchMeta(searchId: string, userId: string): Promise<Sear
 }
 
 /**
- * Označí řádky, které v dřívějších bězích téhož kořene nebyly. Jeden dotaz na klíče
- * dřívějších řádků (IČO / placeId), žádné N+1. Bez dřívějšího běhu nic „nové" není.
+ * Označí řádky, které v dřívějších bězích téhož kořene nebyly (`isNew`), a řádky, u kterých
+ * je poprvé kontakt (`contactNew`): firma už v seznamu byla, ale telefon ani e-mail u ní nikdy
+ * nebyl — a teď je. Jeden dotaz na dřívější řádky, žádné N+1. Bez dřívějšího běhu nic „nové" není.
  */
-export async function markNew<T extends { ico?: string | null; placeId: string }>(
+export async function markNew<T extends { ico?: string | null; placeId: string; phone?: string | null; email?: string | null }>(
   meta: SearchMeta | null,
   userId: string,
   rows: T[],
-): Promise<Array<T & { isNew: boolean }>> {
-  if (!meta || meta.earlierRuns === 0 || rows.length === 0) return rows.map(r => ({ ...r, isNew: false }));
+): Promise<Array<T & { isNew: boolean; contactNew: boolean }>> {
+  if (!meta || meta.earlierRuns === 0 || rows.length === 0) return rows.map(r => ({ ...r, isNew: false, contactNew: false }));
   const current = await prisma.search.findUnique({ where: { id: meta.id }, select: { createdAt: true } });
   const earlier = await prisma.businessResult.findMany({
     where: {
       search: { userId, OR: [{ id: meta.rootId }, { savedId: meta.rootId }], createdAt: { lt: current?.createdAt } },
     },
-    select: { ico: true, placeId: true },
+    select: { ico: true, placeId: true, phone: true, email: true },
   });
-  const seen = new Set(earlier.map(firmKeyOf));
-  return rows.map(r => ({ ...r, isNew: !seen.has(firmKeyOf(r)) }));
+  const { seen, hadContact } = contactHistory(earlier);
+  return rows.map(r => {
+    const key = firmKeyOf(r);
+    return { ...r, isNew: !seen.has(key), contactNew: seen.has(key) && !hadContact.has(key) && Boolean(r.phone || r.email) };
+  });
+}
+
+/** Z dřívějších řádků: které firmy už v seznamu byly a které z nich měly kontakt. */
+export function contactHistory(earlier: Array<{ ico?: string | null; placeId: string; phone?: string | null; email?: string | null }>) {
+  const seen = new Set<string>();
+  const hadContact = new Set<string>();
+  for (const r of earlier) {
+    const key = firmKeyOf(r);
+    seen.add(key);
+    if (r.phone || r.email) hadContact.add(key);
+  }
+  return { seen, hadContact };
 }
 
 /** Uživatel kořen otevřel — od teď se „nové" počítá znovu. */

@@ -228,6 +228,13 @@ model BusinessResult {
   // The firm's own "Kontakt" page, taken from the link on its site. The shortest path from a
   // result to an actual conversation, and usually the only page carrying a person's name.
   contactUrl    String?
+  /// Kdy se u téhle firmy poprvé (v rámci uloženého hledání) objevil telefon nebo e-mail.
+  /// Při dalším běhu se přenáší z dřívějšího řádku, takže „kontakt nalezen 3. 9. 2026" drží
+  /// i po pěti spuštěních. NULL = řádek bez kontaktu, nebo řádek starší než tenhle sloupec.
+  contactFoundAt DateTime?
+  /// Čím firma prošla do výsledků: `nace` (kód oboru v rejstříku), `name` (slovo v názvu
+  /// při hledání v ARESu), `osm` (štítek v OpenStreetMap). NULL u starších řádků a importu.
+  matchedBy     String?
   facebookUrl   String?
   instagramUrl  String?
   linkedInUrl   String?

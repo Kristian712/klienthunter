@@ -103,6 +103,7 @@ function toLead(el: OverpassElement): RawLead | null {
     sourceId: 'osm',
     externalId: `osm:${el.type}/${el.id}`,
     name,
+    matchedBy: 'osm',
     /**
      * Telefon se srovnává do jednoho tvaru hned tady.
      *

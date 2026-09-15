@@ -6,9 +6,10 @@ import { useTranslations, useLocale } from 'next-intl';
 import {
   Search, Globe, Users, ExternalLink, Check, Bookmark, RefreshCw, Sparkles,
   Mail, MapPin, X, Clock, ChevronDown,
-  FileText, Table2, PhoneCall, ShieldCheck, Share2,
+  FileText, Table2, PhoneCall, ShieldCheck, Share2, Phone,
 } from 'lucide-react';
 import { CRM_FORMATS } from '@/lib/crm-export';
+import { formatDate } from '@/lib/format-date';
 import { SearchComposer } from '@/components/SearchComposer';
 import { PLAN_LIMITS } from '@/lib/plans';
 import { LEAD_FILTERS, GROUP_LABELS, GROUP_ORDER, employeeLabel, matchesAll, localized, registryWindowDays, type FilterGroup } from '@/lib/lead-filters';
@@ -93,6 +94,12 @@ interface BusinessResult {
   registryUpdatedAt?: string | null;
   /** Firma, která v dřívějších bězích téhož uloženého hledání nebyla (lib/saved-search.ts). */
   isNew?: boolean;
+  /** Firma v seznamu už byla, ale telefon nebo e-mail je u ní poprvé (dohledávání zpětně). */
+  contactNew?: boolean;
+  /** Kdy se u firmy poprvé objevil kontakt; přenáší se mezi běhy uloženého hledání. */
+  contactFoundAt?: string | null;
+  /** `nace` = obor podle kódu v rejstříku, `name` = slovo v názvu, `osm` = štítek v mapě. */
+  matchedBy?: string | null;
   /** IČO nebo `osm:<placeId>` — klíč pro nároky a míchání pořadí (lib/claim-order.ts). */
   firmKey?: string;
   /** `other` = jiný účet firmu nedávno oslovil (skóre pro řazení klesá), `mine` = já. */
@@ -509,6 +516,17 @@ const S = {
                  sk: 'V skorších behoch tohto uloženého hľadania táto firma nebola.',
                  en: 'This firm was not in earlier runs of this saved search.' },
   provenBy:    { cs: 'Doloženo:', sk: 'Doložené:', en: 'Backed by:' },
+  onlyContactNew: { cs: 'Nové kontakty', sk: 'Nové kontakty', en: 'New contacts' },
+  contactNewBadge: { cs: 'Nový kontakt', sk: 'Nový kontakt', en: 'New contact' },
+  contactNewTip: { cs: 'Firma v seznamu už byla, ale telefon ani e-mail u ní dosud nebyl. Tentokrát se dohledal.',
+                   sk: 'Firma v zozname už bola, ale telefón ani e-mail pri nej doteraz nebol. Tentoraz sa dohľadal.',
+                   en: 'The firm was already on the list, but had no phone or e-mail until now.' },
+  contactFound: { cs: 'kontakt nalezen {d}', sk: 'kontakt nájdený {d}', en: 'contact found {d}' },
+  // Čím firma prošla do výsledků. U hledání v ARESu jsou dvě větve a jen ta podle NACE je jistá:
+  // slovo v názvu sedí na obor zhruba u poloviny až dvou třetin firem (změřeno 14. 9. 2026).
+  matchedNace: { cs: 'obor podle kódu NACE v rejstříku', sk: 'odbor podľa kódu NACE v registri', en: 'trade by NACE code in the registry' },
+  matchedName: { cs: 'obor jen podle slova v názvu firmy — nemusí sedět', sk: 'odbor len podľa slova v názve firmy — nemusí sedieť', en: 'trade by a word in the firm name only — may not match' },
+  matchedOsm:  { cs: 'obor podle štítku v OpenStreetMap', sk: 'odbor podľa štítku v OpenStreetMap', en: 'trade by an OpenStreetMap tag' },
   claimOther:  { cs: 'Nedávno oslovena jinde', sk: 'Nedávno oslovená inde', en: 'Recently approached elsewhere' },
   claimOtherTip: { cs: 'Jiný uživatel ji v posledních 30 dnech označil jako oslovenou. Ve výsledcích je proto níž — ne pryč.',
                    sk: 'Iný používateľ ju v posledných 30 dňoch označil ako oslovenú. Vo výsledkoch je preto nižšie — nie preč.',
@@ -920,6 +938,7 @@ export default function SearchPage() {
   const [savingSearch, setSavingSearch] = useState(false);
   const [showSave, setShowSave] = useState(false);
   const [onlyNew, setOnlyNew] = useState(false);
+  const [onlyContactNew, setOnlyContactNew] = useState(false);
   const [rerunning, setRerunning] = useState(false);
 
   /**
@@ -1148,9 +1167,11 @@ export default function SearchPage() {
   // Skóre po srážce za cizí nárok, remízy podle hashe (klíč firmy + sůl účtu), pak název.
   // Dva účty tak vidí u stejně bodovaných firem jiné pořadí; tentýž účet vždy stejné.
   const newCount = results.filter(b => b.isNew).length;
+  const contactNewCount = results.filter(b => b.contactNew).length;
   const filtered = results
     .filter(b => matchesAll(b, active))
     .filter(b => !onlyNew || b.isNew)
+    .filter(b => !onlyContactNew || b.contactNew)
     .sort(compareRanked(salt));
 
   /**
@@ -2032,6 +2053,12 @@ export default function SearchPage() {
                           <span className={`tnum ${onlyNew ? 'text-accent-ink/70' : 'text-ink-faint'}`}>{newCount}</span>
                         </button>
                       )}
+                      {savedMeta.earlierRuns > 0 && (
+                        <button onClick={() => setOnlyContactNew(v => !v)} className={onlyContactNew ? 'chip-active' : 'chip'} title={localized(S.contactNewTip, locale)}>
+                          {localized(S.onlyContactNew, locale)}
+                          <span className={`tnum ${onlyContactNew ? 'text-accent-ink/70' : 'text-ink-faint'}`}>{contactNewCount}</span>
+                        </button>
+                      )}
                       <button onClick={rerunSearch} disabled={rerunning || jobRunning} className="btn-outline btn-sm gap-1.5">
                         <RefreshCw size={14} />{rerunning ? localized(S.rerunning, locale) : localized(S.rerun, locale)}
                       </button>
@@ -2254,6 +2281,11 @@ export default function SearchPage() {
                             <Sparkles size={10} />{localized(S.newBadge, locale)}
                           </span>
                         )}
+                        {b.contactNew && (
+                          <span className="badge-warm" title={localized(S.contactNewTip, locale)}>
+                            <Phone size={10} />{localized(S.contactNewBadge, locale)}
+                          </span>
+                        )}
                         {b.claim === 'other' && (
                           <span className="badge text-ink-faint" title={localized(S.claimOtherTip, locale)}>
                             <Users size={10} />{localized(S.claimOther, locale)}
@@ -2319,6 +2351,13 @@ export default function SearchPage() {
                           .filter(f => active.has(f.id) && f.evidence)
                           .map(f => f.evidence!(b, locale))
                           .filter((x): x is string => Boolean(x));
+                        // Kdy se kontakt našel (přenáší se mezi běhy) a kterou větví firma prošla.
+                        if (!isDemo && (b.phone || b.email) && b.contactFoundAt) {
+                          proofs.push(localized(S.contactFound, locale).replace('{d}', formatDate(b.contactFoundAt, locale)));
+                        }
+                        if (b.matchedBy === 'nace') proofs.push(localized(S.matchedNace, locale));
+                        else if (b.matchedBy === 'name') proofs.push(localized(S.matchedName, locale));
+                        else if (b.matchedBy === 'osm') proofs.push(localized(S.matchedOsm, locale));
                         return proofs.length > 0 ? (
                           <p className="text-[11px] text-ink-faint leading-relaxed mt-2">
                             <span className="text-ink-muted">{localized(S.provenBy, locale)}</span> {Array.from(new Set(proofs)).join(' · ')}

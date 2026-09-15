@@ -79,6 +79,10 @@ export async function persistResults(
         website:         verdict.url,
         contactUrl:      contactPage,
         ico:             c.ico,
+        // Datum prvního nálezu kontaktu. U opakovaného běhu ho `persistFromPrior` přenáší ze
+        // staršího řádku; tady jde jen o firmy, které se sondovaly teď — u nich je to teď.
+        contactFoundAt:  c.source !== 'csv' && (row.phone || row.email) ? new Date() : null,
+        matchedBy:       c.matchedBy,
         hasWebsite:      verdict.status === 'HAS',
         websiteEvidence: verdict.evidence,
         facebookUrl:     checks?.facebookUrl  ?? c.facebookUrl  ?? social.fb,
@@ -120,4 +124,86 @@ export async function persistResults(
   // (lib/optout.ts). Jeden dotaz na dávku.
   const allowed = await withoutOptouts(verified.map(v => v.c)).then(cs => new Set(cs));
   return (await Promise.all(verified.filter(v => allowed.has(v.c)).map(persist))).filter(Boolean);
+}
+
+/** Dřívější řádek téže firmy, ze kterého se při opakovaném běhu bere kontakt i web. */
+export type PriorRow = Prisma.BusinessResultGetPayload<{ select: typeof PRIOR_SELECT }>;
+
+export const PRIOR_SELECT = {
+  ico: true, placeId: true, phone: true, email: true, website: true, contactUrl: true,
+  hasWebsite: true, websiteStatus: true, websiteEvidence: true, websiteIsOld: true, websiteScore: true,
+  websiteAgeNote: true, hasFacebook: true, hasInstagram: true, hasLinkedIn: true, socialsChecked: true,
+  facebookUrl: true, instagramUrl: true, linkedInUrl: true, vatPayer: true, vatUnreliable: true,
+  activePremises: true, trades: true, employeeCategory: true, contactFoundAt: true, createdAt: true,
+} satisfies Prisma.BusinessResultSelect;
+
+/**
+ * Opakovaný běh uloženého hledání: firma, u které minule telefon nebo e-mail byl, se znovu
+ * nesonduje. Její web a kontakty se opíšou z dřívějšího řádku, rejstříková pole (jméno, sídlo,
+ * datum vzniku, insolvence…) se berou čerstvá z kandidáta. Sondy tak zbývají jen firmám,
+ * které minule kontakt neměly — a právě u nich má opakování smysl.
+ *
+ * Co se přenáší, je z data `contactFoundAt` (nebo vzniku řádku) vidět u firmy v seznamu.
+ */
+export async function persistFromPrior(
+  searchId: string,
+  pairs: Array<{ c: import('./lead-pipeline').Candidate; prior: PriorRow }>,
+  criteria?: readonly string[] | null,
+) {
+  const allowed = await withoutOptouts(pairs.map(p => p.c)).then(cs => new Set(cs));
+  const data: Prisma.BusinessResultCreateManyInput[] = pairs.filter(p => allowed.has(p.c)).map(({ c, prior }) => {
+    const row = {
+      phone:         c.phone ?? prior.phone,
+      email:         c.email ?? prior.email,
+      website:       prior.website,
+      contactUrl:    prior.contactUrl,
+      websiteStatus: prior.websiteStatus,
+      hasWebsite:    prior.hasWebsite,
+      websiteIsOld:  prior.websiteIsOld,
+      hasFacebook:   prior.hasFacebook,
+      hasInstagram:  prior.hasInstagram,
+      hasLinkedIn:   prior.hasLinkedIn,
+      socialsChecked: prior.socialsChecked,
+      foundedAt:     c.foundedAt,
+      vatPayer:      c.vatPayer ?? prior.vatPayer,
+      vatUnreliable: c.vatUnreliable ?? prior.vatUnreliable,
+      legalForm:     c.legalForm,
+      activePremises: c.activePremises ?? prior.activePremises,
+      nace:          c.nace ?? [],
+      trades:        c.trades && c.trades.length ? (c.trades as unknown as Prisma.InputJsonValue) : prior.trades ?? undefined,
+      employeeCategory: c.employeeCategory ?? prior.employeeCategory,
+      inInsolvency:  c.inInsolvency,
+      registryUpdatedAt: c.registryUpdatedAt,
+      address:       c.address,
+      category:      c.category,
+      source:        c.source,
+    };
+    return {
+      ...row,
+      searchId,
+      placeId:         c.placeId,
+      name:            c.name,
+      lat:             c.lat,
+      lon:             c.lon,
+      ruianCode:       c.ruianCode,
+      ico:             c.ico,
+      websiteEvidence: prior.websiteEvidence,
+      facebookUrl:     prior.facebookUrl,
+      instagramUrl:    prior.instagramUrl,
+      linkedInUrl:     prior.linkedInUrl,
+      websiteScore:    prior.websiteScore,
+      websiteAgeNote:  prior.websiteAgeNote,
+      leadScore:       leadScore(row, criteria),
+      reviewCount:     0,
+      contactFoundAt:  prior.contactFoundAt ?? prior.createdAt,
+      matchedBy:       c.matchedBy,
+    };
+  });
+  if (data.length === 0) return 0;
+  try {
+    return (await prisma.businessResult.createMany({ data })).count;
+  } catch (err) {
+    console.error('lead-persist: přenos řádků z minulého běhu selhal:', err);
+    return 0;
+  }
 }

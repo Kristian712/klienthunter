@@ -1,5 +1,5 @@
 import { createRobotsCache } from './robots';
-import { ENRICHMENT_SOURCES, contactPageUrl, extractContacts, type RawLead, type TradeLicence } from './sources';
+import { ENRICHMENT_SOURCES, contactPageUrl, extractContacts, type MatchedBy, type RawLead, type TradeLicence } from './sources';
 import { splitIndustries } from './industries';
 import { resolveNiche } from './nace-map';
 import {
@@ -124,6 +124,8 @@ export interface Candidate {
   employeeCategory?: string;
   inInsolvency?: boolean;
   registryUpdatedAt?: Date;
+  /** Čím firma prošla do výsledků — viz `RawLead.matchedBy`. */
+  matchedBy?: MatchedBy;
   signals: WebsiteSignals;
 }
 
@@ -150,6 +152,7 @@ export function toCandidate(lead: RawLead): Candidate {
     inInsolvency: lead.inInsolvency,
     registryUpdatedAt: lead.registryUpdatedAt,
     vatPayer: lead.vatPayer,
+    matchedBy: lead.matchedBy,
     signals: {
       claimedUrl: lead.website,
       osmSaysEmpty: lead.sourceId === 'osm' && !lead.website,
@@ -178,6 +181,8 @@ function absorb(target: Candidate, lead: RawLead): void {
   // Totéž pro právní formu a stav DPH: nese je jen ARES, ale platí o firmě, ne o záznamu.
   if (!target.legalForm) target.legalForm = lead.legalForm;
   if (target.vatPayer === undefined) target.vatPayer = lead.vatPayer;
+  // Rejstřík říká víc než štítek v mapě: firma z OSM, kterou ARES našel podle NACE, prošla podle oboru.
+  if (lead.matchedBy && (!target.matchedBy || target.matchedBy === 'osm')) target.matchedBy = lead.matchedBy;
 
   // Asymmetric on purpose: a website claim from any source counts, silence from one source
   // never cancels a claim from another.

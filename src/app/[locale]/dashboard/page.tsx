@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
 import Link from 'next/link';
-import { Search, ArrowRight, Crown, Clock, BarChart3, Upload, Trash2, Bookmark, RefreshCw, Sparkles } from 'lucide-react';
+import { Search, ArrowRight, Crown, Clock, BarChart3, Upload, Trash2, Bookmark, RefreshCw, Sparkles, Phone } from 'lucide-react';
 import { clearUser } from '@/lib/client-auth';
 import { industryLabel } from '@/lib/search-options';
 import { formatDate } from '@/lib/format-date';
@@ -36,6 +36,8 @@ interface User {
 interface SavedSearch {
   id: string; name: string; query: string; region: string; runs: number;
   latestId: string; latestAt: string; latestCount: number; newCount: number;
+  /** Firmy, které v seznamu už byly a poprvé mají telefon nebo e-mail. */
+  contactNewCount: number;
   /** `profile` = výchozí kombinace z dotazníku, ještě neupravená. */
   origin: string | null;
 }
@@ -214,6 +216,11 @@ export default function DashboardPage() {
                   <span className="text-ink-muted">{industryLabel(s.query, locale)}, {s.region}</span>
                   {s.newCount > 0 && (
                     <span className="badge-accent ml-2"><Sparkles size={10} />{s.newCount} {isCs ? 'nových' : 'new'}</span>
+                  )}
+                  {s.contactNewCount > 0 && (
+                    <span className="badge-accent ml-2" title={isCs ? 'Firmy, které v seznamu už byly a teď se u nich poprvé dohledal telefon nebo e-mail.' : 'Firms already on the list that now have a phone or e-mail for the first time.'}>
+                      <Phone size={10} />{s.contactNewCount} {isCs ? (s.contactNewCount === 1 ? 'nový kontakt' : s.contactNewCount < 5 ? 'nové kontakty' : 'nových kontaktů') : (s.contactNewCount === 1 ? 'new contact' : 'new contacts')}
+                    </span>
                   )}
                   {s.origin === 'profile' && (
                     <span className="badge ml-2 text-ink-faint"

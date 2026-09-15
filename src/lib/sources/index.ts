@@ -8,7 +8,7 @@ import type { DiscoverySource, EnrichmentSource, RawLead } from './types';
 export type { DiscoveryOptions } from './types';
 export type { TradeLicence } from './types';
 
-export type { RawLead, DiscoverySource, EnrichmentSource } from './types';
+export type { RawLead, DiscoverySource, EnrichmentSource, MatchedBy } from './types';
 export { extractContacts, contactPageUrl } from './site-contacts';
 export { OSM_ATTRIBUTION } from './osm';
 export { registryCanServe } from './registry';

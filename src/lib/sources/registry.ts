@@ -125,7 +125,7 @@ export async function registryDiscover(q: RegistryQuery): Promise<RawLead[]> {
       const ico = icos[next++];
       const started = Date.now();
       const lead = await fetchSubject(ico);
-      if (lead) leads.push({ ...lead, sourceId: 'res' });
+      if (lead) leads.push({ ...lead, sourceId: 'res', matchedBy: 'nace' });
       const wait = MIN_GAP_MS * CONCURRENCY - (Date.now() - started);
       if (wait > 0) await new Promise(r => setTimeout(r, wait));
     }
