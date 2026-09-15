@@ -36,6 +36,7 @@ export async function POST(req: NextRequest) {
     const filters = presetFiltersFor(answer);
     const scenario = SCENARIO_BY_PROFESSION[profession.id] ?? 'all';
     const query = user.targetIndustry || industriesFor(answer)[0] || 'restaurant';
+    // Dotazník kraj vyžaduje; záložní „Celá ČR" zbývá jen pro profil uložený jinudy (PATCH bez kraje).
     const region = user.targetRegion || 'Celá ČR';
     const regionShort = region.split(',')[0].trim();
     const name = `${industryLabel(query, locale)} · ${regionShort}`;

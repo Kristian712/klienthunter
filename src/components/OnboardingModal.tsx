@@ -6,7 +6,7 @@ import { localized } from '@/lib/lead-filters';
 import { INDUSTRIES } from '@/lib/search-options';
 import { PROFESSIONS, industriesFor, presetFiltersFor, professionById, type UserProfile } from '@/lib/profile';
 import { SCENARIO_BY_PROFESSION, scenarioById } from '@/lib/scenarios';
-import { FollowUpField, draftToPayload, toDraft, type ProfileDraft } from './ProfileFields';
+import { CUSTOM, FollowUpField, RegionField, draftToPayload, toDraft, type ProfileDraft } from './ProfileFields';
 import { LEAD_FILTERS, localized as loc } from '@/lib/lead-filters';
 
 /**
@@ -17,8 +17,9 @@ import { LEAD_FILTERS, localized as loc } from '@/lib/lead-filters';
  * vteřin, vyplní víc profilů než ten, který se vyplní pořádně a jen zřídka.
  *
  * Z jedné odpovědi se odvodí dvě věci: kritéria, podle kterých se výsledky řadí (ta u profesí
- * byla vždycky), a výchozí scénář hledání. Obor se nabídne jako tři tlačítka, kraj zůstává ve
- * formuláři, kde ho uživatel stejně vidí. Cokoli z toho jde později změnit v účtu.
+ * byla vždycky), a výchozí scénář hledání. Obor se nabídne jako tři tlačítka. Kraj je jediná
+ * další otázka: bez něj se první uložené hledání zakládalo na „Celá ČR" a přehled nových firem
+ * neměl co ukázat. Cokoli z toho jde později změnit v účtu.
  *
  * Přeskočení je plnohodnotný výsledek, ne dark pattern: tlačítko je v hlavičce a i po přeskočení
  * se uživatel označí za dotázaného, takže se ho aplikace už nikdy neptá.
@@ -34,6 +35,9 @@ const T = {
   pick:    { cs: 'Co budete hledat', sk: 'Čo budete hľadať', en: 'What you will look for' },
   scenario:{ cs: 'Výchozí scénář:', sk: 'Východiskový scenár:', en: 'Default scenario:' },
   finish:  { cs: 'Hotovo, hledat', sk: 'Hotovo, hľadať', en: 'Done, search' },
+  needRegion: { cs: 'Vyberte ještě kraj — podle něj se založí první hledání a přehled nových firem.',
+                sk: 'Vyberte ešte kraj — podľa neho sa založí prvé hľadanie a prehľad nových firiem.',
+                en: 'Pick a region too — the first search and the new-firms overview are built on it.' },
   saving:  { cs: 'Ukládám…', sk: 'Ukladám…', en: 'Saving…' },
   otherLabel: { cs: 'Čemu se věnujete?', sk: 'Čomu sa venujete?', en: 'What is your trade?' },
   failed:  { cs: 'Uložení se nepovedlo. Zkuste to znovu, nebo onboarding přeskočte.',
@@ -122,6 +126,7 @@ export function OnboardingModal({ locale, initial, onDone }: Props) {
   }
 
   const chosen = professionById(draft.profession);
+  const regionSet = draft.region === CUSTOM ? draft.customRegion.trim() !== '' : draft.region !== '';
   const scenario = scenarioById(draft.profession ? SCENARIO_BY_PROFESSION[draft.profession] : 'all');
   const answer = { profession: draft.profession, clientType: draft.clientType || null };
   const presetNames = presetFiltersFor(answer)
@@ -248,6 +253,12 @@ export function OnboardingModal({ locale, initial, onDone }: Props) {
               </p>
             </div>
           )}
+
+          {chosen && (
+            <div className="mt-6 border-t border-line pt-5">
+              <RegionField draft={draft} patch={patch} locale={locale} withCity={false} />
+            </div>
+          )}
         </div>
 
         {failed && (
@@ -257,7 +268,8 @@ export function OnboardingModal({ locale, initial, onDone }: Props) {
         )}
 
         <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-line">
-          <button onClick={finish} className="btn-primary" disabled={saving || !draft.profession}>
+          {chosen && !regionSet && <p className="text-xs text-ink-faint mr-auto">{localized(T.needRegion, locale)}</p>}
+          <button onClick={finish} className="btn-primary" disabled={saving || !draft.profession || !regionSet}>
             {saving ? localized(T.saving, locale) : localized(T.finish, locale)}
           </button>
         </div>

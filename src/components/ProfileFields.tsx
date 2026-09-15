@@ -14,7 +14,7 @@ import { INDUSTRIES, POPULAR_CHIPS, REGIONS } from '@/lib/search-options';
  * different questions — which is the failure mode that makes a saved profile untrustworthy.
  */
 
-const CUSTOM = '__custom__';
+export const CUSTOM = '__custom__';
 
 export interface ProfileDraft {
   profession: string;
@@ -271,7 +271,11 @@ export function IndustryField({ draft, patch, locale }: FieldProps) {
   );
 }
 
-export function RegionField({ draft, patch, locale }: FieldProps) {
+/**
+ * `withCity` schová poznámkové pole s městem — dotazník po registraci chce jen kraj, ve kterém
+ * se opravdu hledá; město je poznámka pro profil.
+ */
+export function RegionField({ draft, patch, locale, withCity = true }: FieldProps & { withCity?: boolean }) {
   return (
     <div>
       <p className="font-semibold">{localized(T.regionQ, locale)}</p>
@@ -307,14 +311,18 @@ export function RegionField({ draft, patch, locale }: FieldProps) {
         />
       )}
 
-      <p className="font-semibold mt-5">{localized(T.cityQ, locale)}</p>
-      <p className="text-sm text-ink-muted mt-1 mb-2">{localized(T.cityHint, locale)}</p>
-      <input
-        className="input"
-        value={draft.city}
-        onChange={e => patch({ city: e.target.value })}
-        maxLength={120}
-      />
+      {withCity && (
+        <>
+          <p className="font-semibold mt-5">{localized(T.cityQ, locale)}</p>
+          <p className="text-sm text-ink-muted mt-1 mb-2">{localized(T.cityHint, locale)}</p>
+          <input
+            className="input"
+            value={draft.city}
+            onChange={e => patch({ city: e.target.value })}
+            maxLength={120}
+          />
+        </>
+      )}
     </div>
   );
 }
