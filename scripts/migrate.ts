@@ -15,9 +15,19 @@
  * v `prisma/migrations` jde do commitu.
  */
 import { execSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
 import { PrismaClient } from '@prisma/client';
 
 const BASELINE = '0_init';
+
+// Lokální spuštění (`npx tsx scripts/migrate.ts`) bez exportovaného prostředí: vezme se .env.
+if (!process.env.DATABASE_URL) {
+  for (const file of ['.env.local', '.env']) {
+    if (!existsSync(file)) continue;
+    const m = /^DATABASE_URL\s*=\s*"?([^"\n]+)"?/m.exec(readFileSync(file, 'utf8'));
+    if (m) { process.env.DATABASE_URL = m[1].trim(); break; }
+  }
+}
 
 async function main() {
   const prisma = new PrismaClient();
@@ -31,6 +41,17 @@ async function main() {
       console.log(`migrate: databáze má tabulky, ale žádnou historii migrací — označuji ${BASELINE} za provedenou`);
       execSync(`npx prisma migrate resolve --applied ${BASELINE}`, { stdio: 'inherit' });
     }
+    /**
+     * Zombie zámek. Build, který Vercel zabil uprostřed migrace, nechal v Neonu spojení, které
+     * drží advisory lock Prismy (72707369) — a každý další `migrate deploy` na něm vyprší
+     * (P1002), i přes přímý host. Spojení téže role smíme ukončit sami; vlastní spojení se vynechá.
+     */
+    const killed = await prisma.$queryRaw<Array<{ pid: number }>>`
+      SELECT l.pid, pg_terminate_backend(l.pid)
+      FROM pg_locks l
+      WHERE l.locktype = 'advisory' AND l.objid = 72707369 AND l.pid <> pg_backend_pid()
+    `;
+    if (killed.length) console.warn(`migrate: ukončeno ${killed.length} spojení, která držela zámek migrací`);
   } finally {
     await prisma.$disconnect();
   }
