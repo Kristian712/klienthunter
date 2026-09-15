@@ -17,8 +17,8 @@ export default function ContactPage() {
     setLoading(true);
     // Aplikace poštu neodesílá, formulář jen připraví zprávu v e-mailovém klientovi. Stejná karta,
     // ne `window.open`: to v některých prohlížečích nechá po `mailto:` otevřenou prázdnou kartu.
-    const subject = encodeURIComponent(`KlientHunter – zpráva od ${form.name}`);
-    const body = encodeURIComponent(`Jméno: ${form.name}\nEmail: ${form.email}\n\n${form.message}`);
+    const subject = encodeURIComponent(isCs ? `KlientHunter – zpráva od ${form.name}` : `KlientHunter – message from ${form.name}`);
+    const body = encodeURIComponent(`${isCs ? 'Jméno' : 'Name'}: ${form.name}\n${isCs ? 'E-mail' : 'E-mail'}: ${form.email}\n\n${form.message}`);
     window.location.href = `mailto:${OPERATOR.email}?subject=${subject}&body=${body}`;
     setSent(true);
     setLoading(false);
@@ -43,7 +43,7 @@ export default function ContactPage() {
           <div className="card text-center py-12">
             <CheckCircle2 size={40} className="mx-auto text-accent mb-4" />
             <h2 className="text-xl font-semibold text-ink mb-2">
-              {isCs ? 'Děkujeme!' : 'Thank you!'}
+              {isCs ? 'Zpráva je připravená' : 'Your message is ready'}
             </h2>
             <p className="text-ink-muted">
               {isCs
@@ -56,24 +56,24 @@ export default function ContactPage() {
           <form onSubmit={handleSubmit} className="card space-y-4">
             <div className="grid sm:grid-cols-2 gap-4">
               <div>
-                <label className="label">{isCs ? 'Jméno' : 'Name'}</label>
-                <input className="input" value={form.name}
+                <label className="label" htmlFor="kh-contact-name">{isCs ? 'Jméno' : 'Name'}</label>
+                <input id="kh-contact-name" className="input" value={form.name}
                   onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required />
               </div>
               <div>
-                <label className="label">Email</label>
-                <input type="email" className="input" value={form.email}
+                <label className="label" htmlFor="kh-contact-email">E-mail</label>
+                <input id="kh-contact-email" type="email" className="input" value={form.email}
                   onChange={e => setForm(f => ({ ...f, email: e.target.value }))} required />
               </div>
             </div>
             <div>
-              <label className="label">{isCs ? 'Zpráva' : 'Message'}</label>
-              <textarea className="input min-h-[140px] resize-none" value={form.message}
+              <label className="label" htmlFor="kh-contact-message">{isCs ? 'Zpráva' : 'Message'}</label>
+              <textarea id="kh-contact-message" className="input min-h-[140px] resize-none" value={form.message}
                 onChange={e => setForm(f => ({ ...f, message: e.target.value }))} required />
             </div>
             <button type="submit" disabled={loading} className="btn-primary w-full py-3">
               <Send size={16} />
-              {isCs ? 'Odeslat zprávu' : 'Send message'}
+              {isCs ? 'Otevřít v e-mailu' : 'Open in your e-mail app'}
             </button>
             <p className="text-xs text-ink-faint text-center">
               {isCs ? 'Nebo nás kontaktujte přímo: ' : 'Or contact us directly: '}

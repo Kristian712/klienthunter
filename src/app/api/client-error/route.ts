@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { countHits, hashIp, recordHit } from '@/lib/rate-limit';
 
 /**
  * Kam se hlásí pád, který se stal v prohlížeči.
@@ -22,8 +23,14 @@ const MAX = 500;
 const clip = (value: unknown): string =>
   typeof value === 'string' ? value.slice(0, MAX) : '';
 
+/** Veřejná routa bez přihlášení: strop na IP, aby ji nešlo použít k zaplavení logu. */
+const REPORTS_PER_IP = 50;
+
 export async function POST(req: NextRequest) {
   try {
+    const ipHash = hashIp(req);
+    if (await countHits(ipHash, 'clienterror') >= REPORTS_PER_IP) return new NextResponse(null, { status: 204 });
+    await recordHit(ipHash, 'clienterror');
     const body = await req.json();
     console.error('[client-error]', {
       message: clip(body?.message) || '(bez hlášky)',

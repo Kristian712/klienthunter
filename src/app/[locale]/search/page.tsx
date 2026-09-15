@@ -533,6 +533,12 @@ const S = {
   emptyHint:  { cs: 'Zkuste jiný kraj, širší obor, nebo obor napsaný vlastními slovy.',
                 sk: 'Skúste iný kraj, širší odbor, alebo odbor napísaný vlastnými slovami.',
                 en: 'Try another region, a broader trade, or type the trade in your own words.' },
+  errDemoOneTrade: { cs: 'V ukázce bez přihlášení jde hledat jen jeden obor. Vyberte jeden, nebo se zaregistrujte zdarma.',
+                     sk: 'V ukážke bez prihlásenia sa dá hľadať len jeden odbor. Vyberte jeden, alebo sa zaregistrujte zadarmo.',
+                     en: 'The demo without an account searches one trade only. Pick one, or register for free.' },
+  errRerunImport: { cs: 'Nahraný seznam se znovu spustit nedá — importujte soubor znovu.',
+                    sk: 'Nahraný zoznam sa znova spustiť nedá — importujte súbor znova.',
+                    en: 'An uploaded list cannot be re-run — import the file again.' },
   errDemoUsed:{ cs: 'Ukázkové hledání jste už využili. Zaregistrujte se zdarma a hledejte dál — registrace je bez platební karty.',
                 sk: 'Ukážkové hľadanie ste už využili. Zaregistrujte sa zadarmo a hľadajte ďalej — registrácia je bez platobnej karty.',
                 en: 'You have used the demo search. Register for free to keep going — no card required.' },
@@ -808,9 +814,18 @@ export default function SearchPage() {
   const isCs = locale === 'cs' || locale === 'sk';
 
   const [userPlan, setUserPlan] = useState<string>('FREE');
+  const [unlimited, setUnlimited] = useState(false);
 
   useEffect(() => {
-    fetch('/api/auth/me').then(r => r.json()).then(d => setUserPlan(d.user?.plan ?? 'FREE')).catch(() => {});
+    fetch('/api/auth/me')
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => {
+        if (!d?.user) return;
+        setUserPlan(d.user.plan ?? 'FREE');
+        // Excel mají i VIP a admin (stejné pravidlo jako /api/export a stránka importu).
+        setUnlimited(Boolean(d.user.isVip || d.user.isAdmin));
+      })
+      .catch(err => console.error('search/me:', err));
   }, []);
 
   const [region, setRegion]               = useState('');
@@ -978,7 +993,7 @@ export default function SearchPage() {
       const res = await fetch(`/api/searches/${savedMeta.rootId}/rerun`, { method: 'POST' });
       const d = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(localized(res.status === 403 ? S.errPlan : res.status === 429 ? S.errBurst : S.errServer, locale));
+        setError(localized(d.code === 'IMPORT' ? S.errRerunImport : res.status === 403 ? S.errPlan : res.status === 429 ? S.errBurst : S.errServer, locale));
         return;
       }
       window.location.href = `${window.location.pathname}?job=${d.jobId}`;
@@ -1445,6 +1460,7 @@ export default function SearchPage() {
           res.status === 401 ? S.errLogin  :
           res.status === 403 ? S.errPlan   :
           code === 'DEMO_USED' ? S.errDemoUsed :
+          code === 'DEMO_ONE_TRADE' ? S.errDemoOneTrade :
           res.status === 429 ? S.errBurst  :
           res.status === 504 || res.status === 408
             ? (isWholeCzech(effectiveRegion) ? S.errTimeoutWholeCz : S.errTimeout) :
@@ -1494,7 +1510,7 @@ export default function SearchPage() {
     const fromProfile = industriesFor(profile).map(value => ({ value, label: industryLabelFor(value, locale) }));
     return fromProfile.length ? fromProfile : (POPULAR_CHIPS[locale] ?? POPULAR_CHIPS.en);
   })();
-  const isPro = userPlan === 'PRO' || userPlan === 'BUSINESS';
+  const isPro = userPlan === 'PRO' || userPlan === 'BUSINESS' || unlimited;
   /** Job běží dál i po tom, co odpověď na POST dorazila — `loading` o tom nic neví. */
   const jobRunning = Boolean(job && job.status !== 'done' && job.status !== 'failed');
 

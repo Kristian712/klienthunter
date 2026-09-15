@@ -8,6 +8,7 @@ import { localized } from '@/lib/lead-filters';
 import { industryLabel } from '@/lib/search-options';
 import { ALL_INDUSTRIES } from '@/lib/industries';
 import { formatDate } from '@/lib/format-date';
+import { nuts3ForRegion } from '@/lib/regions-nuts';
 import type { Digest } from '@/lib/digest';
 
 /**
@@ -65,7 +66,7 @@ export function NewFirmsDigest({ locale, isAdmin }: { locale: string; isAdmin: b
         setDigest(d);
         // Viděno: od teď se „nové" počítá od nejmladší firmy v indexu. Až po vykreslení,
         // aby odznak stihl uživatel přečíst.
-        if (d.indexUntil) setTimeout(() => { fetch('/api/digest', { method: 'PATCH' }).catch(() => undefined); }, 1500);
+        if (d.indexUntil) setTimeout(() => { fetch('/api/digest', { method: 'PATCH' }).catch(err => console.error('digest/seen:', err)); }, 1500);
       })
       .catch(err => { console.error('digest:', err); if (alive) setFailed(true); });
     return () => { alive = false; };
@@ -118,7 +119,7 @@ export function NewFirmsDigest({ locale, isAdmin }: { locale: string; isAdmin: b
     if (!isAdmin) return null;
     return <div className="card mb-6"><p className="text-sm text-ink-muted">{t(T.noIndex)}</p></div>;
   }
-  if (digest.totalAll === 0 && !digest.region.includes('kraj') && !/Praha/.test(digest.region)) {
+  if (!nuts3ForRegion(digest.region)) {
     return <div className="card mb-6">{head}<p className="text-sm text-ink-muted">{t(T.foreign).replace('{r}', digest.region)}</p></div>;
   }
 

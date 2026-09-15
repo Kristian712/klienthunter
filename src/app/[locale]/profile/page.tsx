@@ -69,7 +69,11 @@ export default function ProfilePage() {
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok && data.url) { window.location.assign(data.url); return; }
-    } catch { /* níž se jen odemkne tlačítko */ }
+      showToast(isCs ? 'Portál se nepodařilo otevřít. Zkuste to znovu, nebo nám napište.' : 'Could not open the portal. Try again or write to us.');
+    } catch (err) {
+      console.error('profile/portal:', err);
+      showToast(isCs ? 'Nepodařilo se spojit se serverem.' : 'Could not reach the server.');
+    }
     setPortalBusy(false);
   };
   const isCs = locale === 'cs' || locale === 'sk';
@@ -115,17 +119,22 @@ export default function ProfilePage() {
 
   const saveName = async () => {
     setSaving(true);
-    const res = await fetch('/api/profile', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: nameVal }),
-    });
-    if (res.ok) {
+    try {
+      const res = await fetch('/api/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: nameVal }),
+      });
+      if (!res.ok) throw new Error(`profile ${res.status}`);
       setData(prev => prev ? { ...prev, user: { ...prev.user, name: nameVal } } : prev);
       setEditName(false);
       showToast(isCs ? 'Jméno uloženo' : 'Name saved');
+    } catch (err) {
+      console.error('profile/name:', err);
+      showToast(isCs ? 'Jméno se nepodařilo uložit. Zkuste to znovu.' : 'Could not save the name. Please try again.');
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   };
 
   const patch = (next: Partial<ProfileDraft>) => setDraft(d => ({ ...d, ...next }));
@@ -140,26 +149,34 @@ export default function ProfilePage() {
   useEffect(() => { setWebhookVal(data?.user.webhookUrl ?? ''); }, [data?.user.webhookUrl]);
   const saveWebhook = async () => {
     setWebhookBusy('save'); setWebhookNote('');
-    const res = await fetch('/api/profile', {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ webhookUrl: webhookVal.trim() || null }),
-    });
-    const d = await res.json().catch(() => null);
-    if (res.ok && d?.user) {
-      setData(prev => (prev ? { ...prev, user: { ...prev.user, webhookUrl: d.user.webhookUrl, webhookSecret: d.user.webhookSecret } } : prev));
-      setWebhookNote(webhookVal.trim() ? (isCs ? 'Uloženo. Tajemství pro podpis je níž.' : 'Saved. The signing secret is below.') : (isCs ? 'Webhook vypnutý.' : 'Webhook off.'));
-    } else {
-      setWebhookNote(isCs ? 'Adresa musí začínat https:// a nesmí mířit do vnitřní sítě.' : 'The address must start with https:// and must not point to a private network.');
+    try {
+      const res = await fetch('/api/profile', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ webhookUrl: webhookVal.trim() || null }),
+      });
+      const d = await res.json().catch(() => null);
+      if (res.ok && d?.user) {
+        setData(prev => (prev ? { ...prev, user: { ...prev.user, webhookUrl: d.user.webhookUrl, webhookSecret: d.user.webhookSecret } } : prev));
+        setWebhookNote(webhookVal.trim() ? (isCs ? 'Uloženo. Tajemství pro podpis je níž.' : 'Saved. The signing secret is below.') : (isCs ? 'Webhook vypnutý.' : 'Webhook off.'));
+      } else if (res.status === 422 || res.status === 400) {
+        setWebhookNote(isCs ? 'Adresa musí začínat https:// a nesmí mířit do vnitřní sítě.' : 'The address must start with https:// and must not point to a private network.');
+      } else {
+        setWebhookNote(isCs ? 'Uložení se nepodařilo — chyba na naší straně. Zkuste to znovu.' : 'Saving failed on our side. Please try again.');
+      }
+    } catch (err) {
+      console.error('profile/webhook:', err);
+      setWebhookNote(isCs ? 'Nepodařilo se spojit se serverem.' : 'Could not reach the server.');
+    } finally {
+      setWebhookBusy(null);
     }
-    setWebhookBusy(null);
   };
   const testWebhook = async () => {
     setWebhookBusy('test'); setWebhookNote('');
     const res = await fetch('/api/profile/webhook-test', { method: 'POST' });
     const d = await res.json().catch(() => null);
     setWebhookNote(res.ok
-      ? (isCs ? `Odesláno, server odpověděl ${d?.status}.` : `Sent, the server answered ${d?.status}.`)
-      : (isCs ? `Nedoručeno${d?.status ? ` (HTTP ${d.status})` : ''}. Zkontrolujte adresu a scénář.` : `Not delivered${d?.status ? ` (HTTP ${d.status})` : ''}. Check the address and the scenario.`));
+      ? (isCs ? 'Testovací událost dorazila, scénář na druhé straně ji přijal.' : 'The test event arrived; the receiving scenario accepted it.')
+      : (isCs ? 'Testovací událost nedorazila. Zkontrolujte adresu a jestli je scénář zapnutý.' : 'The test event did not arrive. Check the address and that the scenario is switched on.'));
     setWebhookBusy(null);
   };
 
@@ -184,22 +201,31 @@ export default function ProfilePage() {
     e.preventDefault();
     setError('');
     setSaving(true);
-    const res = await fetch('/api/profile', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ currentPassword: pwForm.current, newPassword: pwForm.next }),
-    });
-    const d = await res.json();
-    if (res.ok) {
-      setChangePw(false);
-      setPwForm({ current: '', next: '' });
-      showToast(isCs ? 'Heslo změněno' : 'Password changed');
-    } else {
-      setError(d.error === 'Wrong current password'
-        ? (isCs ? 'Špatné současné heslo' : 'Wrong current password')
-        : (isCs ? 'Chyba' : 'Error'));
+    try {
+      const res = await fetch('/api/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword: pwForm.current, newPassword: pwForm.next }),
+      });
+      // Odpověď nemusí být JSON (504 od proxy) — dřív to shodilo handler a tlačítko zůstalo zamčené.
+      const d = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setChangePw(false);
+        setPwForm({ current: '', next: '' });
+        showToast(isCs ? 'Heslo změněno' : 'Password changed');
+      } else if (d.error === 'Wrong current password') {
+        setError(isCs ? 'Současné heslo nesedí.' : 'The current password is wrong.');
+      } else if (res.status === 400 || res.status === 422) {
+        setError(isCs ? 'Nové heslo musí mít alespoň 8 znaků.' : 'The new password must have at least 8 characters.');
+      } else {
+        setError(isCs ? 'Změna hesla se nepodařila — chyba na naší straně. Zkuste to prosím znovu.' : 'Changing the password failed on our side. Please try again.');
+      }
+    } catch (err) {
+      console.error('profile/password:', err);
+      setError(isCs ? 'Nepodařilo se spojit se serverem.' : 'Could not reach the server.');
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   };
 
   if (loading) return (

@@ -65,9 +65,18 @@ export default function DashboardPage() {
       : 'Delete this search and all its results? This cannot be undone.');
     if (!ok) return;
     setDeleting(id);
-    const res = await fetch(`/api/searches/${id}`, { method: 'DELETE', credentials: 'include' });
-    if (res.ok) setSearches(list => list.filter(s => s.id !== id));
-    setDeleting(null);
+    try {
+      const res = await fetch(`/api/searches/${id}`, { method: 'DELETE', credentials: 'include' });
+      if (!res.ok) throw new Error(`delete ${res.status}`);
+      setSearches(list => list.filter(s => s.id !== id));
+      // I mezi uloženými: smazaný kořen nebo běh tam nesmí zůstat viset.
+      setSaved(list => list.filter(s => s.id !== id && s.latestId !== id));
+    } catch (err) {
+      console.error('dashboard/delete:', err);
+      setRerunError(isCs ? 'Smazání se nepovedlo. Zkuste to prosím znovu.' : 'Could not delete. Please try again.');
+    } finally {
+      setDeleting(null);
+    }
   };
 
   useEffect(() => {
@@ -227,7 +236,9 @@ export default function DashboardPage() {
                         const res = await fetch(`/api/searches/${s.id}/rerun`, { method: 'POST' });
                         const d = await res.json().catch(() => ({}));
                         if (!res.ok) {
-                          setRerunError(res.status === 403
+                          setRerunError(d.code === 'IMPORT'
+                            ? (isCs ? 'Nahraný seznam se znovu spustit nedá — importujte soubor znovu.' : 'An uploaded list cannot be re-run — import the file again.')
+                            : res.status === 403
                             ? (isCs ? 'Vyčerpali jste hledání ve svém tarifu.' : 'You have used up the searches in your plan.')
                             : res.status === 429
                               ? (isCs ? 'Příliš mnoho hledání za sebou. Zkuste to za pár minut.' : 'Too many searches in a row. Try again in a few minutes.')

@@ -196,64 +196,92 @@ export default function AdminPage() {
   /** Zamítnutí vrátí subjekt do výsledků; obnovení ho zase vyřadí. Vyřazení samo na nikoho nečekalo. */
   const setOptoutStatus = async (o: Optout, status: 'active' | 'rejected') => {
     setUpdating(o.id + '-optout');
-    const res = await fetch('/api/admin/optouts', {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: o.id, status }),
-    });
-    if (res.ok) {
-      setOptouts(prev => prev.map(x => x.id === o.id ? { ...x, status, reviewedAt: new Date().toISOString() } : x));
-      showToast(status === 'rejected' ? (isCs ? `Žádost zamítnuta, ${o.firmKey} se zase zobrazuje` : `Request rejected, ${o.firmKey} is visible again`)
-                                      : (isCs ? `${o.firmKey} znovu vyřazeno` : `${o.firmKey} removed again`));
-    } else {
+    try {
+      const res = await fetch('/api/admin/optouts', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: o.id, status }),
+      });
+      if (res.ok) {
+        setOptouts(prev => prev.map(x => x.id === o.id ? { ...x, status, reviewedAt: new Date().toISOString() } : x));
+        showToast(status === 'rejected' ? (isCs ? `Žádost zamítnuta, ${o.firmKey} se zase zobrazuje` : `Request rejected, ${o.firmKey} is visible again`)
+                                        : (isCs ? `${o.firmKey} znovu vyřazeno` : `${o.firmKey} removed again`));
+      } else {
+        failToast();
+      }
+
+    } catch (err) {
+      console.error('admin/setOptoutStatus:', err);
       failToast();
+    } finally {
+      setUpdating(null);
     }
-    setUpdating(null);
   };
 
   const toggleVip = async (user: AdminUser) => {
     setUpdating(user.id + '-vip');
-    const res = await fetch(`/api/admin/users/${user.id}/vip`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ isVip: !user.isVip }),
-    });
-    if (res.ok) {
-      setUsers(prev => prev.map(u => u.id === user.id ? { ...u, isVip: !u.isVip } : u));
-      showToast(`VIP ${!user.isVip ? (isCs ? 'přidáno' : 'granted') : (isCs ? 'odebráno' : 'revoked')}: ${user.email}`);
-    } else {
+    try {
+      const res = await fetch(`/api/admin/users/${user.id}/vip`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isVip: !user.isVip }),
+      });
+      if (res.ok) {
+        setUsers(prev => prev.map(u => u.id === user.id ? { ...u, isVip: !u.isVip } : u));
+        showToast(`VIP ${!user.isVip ? (isCs ? 'přidáno' : 'granted') : (isCs ? 'odebráno' : 'revoked')}: ${user.email}`);
+      } else {
+        failToast();
+      }
+
+    } catch (err) {
+      console.error('admin/toggleVip:', err);
       failToast();
+    } finally {
+      setUpdating(null);
     }
-    setUpdating(null);
   };
 
   const toggleBlock = async (user: AdminUser) => {
     const isBlocked = user.accessExpiresAt === '1970-01-01T00:00:00.000Z' || (!!user.accessExpiresAt && new Date(user.accessExpiresAt) < new Date());
     setUpdating(user.id + '-block');
-    const res = await fetch(`/api/admin/users/${user.id}/block`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ blocked: !isBlocked }),
-    });
-    if (res.ok) {
-      setUsers(prev => prev.map(u => u.id === user.id ? { ...u, accessExpiresAt: !isBlocked ? null : '1970-01-01T00:00:00.000Z' } : u));
-      showToast(!isBlocked ? (isCs ? `Přístup obnoven: ${user.email}` : `Access restored: ${user.email}`) : (isCs ? `Zablokováno: ${user.email}` : `Blocked: ${user.email}`));
-    } else {
+    try {
+      const res = await fetch(`/api/admin/users/${user.id}/block`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ blocked: !isBlocked }),
+      });
+      if (res.ok) {
+        setUsers(prev => prev.map(u => u.id === user.id ? { ...u, accessExpiresAt: !isBlocked ? null : '1970-01-01T00:00:00.000Z' } : u));
+        showToast(!isBlocked ? (isCs ? `Přístup obnoven: ${user.email}` : `Access restored: ${user.email}`) : (isCs ? `Zablokováno: ${user.email}` : `Blocked: ${user.email}`));
+      } else {
+        failToast();
+      }
+
+    } catch (err) {
+      console.error('admin/toggleBlock:', err);
       failToast();
+    } finally {
+      setUpdating(null);
     }
-    setUpdating(null);
   };
 
   const toggleAdmin = async (user: AdminUser) => {
     setUpdating(user.id + '-admin');
-    const res = await fetch(`/api/admin/users/${user.id}/admin`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ isAdmin: !user.isAdmin }),
-    });
-    if (res.ok) {
-      setUsers(prev => prev.map(u => u.id === user.id ? { ...u, isAdmin: !u.isAdmin } : u));
-      showToast(`Admin ${!user.isAdmin ? (isCs ? 'přidán' : 'granted') : (isCs ? 'odebrán' : 'revoked')}: ${user.email}`);
-    } else {
+    try {
+      const res = await fetch(`/api/admin/users/${user.id}/admin`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isAdmin: !user.isAdmin }),
+      });
+      if (res.ok) {
+        setUsers(prev => prev.map(u => u.id === user.id ? { ...u, isAdmin: !u.isAdmin } : u));
+        showToast(`Admin ${!user.isAdmin ? (isCs ? 'přidán' : 'granted') : (isCs ? 'odebrán' : 'revoked')}: ${user.email}`);
+      } else {
+        failToast();
+      }
+
+    } catch (err) {
+      console.error('admin/toggleAdmin:', err);
       failToast();
+    } finally {
+      setUpdating(null);
     }
-    setUpdating(null);
   };
 
   const generateCodes = async (e: React.FormEvent) => {
@@ -278,20 +306,35 @@ export default function AdminPage() {
   };
 
   const deleteCode = async (id: string) => {
-    const res = await fetch(`/api/admin/invite-codes/${id}`, { method: 'DELETE' });
-    if (res.ok) {
-      setCodes(prev => prev.filter(c => c.id !== id));
-      showToast(isCs ? 'Kód smazán' : 'Code deleted');
-    } else {
+    // Nevratné a bez potvrzení se to dřív dalo odklikat dvakrát — smazání kódu, který někdo dostal.
+    if (!window.confirm(isCs ? 'Smazat tento kód? Kdo ho dostal, už se s ním nezaregistruje.' : 'Delete this code? Whoever has it can no longer register with it.')) return;
+    setUpdating(id + '-delete');
+    try {
+      const res = await fetch(`/api/admin/invite-codes/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setCodes(prev => prev.filter(c => c.id !== id));
+        showToast(isCs ? 'Kód smazán' : 'Code deleted');
+      } else {
+        failToast();
+      }
+    } catch (err) {
+      console.error('admin/delete-code:', err);
       failToast();
+    } finally {
+      setUpdating(null);
     }
   };
 
   const copyCode = async (code: InviteCode) => {
     const url = `${window.location.origin}/${locale}/auth/register?code=${code.code}`;
-    await navigator.clipboard.writeText(url);
-    setCopiedId(code.id);
-    setTimeout(() => setCopiedId(null), 2000);
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedId(code.id);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch {
+      // Schránka není dostupná (http, zakázané oprávnění): odkaz se aspoň ukáže k ručnímu zkopírování.
+      window.prompt(isCs ? 'Zkopírujte odkaz ručně:' : 'Copy the link manually:', url);
+    }
   };
 
   const stats = {
@@ -443,7 +486,7 @@ export default function AdminPage() {
             {optouts.length === 0 ? (
               <p className="text-sm text-ink-faint">{isCs ? 'Zatím žádná žádost.' : 'No requests yet.'}</p>
             ) : (
-              <div className="overflow-x-auto"><table className="table">
+              <div className="overflow-x-auto"><table className="w-full text-sm results-table">
                 <thead><tr>
                   <th>IČO / klíč</th><th>E-mail</th><th>{isCs ? 'Stav' : 'Status'}</th><th>{isCs ? 'Podáno' : 'Filed'}</th><th></th>
                 </tr></thead>

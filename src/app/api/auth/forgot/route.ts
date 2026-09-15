@@ -14,7 +14,7 @@ const Body = z.object({
 
 /** Kolik žádostí o reset z jedné IP za 24 h. Víc nemá poctivý uživatel proč posílat. */
 const FORGOT_PER_IP = 10;
-export const RESET_TTL_MIN = 60;
+const RESET_TTL_MIN = 60;
 
 const T = {
   subject: { cs: 'Obnova hesla · KlientHunter', sk: 'Obnova hesla · KlientHunter', en: 'Password reset · KlientHunter' },

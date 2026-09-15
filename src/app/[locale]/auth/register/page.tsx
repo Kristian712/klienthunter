@@ -24,6 +24,8 @@ const ERR: Record<string, { cs: string; sk?: string; en: string }> = {
 };
 
 const UI = {
+  badPassword: { cs: 'Heslo musí mít alespoň 8 znaků.', sk: 'Heslo musí mať aspoň 8 znakov.', en: 'The password must have at least 8 characters.' },
+  badEmail:    { cs: 'Tohle nevypadá jako platný e-mail.', sk: 'Toto nevyzerá ako platný e-mail.', en: 'That does not look like a valid e-mail.' },
   fallback: { cs: 'Registrace se nepodařila. Zkuste to prosím znovu.',
               sk: 'Registrácia sa nepodarila. Skúste to prosím znova.',
               en: 'Registration failed. Please try again.' },
@@ -59,11 +61,12 @@ const UI = {
   },
 };
 
+// Jen to, co účet zdarma opravdu dostane (lib/plans.ts): Excel je placený, počet hledání je za 30 dní.
 const PERKS = [
-  { cs: '5 vyhledávání zdarma',   sk: '5 hľadaní zadarmo',       en: '5 free searches' },
-  { cs: 'Přístup ke všem filtrům', sk: 'Prístup ku všetkým filtrom', en: 'All filters included' },
-  { cs: 'Export výsledků',        sk: 'Export výsledkov',        en: 'Export results' },
-  { cs: 'Bez kreditní karty',     sk: 'Bez kreditnej karty',     en: 'No credit card' },
+  { cs: '5 vyhledávání za 30 dní zdarma', sk: '5 hľadaní za 30 dní zadarmo', en: '5 free searches every 30 days' },
+  { cs: 'Všechny filtry a kritéria', sk: 'Všetky filtre a kritériá', en: 'All filters and criteria' },
+  { cs: 'Export do CSV',          sk: 'Export do CSV',           en: 'CSV export' },
+  { cs: 'Bez platební karty',     sk: 'Bez platobnej karty',     en: 'No credit card' },
 ];
 
 export default function RegisterPage() {
@@ -99,7 +102,10 @@ export default function RegisterPage() {
         }
         const data = await res.json().catch(() => ({}));
         const known = typeof data.error === 'string' ? ERR[data.error] : undefined;
-        setError(known ? localized(known, locale) : localized(UI.fallback, locale));
+        // 422 ze Zodu: pole `error` je seznam chyb, ne řetězec. Řekne se, které pole nesedí.
+        const zodPath = Array.isArray(data.error) ? String(data.error[0]?.path?.[0] ?? '') : '';
+        const zod = zodPath === 'password' ? UI.badPassword : zodPath === 'email' ? UI.badEmail : undefined;
+        setError(known ? localized(known, locale) : zod ? localized(zod, locale) : localized(UI.fallback, locale));
         return;
       }
       // Až tady, protože `res.json()` na nejsonové odpovědi vyhodí výjimku — a ta dřív

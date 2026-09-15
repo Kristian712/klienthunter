@@ -58,9 +58,12 @@ const T = {
   none:       { cs: '— nepoužít —', sk: '— nepoužiť —', en: '— skip —' },
   working:    { cs: 'Zpracovávám…', sk: 'Spracovávam…', en: 'Working…' },
   needName:   { cs: 'Vyberte sloupec s názvem firmy.', sk: 'Vyberte stĺpec s názvom firmy.', en: 'Choose the column with the business name.' },
-  takesTime:  { cs: 'Import trvá až minutu – ověřujeme weby jeden po druhém. Nezavírejte stránku.',
-                sk: 'Import trvá až minútu – overujeme weby jeden po druhom. Nezatvárajte stránku.',
-                en: 'The import takes up to a minute — we check the websites one by one. Keep the page open.' },
+  takesTime:  { cs: 'Import trvá zhruba sekundu na firmu – ověřujeme weby jeden po druhém, u velkého seznamu i několik minut. Nezavírejte stránku.',
+                sk: 'Import trvá zhruba sekundu na firmu – overujeme weby jeden po druhom, pri veľkom zozname aj niekoľko minút. Nezatvárajte stránku.',
+                en: 'The import takes about a second per firm — we check the websites one by one, several minutes for a large list. Keep the page open.' },
+  skipped:    { cs: 'Poškozené řádky přeskočeny: {n}. Zkontrolujte oddělovač a uvozovky v souboru.',
+                sk: 'Poškodené riadky preskočené: {n}. Skontrolujte oddeľovač a úvodzovky v súbore.',
+                en: 'Damaged rows skipped: {n}. Check the delimiter and quotes in the file.' },
   openList:   { cs: 'Otevřít seznam', sk: 'Otvoriť zoznam', en: 'Open the list' },
   overview:   { cs: 'Přehled importů', sk: 'Prehľad importov', en: 'Import overview' },
   csv:        { cs: 'Stáhnout CSV', sk: 'Stiahnuť CSV', en: 'Download CSV' },
@@ -169,16 +172,22 @@ export default function ImportPage() {
   // Tarif jen kvůli tlačítku Excel: tomu, kdo ho nemá, se dřív ukázalo a po kliknutí mu
   // vyskočil syrový JSON `{"error":"Excel export requires Pro plan"}`.
   useEffect(() => {
+    // Import je jen pro přihlášené. Dřív se to zjistilo až po kliknutí na „Importovat" — uživatel
+    // prošel celé mapování sloupců a pak přišel o práci. Teď se pošle na přihlášení hned.
     fetch('/api/auth/me')
-      .then(r => r.json())
-      .then(d => setIsPro(['PRO', 'BUSINESS'].includes(d.user?.plan) || !!d.user?.isVip || !!d.user?.isAdmin))
+      .then(r => {
+        if (r.status === 401) { window.location.href = `/${locale}/auth/login`; return null; }
+        return r.ok ? r.json() : null;
+      })
+      .then(d => { if (d?.user) setIsPro(['PRO', 'BUSINESS'].includes(d.user.plan) || !!d.user.isVip || !!d.user.isAdmin); })
       .catch(err => console.error('import/me:', err));
   }, []);
 
   const t = (key: keyof typeof T) => localized(T[key], locale);
 
+  const [parseErrors, setParseErrors] = useState(0);
   const reset = () => {
-    setHeaders([]); setRows([]); setMapping({}); setError(''); setErrorAction(null); setDone(null);
+    setHeaders([]); setRows([]); setMapping({}); setError(''); setErrorAction(null); setDone(null); setParseErrors(0);
   };
 
   const onFile = async (file: File) => {
@@ -198,6 +207,8 @@ export default function ImportPage() {
       setError(t('errEmpty'));
       return;
     }
+    // Poškozené řádky parser tiše přeskočí; kolik jich bylo, má uživatel vědět.
+    setParseErrors(res.errors.filter(e => e.row !== undefined).length);
     setHeaders(cols);
     setRows(res.data);
     setMapping(guessMapping(cols));
@@ -285,6 +296,7 @@ export default function ImportPage() {
       {headers.length > 0 && !done && (
         <div className="card mb-6">
           <h2 className="text-lg font-semibold mb-1">{t('mapTitle')}</h2>
+          {parseErrors > 0 && <p className="text-xs text-warm mb-2">{t('skipped').replace('{n}', String(parseErrors))}</p>}
           <p className="text-sm text-ink-muted mb-4">
             {localized({
               cs: `Načteno ${plural(rows.length, ROWS, 'cs')}. `,

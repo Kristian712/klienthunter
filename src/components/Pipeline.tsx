@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type DragEvent } from 'react';
 import Link from 'next/link';
-import { KanbanSquare, Phone, Mail, Globe, ChevronDown, ChevronRight } from 'lucide-react';
+import { KanbanSquare, Phone, Mail, Globe, ChevronDown, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { localized } from '@/lib/lead-filters';
 import { LEAD_STATUSES, type LeadStatus } from '@/lib/lead-tags';
 import { formatDate } from '@/lib/format-date';
@@ -34,6 +34,11 @@ const T = {
   rejected: { cs: 'Nezájem', sk: 'Nezáujem', en: 'Not interested' },
   drop:   { cs: 'Sem přetáhnout', sk: 'Sem presunúť', en: 'Drop here' },
   err:    { cs: 'Přesun se nepovedl, karta je zpátky.', sk: 'Presun sa nepodaril, karta je späť.', en: 'The move failed; the card is back.' },
+  loadFailed: { cs: 'Nástěnku se teď nepodařilo načíst. Vaše značky jsou v pořádku — obnovte stránku.',
+                sk: 'Nástenku sa teraz nepodarilo načítať. Vaše značky sú v poriadku — obnovte stránku.',
+                en: 'The board could not be loaded right now. Your tags are safe — reload the page.' },
+  moveBack: { cs: 'Zpět do', sk: 'Späť do', en: 'Back to' },
+  rejectDrop: { cs: 'Sem přetáhněte firmu, která nemá zájem', sk: 'Sem presuňte firmu, ktorá nemá záujem', en: 'Drop a firm that is not interested here' },
   fromSearch: { cs: 'z hledání', sk: 'z hľadania', en: 'from search' },
   moveTo: { cs: 'Přesunout do', sk: 'Presunúť do', en: 'Move to' },
 };
@@ -80,7 +85,17 @@ export function Pipeline({ locale }: { locale: string }) {
     if (id) void move(id, status);
   };
 
-  if (failed || !cards) return null;
+  if (failed) {
+    return (
+      <div className="card mb-6">
+        <h2 className="text-lg font-semibold mb-1 flex items-center gap-2">
+          <span className="icon-tile icon-tile--reach h-7 w-7"><KanbanSquare size={14} /></span>{t(T.title)}
+        </h2>
+        <p className="text-sm text-ink-muted">{t(T.loadFailed)}</p>
+      </div>
+    );
+  }
+  if (!cards) return null;
 
   const head = (
     <h2 className="text-lg font-semibold mb-1 flex items-center gap-2">
@@ -141,16 +156,30 @@ export function Pipeline({ locale }: { locale: string }) {
                       {c.website && <a href={c.website} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-ink-muted hover:text-ink"><Globe size={10} />web</a>}
                     </div>
                     {c.note && <p className="mt-2 text-[11px] text-ink-muted border-l-2 border-line pl-2 leading-snug">{c.note}</p>}
-                    <div className="mt-2 flex items-center justify-between gap-2 text-[10px] text-ink-faint">
+                    <div className="mt-2 flex items-center justify-between gap-2 text-[11px] text-ink-faint">
                       <span className="truncate">{t(T.fromSearch)} {c.searchLabel} · {formatDate(c.updatedAt, locale)}</span>
-                      {/* Dotyk drag & drop neumí: šipka posune kartu o sloupec dál. */}
-                      {COLUMNS.indexOf(status) < COLUMNS.length - 1 && (
-                        <button type="button" onClick={() => move(c.id, COLUMNS[COLUMNS.indexOf(status) + 1])}
-                          className="inline-flex items-center gap-0.5 rounded-md border border-line px-1.5 py-0.5 hover:border-ink hover:text-ink"
-                          aria-label={`${t(T.moveTo)} ${localized(LEAD_STATUSES.find(s => s.id === COLUMNS[COLUMNS.indexOf(status) + 1])!.label, locale)}`}>
-                          <ChevronRight size={11} />
+                      {/* Dotyk drag & drop neumí: šipky posunou kartu o sloupec zpět nebo dál, 36 px na prst. */}
+                      <span className="flex shrink-0 gap-1">
+                        {COLUMNS.indexOf(status) > 0 && (
+                          <button type="button" onClick={() => move(c.id, COLUMNS[COLUMNS.indexOf(status) - 1])}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-line hover:border-ink hover:text-ink"
+                            aria-label={`${t(T.moveBack)} ${localized(LEAD_STATUSES.find(s => s.id === COLUMNS[COLUMNS.indexOf(status) - 1])!.label, locale)}`}>
+                            <ChevronLeft size={14} />
+                          </button>
+                        )}
+                        {COLUMNS.indexOf(status) < COLUMNS.length - 1 && (
+                          <button type="button" onClick={() => move(c.id, COLUMNS[COLUMNS.indexOf(status) + 1])}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-line hover:border-ink hover:text-ink"
+                            aria-label={`${t(T.moveTo)} ${localized(LEAD_STATUSES.find(s => s.id === COLUMNS[COLUMNS.indexOf(status) + 1])!.label, locale)}`}>
+                            <ChevronRight size={14} />
+                          </button>
+                        )}
+                        <button type="button" onClick={() => move(c.id, 'rejected')}
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-line hover:border-ink hover:text-ink"
+                          aria-label={`${t(T.moveTo)} ${t(T.rejected)}`} title={t(T.rejected)}>
+                          <X size={14} />
                         </button>
-                      )}
+                      </span>
                     </div>
                   </article>
                 ))}
@@ -163,23 +192,32 @@ export function Pipeline({ locale }: { locale: string }) {
         })}
       </div>
 
-      {rejected.length > 0 && (
-        <div className="mt-3 border-t border-line pt-3"
-             onDragOver={e => e.preventDefault()} onDrop={e => onDrop(e, 'rejected')}>
-          <button type="button" onClick={() => setShowRejected(v => !v)} className="flex items-center gap-2 text-xs text-ink-faint hover:text-ink">
-            <ChevronDown size={12} className={`transition-transform ${showRejected ? '' : '-rotate-90'}`} />
-            {t(T.rejected)} <span className="tnum">{rejected.length}</span>
-          </button>
+      {/* Nezájem: vždycky jako místo k přetažení, i prázdné — dřív se sloupec ukázal až s první kartou,
+          takže první firmu tam z nástěnky nešlo dostat. */}
+      <div className={`mt-3 rounded-xl border border-dashed p-3 transition-colors ${over === 'rejected' ? 'border-accent bg-accent/5' : 'border-line'}`}
+           onDragOver={e => { e.preventDefault(); if (over !== 'rejected') setOver('rejected'); }}
+           onDragLeave={() => setOver(null)} onDrop={e => onDrop(e, 'rejected')}>
+        <button type="button" onClick={() => setShowRejected(v => !v)} className="flex items-center gap-2 text-xs text-ink-faint hover:text-ink">
+          <ChevronDown size={12} className={`transition-transform ${showRejected ? '' : '-rotate-90'}`} />
+          {t(T.rejected)} <span className="tnum">{rejected.length}</span>
+          {rejected.length === 0 && <span className="text-ink-faint">· {t(T.rejectDrop)}</span>}
+        </button>
+        {rejected.length > 0 && (
+          <div>
           {showRejected && (
             <ul className="mt-2 flex flex-wrap gap-2">
               {rejected.map(c => (
                 <li key={c.id} draggable onDragStart={e => e.dataTransfer.setData('text/kh-lead', c.id)}
-                    className="badge cursor-grab">{c.name}</li>
+                    className="badge cursor-grab">
+                  {c.name}
+                  <button type="button" onClick={() => move(c.id, 'contacted')} className="ml-1 hover:text-ink" aria-label={`${t(T.moveBack)} ${localized(LEAD_STATUSES[1].label, locale)}`}><ChevronLeft size={11} /></button>
+                </li>
               ))}
             </ul>
           )}
-        </div>
-      )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

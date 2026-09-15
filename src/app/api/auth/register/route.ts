@@ -110,6 +110,7 @@ export async function POST(req: NextRequest) {
     if (err instanceof z.ZodError) {
       return NextResponse.json({ error: err.errors }, { status: 422 });
     }
+    console.error('/api/auth/register:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
