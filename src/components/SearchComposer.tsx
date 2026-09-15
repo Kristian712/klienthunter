@@ -6,7 +6,7 @@ import {
   GROUP_LABELS, GROUP_ORDER, LEAD_FILTERS, NEW_FIRM_WINDOW_DAYS, SCOPE_TEXT, effectiveWindowDays, localized, registryWindowDays, scopeOf,
   type FilterGroup, type LeadFilter,
 } from '@/lib/lead-filters';
-import { DISTRICTS, nuts3ForRegion } from '@/lib/regions-nuts';
+import { DISTRICTS, isWholeCz, nuts3ForRegion } from '@/lib/regions-nuts';
 import { ALL_INDUSTRIES } from '@/lib/industries';
 import { formatDate } from '@/lib/format-date';
 
@@ -36,6 +36,7 @@ const T = {
   on:        { cs: 'zapnuto', sk: 'zapnuté', en: 'on' },
   districts: { cs: 'Okresy', sk: 'Okresy', en: 'Districts' },
   allKraj:   { cs: 'celý kraj', sk: 'celý kraj', en: 'whole region' },
+  wholeCz:   { cs: 'celá ČR', sk: 'celá ČR', en: 'whole Czechia' },
   unknownEmp:{ cs: 'počet neuveden u {n} firem', sk: 'počet neuvedený pri {n} firmách', en: 'count not stated for {n} firms' },
   noIndustry:{ cs: 'Bez oboru se hledá jen v indexu ČSÚ: celý kraj, firmy vzniklé za posledních 5 let. Starší firmy bez oboru najít nejdou — ARES potřebuje obor nebo slovo v názvu.',
                sk: 'Bez odboru sa hľadá len v indexe ČSÚ: celý kraj, firmy vzniknuté za posledných 5 rokov. Staršie firmy bez odboru nájsť nejdú — ARES potrebuje odbor alebo slovo v názve.',
@@ -90,11 +91,14 @@ export function SearchComposer({
   const reqId = useRef(0);
 
   const nuts3 = region ? nuts3ForRegion(region) : null;
+  // Celá ČR: index pokrývá celou republiku (bez okresů), počty i hledání bez oboru fungují.
+  const wholeCz = Boolean(region) && isWholeCz(region);
+  const indexable = Boolean(nuts3) || wholeCz;
   const ids = useMemo(() => Array.from(active), [active]);
   // Bez oboru se hledá v indexu i bez filtru podle vzniku (celé okno, pět let) — viz lead-filters.
   const windowDays = effectiveWindowDays(ids, industry);
   const implicitWindow = windowDays !== null && registryWindowDays(ids) === null;
-  const indexMode = Boolean(nuts3) && windowDays !== null;
+  const indexMode = indexable && windowDays !== null;
   // Zdroj bez klíče (Meta) se neukazuje vůbec: zamčený chip je slib, který nasazení neplní.
   // Rozhodnutí majitele 15. 9. 2026 — token s 60denní platností teď udržovat nechce.
   const offered = LEAD_FILTERS.filter(f => metaAds || f.source !== 'Meta');
@@ -104,7 +108,7 @@ export function SearchComposer({
 
   /** Počty z indexu — s odstupem, ať každé kliknutí nedělá deset dotazů naráz. */
   useEffect(() => {
-    if (!nuts3) { setCounts(null); return; }
+    if (!indexable) { setCounts(null); return; }
     const my = ++reqId.current;
     setCounting(true);
     const timer = setTimeout(() => {
@@ -172,14 +176,15 @@ export function SearchComposer({
   // ── Řádek „Co se prohledá" ──
   const kraj = region.split(',').pop()?.trim() ?? region;
   const city = region.split(',')[0]?.trim() ?? region;
-  const where = districts.length
+  const where = wholeCz ? t(T.wholeCz)
+    : districts.length
     ? districts.map(c => DISTRICTS[nuts3 ?? '']?.find(d => d.code === c)?.name ?? c).join(', ')
     : `${t(T.allKraj)} · ${kraj}`;
   const legalText = active.has('sole_trader') && !active.has('company_form') ? t(T.legalSole)
     : active.has('company_form') && !active.has('sole_trader') ? t(T.legalCo) : '';
   const since = windowDays !== null ? formatDate(new Date(Date.now() - windowDays * 86_400_000).toISOString(), locale) : '';
   const scopeLine = !region ? null
-    : !nuts3 ? t(T.foreign)
+    : !indexable ? t(T.foreign)
     : indexMode
       ? (counts && !counting
         ? t(T.idxLine).replace('{where}', where).replace('{since}', since).replace('{legal}', legalText)
@@ -205,9 +210,9 @@ export function SearchComposer({
               <span className="icon-tile icon-tile--who h-7 w-7"><Database size={14} /></span>{t(SCOPE_TEXT.index.title)}
             </h3>
             <p className="mt-1 text-[11px] leading-snug text-ink-muted">{t(SCOPE_TEXT.index.note)}</p>
-            {!nuts3 && region && <p className="mt-2 text-[11px] text-ink-faint">{t(T.foreign)}</p>}
+            {!indexable && region && <p className="mt-2 text-[11px] text-ink-faint">{t(T.foreign)}</p>}
             <div className="mt-3 space-y-2.5">
-              {groupRows(indexFilters, Boolean(nuts3), f => (INDEX_ONLY.has(f.id) ? toggleIndexOnly(f.id) : toggle(f.id)))}
+              {groupRows(indexFilters, indexable, f => (INDEX_ONLY.has(f.id) ? toggleIndexOnly(f.id) : toggle(f.id)))}
               {counts && (
                 <p className="text-[11px] text-ink-faint pl-0 sm:pl-24">{t(T.unknownEmp).replace('{n}', counts.employees.unknown.toLocaleString('cs-CZ'))}</p>
               )}
@@ -226,8 +231,8 @@ export function SearchComposer({
                 </div>
               )}
               {autoNote && windowDays !== null && <p className="text-[11px] text-warm">{t(T.autoWindow)}</p>}
-              {implicitWindow && nuts3 && <p className="text-[11px] text-ink-muted">{t(T.noIndustry)}</p>}
-              {nuts3 && !indexMode && <p className="text-[11px] text-ink-faint">{t(T.noCountArs)}</p>}
+              {implicitWindow && indexable && <p className="text-[11px] text-ink-muted">{t(T.noIndustry)}</p>}
+              {indexable && !indexMode && <p className="text-[11px] text-ink-faint">{t(T.noCountArs)}</p>}
             </div>
           </section>
 

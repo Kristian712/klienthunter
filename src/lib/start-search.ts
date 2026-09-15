@@ -2,7 +2,7 @@ import { waitUntil } from '@vercel/functions';
 import { activeAccount, getPlanLimits } from './auth';
 import { prisma } from './db';
 import { isAllIndustries } from './industries';
-import { nuts3ForRegion } from './regions-nuts';
+import { isWholeCz, nuts3ForRegion } from './regions-nuts';
 import { runSearchJob } from './search-job';
 
 /**
@@ -46,7 +46,7 @@ export async function startSearch(opts: {
   // „Všechny obory" (i prázdný obor) umí jen index z ČSÚ, a ten pokrývá jen české kraje. Bez filtru
   // podle vzniku se vezme celé okno indexu (viz `effectiveWindowDays`); mimo české kraje by běh šel
   // do ARESu bez NACE a ten ho odmítne — lepší říct to hned než po minutě.
-  if (isAllIndustries(opts.industry) && nuts3ForRegion(opts.region) === null) {
+  if (isAllIndustries(opts.industry) && nuts3ForRegion(opts.region) === null && !isWholeCz(opts.region)) {
     return { ok: false, status: 422, code: 'ALL_NEEDS_EVENT' };
   }
 

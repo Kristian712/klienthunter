@@ -3,7 +3,7 @@ import { isAllIndustries, splitIndustries } from '../industries';
 import { SOLE_TRADER_FORMS, indexConstraints } from '../lead-filters';
 import { resolveNiche, USELESS_NACE } from '../nace-map';
 import { activeOptoutKeys } from '../optout';
-import { nuts3ForRegion } from '../regions-nuts';
+import { isWholeCz, nuts3ForRegion } from '../regions-nuts';
 import { fetchSubject } from './ares';
 import type { RawLead } from './types';
 
@@ -50,11 +50,12 @@ export interface RegistryQuery {
  * totéž. Právní forma: živnostník = kódy 100/101, společnost = cokoli jiného. Zaměstnanci:
  * „má" = kategorie mimo 110 a neuvedeno, „bez" = jen výslovné 110 (neuvedeno nikdy).
  */
-export function indexWhere(q: { nuts3: string; districts?: readonly string[]; windowDays: number; codes: string[]; all: boolean; filters: readonly string[] }) {
+export function indexWhere(q: { nuts3: string | null; districts?: readonly string[]; windowDays: number; codes: string[]; all: boolean; filters: readonly string[] }) {
   const c = indexConstraints(q.filters);
   const since = new Date(Date.now() - q.windowDays * 24 * 60 * 60 * 1000);
+  // `nuts3` null = celá ČR: index pokrývá celou republiku, tak se kraj neomezuje.
   const and: Record<string, unknown>[] = [
-    q.districts && q.districts.length ? { district: { in: [...q.districts] } } : { district: { startsWith: q.nuts3 } },
+    ...(q.districts && q.districts.length ? [{ district: { in: [...q.districts] } }] : q.nuts3 ? [{ district: { startsWith: q.nuts3 } }] : []),
     { foundedAt: { gte: since } },
   ];
   if (!q.all && q.codes.length) and.push(naceWhere(q.codes));
@@ -68,7 +69,7 @@ export function indexWhere(q: { nuts3: string; districts?: readonly string[]; wi
 
 /** Zda index pro tenhle dotaz vůbec může něco vrátit — jinak se hledá po staru přes ARES. */
 export function registryCanServe(q: Pick<RegistryQuery, 'industry' | 'region'>): boolean {
-  return nuts3ForRegion(q.region) !== null && (isAllIndustries(q.industry) || naceCodesFor(q.industry).length > 0);
+  return (nuts3ForRegion(q.region) !== null || isWholeCz(q.region)) && (isAllIndustries(q.industry) || naceCodesFor(q.industry).length > 0);
 }
 
 /** NACE kódy všech oborů v dotazu (`a + b` = sjednocení). Pro „všechny obory" prázdné = bez filtru. */
@@ -101,7 +102,7 @@ export async function registryDiscover(q: RegistryQuery): Promise<RawLead[]> {
   const nuts3 = nuts3ForRegion(q.region);
   const all = isAllIndustries(q.industry);
   const codes = naceCodesFor(q.industry);
-  if (!nuts3 || (!all && codes.length === 0) || q.limit <= 0) return [];
+  if ((!nuts3 && !isWholeCz(q.region)) || (!all && codes.length === 0) || q.limit <= 0) return [];
 
   const rows = await prisma.registrySubject.findMany({
     // „Všechny obory": jen kraj a datum. Jediné místo v aplikaci, kde jde hledat bez oboru.

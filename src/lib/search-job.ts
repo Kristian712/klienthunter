@@ -4,6 +4,7 @@ import { firmKeyOf } from './claim-order';
 import { enrichAndVerify, mergeLeads } from './lead-pipeline';
 import { fillCoordinates } from './ruian';
 import { CZ_STAGES } from './search-options';
+import { isWholeCz } from './regions-nuts';
 import { ALL_INDUSTRIES, isAllIndustries, splitIndustries } from './industries';
 import { SOLE_TRADER_FORMS, effectiveWindowDays, indexConstraints } from './lead-filters';
 import { scenarioById } from './scenarios';
@@ -39,6 +40,13 @@ const COMPANY_FORMS = ['111', '112', '113', '121', '205', '421', '424'];
 const BATCH = 25;
 
 /**
+ * Kolik času smí vzít doplnění souřadnic z RÚIAN. Hledání v celém kraji sype firmy ze stovek
+ * obcí a každá obec je jedno stažení; dřív platil strop 25 obcí a na mapě chyběla skoro
+ * polovina firem. Minuta z 270sekundového rozpočtu stačí na zhruba 300 obcí.
+ */
+const COORDS_BUDGET_MS = 60_000;
+
+/**
  * Kolik času si necháváme na síť. Pod stropem funkce (300 s) s rezervou na zápis a na dobíhající
  * úlohy — `runPool` kontroluje hodiny jen než úlohu spustí, takže po vypršení rozpočtu ještě
  * doběhne nejvýš `PER_CANDIDATE_MS` z lead-pipeline.
@@ -65,16 +73,14 @@ const MAX_WEB_SEARCHES = Number(process.env.MAX_WEB_SEARCHES ?? 100);
 /** Job, který se takhle dlouho neposunul, už se nevrátí — instance ho vzala s sebou. */
 export const STALE_AFTER_MS = 5 * 60 * 1000;
 
-const WHOLE_CZ_TRIGGERS = ['celá čr', 'cela cr', 'celá cr', 'celé česko'];
-const isWholeCz = (region: string) => WHOLE_CZ_TRIGGERS.includes(region.toLowerCase().trim());
-
 /**
  * Na kolik dávek se hledání rozpadne. Běžné hledání má jednu fázi — samo město, jak ho
- * uživatel vybral. „Celá ČR" má čtrnáct, protože jeden dotaz na celou republiku ARES odmítne
- * dřív, než stihne cokoli vrátit (viz `CZ_STAGES`).
+ * uživatel vybral. „Celá ČR" přes ARES má čtrnáct, protože jeden dotaz na celou republiku ARES
+ * odmítne dřív, než stihne cokoli vrátit (viz `CZ_STAGES`). Přes index (filtr podle vzniku
+ * nebo bez oboru) je celá ČR jeden dotaz do databáze, tedy jedna fáze.
  */
-function stagesFor(region: string): { value: string; label: string }[] {
-  if (isWholeCz(region)) return CZ_STAGES;
+function stagesFor(region: string, viaIndex: boolean): { value: string; label: string }[] {
+  if (isWholeCz(region)) return viaIndex ? [{ value: region, label: 'Celá ČR' }] : CZ_STAGES;
   return [{ value: region, label: region.split(',')[0].trim() }];
 }
 
@@ -111,7 +117,7 @@ export async function runSearchJob(jobId: string): Promise<void> {
 
   try {
     const deadlineAt = Date.now() + NETWORK_BUDGET_MS;
-    const stages = stagesFor(job.region);
+    const stages = stagesFor(job.region, windowDays !== null);
     const startAt = Math.min(job.stageIndex, stages.length - 1);
     const searchQuota = createSearchQuota(MAX_WEB_SEARCHES - job.webSearchCount);
 
@@ -245,7 +251,8 @@ export async function runSearchJob(jobId: string): Promise<void> {
        * doplňovaly až potom, první dávky by na mapě chyběly. Stojí to jedno stažení na obec
        * (řádově desetiny sekundy) a selhání ČÚZK hledání nepoloží — firmy jen zůstanou bez bodu.
        */
-      await fillCoordinates(merged);
+      // Rozpočet na souřadnice: celý kraj je stovky obcí, každá je jedno stažení z ČÚZK.
+      await fillCoordinates(merged, Math.min(deadlineAt, Date.now() + COORDS_BUDGET_MS));
 
       // Firmy s kontaktem z minula se zapíšou hned — bez sond, bez čekání na zbytek fáze.
       if (known.length > 0) {

@@ -1,3 +1,4 @@
+import { isWholeCz } from '@/lib/regions-nuts';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { sessionFrom } from '@/lib/auth';
@@ -31,11 +32,7 @@ const SearchSchema = z.object({
   districts: z.array(z.string().regex(/^CZ0[0-9A-C]{3}$/)).max(80).optional(),
 });
 
-const WHOLE_CZ_TRIGGERS = ['celá čr', 'cela cr', 'celá cr', 'celé česko'];
 
-function isWholeCz(region: string): boolean {
-  return WHOLE_CZ_TRIGGERS.includes(region.toLowerCase().trim());
-}
 
 /**
  * Kolik z minuty, kterou funkce má, smí strávit na síti.

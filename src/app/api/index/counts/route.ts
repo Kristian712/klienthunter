@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { sessionFrom } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { NEW_FIRM_WINDOW_DAYS, registryWindowDays } from '@/lib/lead-filters';
-import { nuts3ForRegion } from '@/lib/regions-nuts';
+import { isWholeCz, nuts3ForRegion } from '@/lib/regions-nuts';
 import { indexWhere, naceCodesFor } from '@/lib/sources/registry';
 import { isAllIndustries } from '@/lib/industries';
 
@@ -33,7 +33,8 @@ export async function POST(req: NextRequest) {
   try {
     const body = Body.parse(await req.json());
     const nuts3 = nuts3ForRegion(body.region);
-    if (!nuts3) return NextResponse.json({ counts: null });
+    // Celá ČR: index pokrývá celou republiku, počítá se bez omezení na kraj.
+    if (!nuts3 && !isWholeCz(body.region)) return NextResponse.json({ counts: null });
 
     const windowDays = registryWindowDays(body.filters) ?? NEW_FIRM_WINDOW_DAYS.new_firm_5y;
     const all = isAllIndustries(body.industry);

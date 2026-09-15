@@ -1,3 +1,4 @@
+import { isWholeCz } from '../regions-nuts';
 import axios from 'axios';
 import { resolveNiche } from '../nace-map';
 import { CRAWLER_UA } from '../robots';
@@ -133,7 +134,8 @@ export const osmSource: DiscoverySource = {
 
   async search(niche: string, city: string, limit: number, _opts?: DiscoveryOptions): Promise<RawLead[]> {
     const { osm } = resolveNiche(niche);
-    if (osm.length === 0) return [];
+    // „Celá ČR" přes index je jedna fáze bez města; Overpass přes celou republiku by jen vypršel.
+    if (osm.length === 0 || isWholeCz(city)) return [];
 
     const key = `${osm.join('|')}::${city}::${limit}`;
     const hit = cache.get(key);

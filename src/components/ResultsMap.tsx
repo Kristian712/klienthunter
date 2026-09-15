@@ -423,6 +423,11 @@ export function ResultsMap({ leads, total, locale, onSetStatus, hideDone, hidden
       if (!m.getSource('openmaptiles')) return;
       tintVanek(m);
       setStyleReady(true);
+      // `load` po výměně stylu za běhu už podruhé nepřijde (v produkci zůstal štítek „Načítám
+      // mapu…" napořád nad hotovou mapou). Skončit načítání, jakmile mapa dojede do klidu —
+      // a nejpozději po deseti vteřinách, kdyby `idle` kvůli dlaždicím nepřišel.
+      m.once('idle', () => setLoading(false));
+      setTimeout(() => setLoading(false), 10_000);
     });
     // První vykreslení s daty. Přiblížení na výsledky se tu opakuje pro případ, že se
     // vykonalo dřív, než mapa znala svou velikost (mount ve skryté záložce, přepnutí pohledu).

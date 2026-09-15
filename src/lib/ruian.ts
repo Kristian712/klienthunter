@@ -27,8 +27,14 @@ proj4.defs(
 
 export interface LatLon { lat: number; lon: number }
 
-/** Kolik obcí smí jedno hledání stáhnout. Pojistka proti dotazu rozesetému po celé republice. */
-const MAX_OBCE_PER_SEARCH = 25;
+/**
+ * Kolik obcí smí jedno hledání stáhnout a kolik naráz. Dřív strop 25 obcí: hledání v celém kraji
+ * (změřeno 15. 9. 2026, Zlínský kraj: 187 obcí) pak nechalo 40 % firem bez bodu na mapě. Teď
+ * rozhoduje čas (`deadlineAt` od volajícího) a obce jdou od nejčastější — když čas dojde,
+ * chybí ty s jednou firmou, ne ty s deseti.
+ */
+const MAX_OBCE_PER_SEARCH = 400;
+const OBEC_CONCURRENCY = 8;
 const FEED_TIMEOUT_MS = 8_000;
 const FILE_TIMEOUT_MS = 15_000;
 
@@ -124,7 +130,7 @@ export interface Geocodable {
  * kde přinese nejvíc bodů. Souřadnice ze zdroje (OpenStreetMap) se nepřepisují — ta je u firmy,
  * ne u adresy jejího sídla, a je tedy přesnější.
  */
-export async function fillCoordinates(leads: Geocodable[]): Promise<number> {
+export async function fillCoordinates(leads: Geocodable[], deadlineAt: number = Date.now() + 60_000): Promise<number> {
   const missing = leads.filter(l => l.lat === undefined && l.obecCode && l.ruianCode);
   if (missing.length === 0) return 0;
 
@@ -135,8 +141,18 @@ export async function fillCoordinates(leads: Geocodable[]): Promise<number> {
     .slice(0, MAX_OBCE_PER_SEARCH)
     .map(([code]) => code);
 
+  // Osm pracovníků nad frontou obcí; nová obec se nezačne, když došel čas. Co je v paměťové
+  // cache, se vrátí i po čase — ta nic nestahuje.
   const tables = new Map<number, Map<number, LatLon>>();
-  await Promise.all(obce.map(async code => { tables.set(code, await obecTable(code)); }));
+  let next = 0;
+  const worker = async () => {
+    while (next < obce.length) {
+      const code = obce[next++];
+      if (Date.now() > deadlineAt && !cache.has(code)) continue;
+      tables.set(code, await obecTable(code));
+    }
+  };
+  await Promise.all(Array.from({ length: OBEC_CONCURRENCY }, worker));
 
   let filled = 0;
   for (const lead of missing) {

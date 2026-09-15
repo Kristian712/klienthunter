@@ -23,6 +23,12 @@ export const KRAJ_NUTS3: Record<string, string> = {
   'Moravskoslezský kraj':  'CZ080',
 };
 
+/** Hodnota regionu „Celá ČR" ve všech tvarech, které kdy UI posílalo. */
+const WHOLE_CZ_TRIGGERS = ['celá čr', 'cela cr', 'celá cr', 'celé česko'];
+export function isWholeCz(region: string): boolean {
+  return WHOLE_CZ_TRIGGERS.includes(region.toLowerCase().trim());
+}
+
 /** NUTS 3 pro hodnotu regionu, nebo `null` pro cizí město či volný text. */
 export function nuts3ForRegion(region: string): string | null {
   const parts = region.split(',').map(p => p.trim());

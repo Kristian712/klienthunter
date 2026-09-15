@@ -13,7 +13,7 @@ import { CRM_FORMATS } from '@/lib/crm-export';
 import { formatDate } from '@/lib/format-date';
 import { SearchComposer } from '@/components/SearchComposer';
 import { PLAN_LIMITS } from '@/lib/plans';
-import { LEAD_FILTERS, GROUP_LABELS, GROUP_ORDER, employeeLabel, matchesAll, localized, type FilterGroup } from '@/lib/lead-filters';
+import { LEAD_FILTERS, GROUP_LABELS, GROUP_ORDER, effectiveWindowDays, employeeLabel, matchesAll, localized, type FilterGroup } from '@/lib/lead-filters';
 import { leadReason } from '@/lib/lead-reason';
 import { reachHint, reachScore } from '@/lib/reach-score';
 import { scoreBreakdown } from '@/lib/lead-score';
@@ -22,7 +22,7 @@ import { YIELD_NOTE, yieldFor } from '@/lib/nace-map';
 import { SCENARIOS, SCENARIO_BY_PROFESSION, scenarioById } from '@/lib/scenarios';
 import { EMPTY_PROFILE, industriesFor, presetFiltersFor, type UserProfile } from '@/lib/profile';
 import { ALL_INDUSTRIES, ALL_INDUSTRIES_LABEL, MAX_INDUSTRIES, isAllIndustries, joinIndustries } from '@/lib/industries';
-import { nuts3ForRegion } from '@/lib/regions-nuts';
+import { isWholeCz, nuts3ForRegion } from '@/lib/regions-nuts';
 import { compareRanked, type ClaimMark } from '@/lib/claim-order';
 
 /** Totéž, co vrací `searchMeta` v lib/saved-search.ts. */
@@ -1186,7 +1186,7 @@ export default function SearchPage() {
   // a mezi firmami do 5 let — viz `effectiveWindowDays`). Ukázka bez přihlášení obor potřebuje.
   const effectiveIndustry = industries.length ? joinIndustries(industries)
     : industryQuery.trim() || customIndustry
-    || (!isDemo && effectiveRegion && nuts3ForRegion(effectiveRegion) ? ALL_INDUSTRIES : '');
+    || (!isDemo && effectiveRegion && (nuts3ForRegion(effectiveRegion) || isWholeCz(effectiveRegion)) ? ALL_INDUSTRIES : '');
   const allPicked = industries.length === 1 && isAllIndustries(industries[0]);
   /** Scénář, jehož filtry jsou všechny zapnuté; `custom`, když uživatel kombinaci rozbil. */
   const effectiveScenario = (() => {
@@ -1196,7 +1196,9 @@ export default function SearchPage() {
   })();
   /** „Všechny obory" bez filtru podle vzniku nejde spustit — index z ČSÚ hledá jen podle data. */
   // „Všechny obory" mimo české kraje nejdou (index je jen pro ně a ARES bez oboru nehledá).
-  const allBlocked = isAllIndustries(effectiveIndustry) && Boolean(effectiveRegion) && nuts3ForRegion(effectiveRegion) === null;
+  const allBlocked = isAllIndustries(effectiveIndustry) && Boolean(effectiveRegion) && nuts3ForRegion(effectiveRegion) === null && !isWholeCz(effectiveRegion);
+  /** Celá ČR přes index je jeden dotaz; přes ARES čtrnáct krajských měst — hlášky se liší. */
+  const wholeCzByCities = isWholeCz(effectiveRegion) && effectiveWindowDays(Array.from(active), effectiveIndustry) === null;
 
   const addIndustry = (value: string) => {
     setIndustries(prev => {
@@ -1290,8 +1292,6 @@ export default function SearchPage() {
     return results.filter(b => matchesAll(b, withIt)).length;
   };
 
-  const isWholeCzech = (r: string) =>
-    ['celá čr', 'cela cr', 'celá cr'].includes(r.toLowerCase().trim());
 
   /**
    * Obnovení hledání z adresy.
@@ -1519,10 +1519,7 @@ export default function SearchPage() {
     setJob(null);
     setActive(new Set());
     setHasSearched(true);
-    setLoadingMsg(localized(
-      isWholeCzech(effectiveRegion) ? S.loadingWholeCz : S.loadingCity,
-      locale,
-    ));
+    setLoadingMsg(localized(wholeCzByCities ? S.loadingWholeCz : S.loadingCity, locale));
     try {
       const res = await fetch('/api/search', {
         method: 'POST',
@@ -1564,7 +1561,7 @@ export default function SearchPage() {
           code === 'DEMO_ONE_TRADE' ? S.errDemoOneTrade :
           res.status === 429 ? S.errBurst  :
           res.status === 504 || res.status === 408
-            ? (isWholeCzech(effectiveRegion) ? S.errTimeoutWholeCz : S.errTimeout) :
+            ? (wholeCzByCities ? S.errTimeoutWholeCz : S.errTimeout) :
           S.errServer;
         setError(localized(byStatus, locale));
         return;
