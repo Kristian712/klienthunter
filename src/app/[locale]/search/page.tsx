@@ -1961,7 +1961,8 @@ export default function SearchPage() {
             districts={districts}
             setDistricts={next => { dirtyRef.current = true; setDistricts(next); }}
             presetIds={presetsOn ? presetIds : []}
-            limit={PLAN_LIMITS[(userPlan as keyof typeof PLAN_LIMITS)]?.resultsPerSearch ?? PLAN_LIMITS.FREE.resultsPerSearch}
+            // Admin a VIP mají limit VIP (500), ne podle tarifu — dřív řádek „Co se prohledá" slíbil 20 a přišlo 500.
+            limit={unlimited ? PLAN_LIMITS.VIP.resultsPerSearch : PLAN_LIMITS[(userPlan as keyof typeof PLAN_LIMITS)]?.resultsPerSearch ?? PLAN_LIMITS.FREE.resultsPerSearch}
             metaAds={metaAds}
           />
 

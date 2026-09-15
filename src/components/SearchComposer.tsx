@@ -38,9 +38,10 @@ const T = {
   allKraj:   { cs: 'celý kraj', sk: 'celý kraj', en: 'whole region' },
   wholeCz:   { cs: 'celá ČR', sk: 'celá ČR', en: 'whole Czechia' },
   unknownEmp:{ cs: 'počet neuveden u {n} firem', sk: 'počet neuvedený pri {n} firmách', en: 'count not stated for {n} firms' },
-  noIndustry:{ cs: 'Bez oboru se hledá jen v indexu ČSÚ: celý kraj, firmy vzniklé za posledních 5 let. Starší firmy bez oboru najít nejdou — ARES potřebuje obor nebo slovo v názvu.',
-               sk: 'Bez odboru sa hľadá len v indexe ČSÚ: celý kraj, firmy vzniknuté za posledných 5 rokov. Staršie firmy bez odboru nájsť nejdú — ARES potrebuje odbor alebo slovo v názve.',
-               en: 'Without a trade the search uses the CZSO index only: the whole region, firms founded in the last 5 years. Older firms cannot be found without a trade — ARES needs a trade or a word in the name.' },
+  noIndustryTitle: { cs: 'Bez oboru jen firmy do 5 let', sk: 'Bez odboru len firmy do 5 rokov', en: 'Without a trade: firms under 5 years only' },
+  noIndustry:{ cs: 'Dostanete jen firmy vzniklé od {since}. Proč: ARES neumí hledat bez oboru, takže hledání přes celé území jde jen přes náš index z registru ČSÚ, a ten sahá 5 let zpět. Starší firmy najdete, když vyberete obor.',
+               sk: 'Dostanete len firmy vzniknuté od {since}. Prečo: ARES nevie hľadať bez odboru, takže hľadanie cez celé územie ide len cez náš index z registra ČSÚ, a ten siaha 5 rokov späť. Staršie firmy nájdete, keď vyberiete odbor.',
+               en: 'You will get only firms founded since {since}. Why: ARES cannot search without a trade, so a search across the whole area goes through our index of the CZSO register only, and it reaches back 5 years. Pick a trade to find older firms.' },
   autoWindow:{ cs: 'Okres a zaměstnanci jsou jen v indexu, proto se zapnulo „Vznik do 5 let".',
                sk: 'Okres a zamestnanci sú len v indexe, preto sa zaplo „Vznik do 5 rokov".',
                en: 'Districts and employees exist only in the index, so “Founded within 5 years” was turned on.' },
@@ -231,7 +232,6 @@ export function SearchComposer({
                 </div>
               )}
               {autoNote && windowDays !== null && <p className="text-[11px] text-warm">{t(T.autoWindow)}</p>}
-              {implicitWindow && indexable && <p className="text-[11px] text-ink-muted">{t(T.noIndustry)}</p>}
               {indexable && !indexMode && <p className="text-[11px] text-ink-faint">{t(T.noCountArs)}</p>}
             </div>
           </section>
@@ -254,6 +254,14 @@ export function SearchComposer({
           <span className="font-semibold uppercase tracking-wider text-[11px] text-ink-faint mr-2">{t(T.scopeIdx)}</span>
           {scopeLine}
         </p>
+      )}
+      {/* Mez hledání bez oboru patří PŘED spuštění a mimo sbalený panel: kdo zvolí kraj nebo celou
+          ČR a obor nechá prázdný, musí vědět, že starší firmy nedostane a proč. */}
+      {implicitWindow && indexable && (
+        <div role="note" className="mt-3 rounded-lg border border-field bg-ink/[0.04] px-3 py-2.5">
+          <p className="text-xs font-semibold text-ink">{t(T.noIndustryTitle)}</p>
+          <p className="mt-0.5 text-xs leading-relaxed text-ink-muted">{t(T.noIndustry).replace('{since}', since)}</p>
+        </div>
       )}
     </div>
   );
