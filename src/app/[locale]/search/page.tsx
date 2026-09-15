@@ -563,9 +563,6 @@ const S = {
   icoTip:     { cs: 'IČO z veřejného rejstříku ARES', sk: 'IČO z verejného registra ARES', en: 'Company ID from the public ARES register' },
   origSource: { cs: 'Původní zdroj záznamu', sk: 'Pôvodný zdroj záznamu', en: 'Original source of the record' },
   adsBadge:   { cs: 'Inzeruje na Meta', sk: 'Inzeruje na Meta', en: 'Advertises on Meta' },
-  metaLocked: { cs: 'Vyžaduje přístup k Meta Ad Library API — v tomhle nasazení není nastavený token (META_AD_LIBRARY_TOKEN).',
-                sk: 'Vyžaduje prístup k Meta Ad Library API — v tomto nasadení nie je nastavený token (META_AD_LIBRARY_TOKEN).',
-                en: 'Needs Meta Ad Library API access — this deployment has no token set (META_AD_LIBRARY_TOKEN).' },
   adsTipWeb:  { cs: 'Stránka „{p}" má v Knihovně reklam Meta {n} aktivních reklam, vedou na {d}.',
                 sk: 'Stránka „{p}" má v Knižnici reklám Meta {n} aktívnych reklám, vedú na {d}.',
                 en: 'Page “{p}” has {n} active ads in the Meta Ad Library, linking to {d}.' },
@@ -974,7 +971,7 @@ export default function SearchPage() {
   const [active, setActive]               = useState<Set<string>>(new Set(['working']));
   const [profile, setProfile] = useState<UserProfile>(EMPTY_PROFILE);
   /** Co je v nasazení zapnuté (`/api/features`): bez tokenu Meta jsou filtry `ads_*` zamčené. */
-  const [metaAds, setMetaAds] = useState(true);
+  const [metaAds, setMetaAds] = useState(false);
   useEffect(() => {
     fetch('/api/features').then(r => (r.ok ? r.json() : null)).then(d => { if (d) setMetaAds(Boolean(d.metaAds)); }).catch(err => console.error('features:', err));
   }, []);
@@ -1690,23 +1687,17 @@ export default function SearchPage() {
             <span className="w-full md:w-auto md:mr-1 text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
               {localized({ cs: 'Scénář', sk: 'Scenár', en: 'Scenario' }, locale)}
             </span>
-            {SCENARIOS.map(sc => {
-              // Scénář, který stojí jen na zdroji bez klíče (Meta), je zamčený stejně jako jeho chipy.
-              const locked = !metaAds && sc.filters.length > 0 && sc.filters.every(id => LEAD_FILTERS.find(f => f.id === id)?.source === 'Meta');
-              return (
+            {SCENARIOS.filter(sc => metaAds || !(sc.filters.length > 0 && sc.filters.every(id => LEAD_FILTERS.find(f => f.id === id)?.source === 'Meta'))).map(sc => (
               <button
                 key={sc.id}
                 type="button"
                 onClick={() => applyScenario(sc.id)}
                 aria-pressed={effectiveScenario === sc.id}
-                disabled={locked}
-                title={locked ? localized(S.metaLocked, locale) : undefined}
                 className={effectiveScenario === sc.id ? 'chip-active' : 'chip'}
               >
                 {localized(sc.label, locale)}
               </button>
-              );
-            })}
+            ))}
             {effectiveScenario === 'custom' && (
               <span className="chip-active cursor-default" title={localized({ cs: 'Kombinace, kterou jste si poskládali sami. Scénář je jen přednastavení.', sk: 'Kombinácia, ktorú ste si poskladali sami. Scenár je len prednastavenie.', en: 'A combination you built yourself. A scenario is only a preset.' }, locale)}>
                 {localized({ cs: 'Vlastní kombinace', sk: 'Vlastná kombinácia', en: 'Custom combination' }, locale)}
@@ -2231,7 +2222,8 @@ export default function SearchPage() {
 
               <div className="space-y-2.5">
                 {GROUP_ORDER.map(group => {
-                  const items = LEAD_FILTERS.filter(f => f.group === group);
+                  // Bez tokenu Meta se její filtry nenabízejí (stejně jako ve skládačce), ať nic neslibují.
+                  const items = LEAD_FILTERS.filter(f => f.group === group && (metaAds || f.source !== 'Meta'));
                   if (items.length === 0) return null;
                   return (
                     <div key={group} className="flex flex-wrap items-center gap-2">

@@ -6,8 +6,12 @@ import { LeadScore, GOOD_LEAD } from '@/components/LeadScore';
 import { Reveal } from '@/components/Reveal';
 import { LEAD_FILTERS, localized } from '@/lib/lead-filters';
 
-/** Kolik kritérií skládačka opravdu nabízí — z katalogu, aby číslo na úvodu nezastaralo. */
-const CRITERIA = LEAD_FILTERS.length;
+/**
+ * Kolik kritérií skládačka opravdu nabízí — z katalogu, aby číslo na úvodu nezastaralo.
+ * Filtry se zdrojem Meta se počítají jen když je token; úvod ho nezná, tak je nepočítá vůbec
+ * (spodní odhad, nikdy slib navíc).
+ */
+const CRITERIA = LEAD_FILTERS.filter(f => f.source !== 'Meta').length;
 
 /**
  * The landing page has five seconds and no brand recognition, so it says one thing in type big
