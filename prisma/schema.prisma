@@ -73,6 +73,7 @@ model User {
   searches         Search[]
   jobs             SearchJob[]
   claims           Claim[]
+  passwordResets   PasswordReset[]
   leadTags         LeadTag[]
   savedResults     SavedResult[]
   createdCodes     InviteCode[] @relation("CreatedCodes")
@@ -401,6 +402,20 @@ model RegistryImport {
   error       String?
 
   @@index([startedAt])
+}
+
+/// Žádost o obnovu hesla. V databázi jen otisk tokenu (SHA-256); samotný token je jen v e-mailu.
+model PasswordReset {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model Optout {

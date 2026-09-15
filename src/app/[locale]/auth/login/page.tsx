@@ -146,7 +146,10 @@ export default function LoginPage() {
               )}
             </button>
           </form>
-          <p className="text-center text-sm text-ink-faint mt-6">
+          <p className="text-center text-sm text-ink-faint mt-4">
+            <Link href={`/${locale}/auth/forgot`} className={LINK}>{t('forgot_link')}</Link>
+          </p>
+          <p className="text-center text-sm text-ink-faint mt-3">
             {t('no_account')}{' '}
             <Link href={`/${locale}/auth/register`} className={`font-medium ${LINK}`}>
               {t('register_link')}

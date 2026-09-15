@@ -22,7 +22,8 @@
     "no_account": "Nemáte účet?",
     "have_account": "Už máte účet?",
     "register_link": "Registrovať sa",
-    "login_link": "Prihlásiť sa"
+    "login_link": "Prihlásiť sa",
+    "forgot_link": "Zabudli ste heslo?"
   },
   "search": {
     "title": "Vyhľadať firmy",

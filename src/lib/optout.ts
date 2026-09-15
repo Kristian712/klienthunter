@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { prisma } from './db';
+import { sendMail } from './mail';
 import { firmKeyOf } from './claim-order';
 
 /**
@@ -70,14 +71,16 @@ export async function confirmOptout(token: string): Promise<boolean> {
 }
 
 /**
- * Potvrzovací e-mail — dnes se NEODESÍLÁ a nikde se to netvrdí.
+ * Potvrzovací e-mail přes společnou poštovní službu (lib/mail.ts, od 15. 9. 2026).
  *
- * Aplikace žádnou poštu neposílá; poštovní služba bude jedna pro celou aplikaci (registrace,
- * reset hesla, notifikace) a majitel ji zavede zvlášť, až bude mít doménu pro odesílatele.
- * Vyřazení platí od okamžiku žádosti a žádné potvrzení nepotřebuje; odkaz i stav `confirmed`
- * zůstávají v kódu pro tu chvíli, kdy se pošta zapne. Do té doby se odkaz jen zapíše do logu.
+ * Vyřazení platí od okamžiku žádosti a žádné potvrzení nepotřebuje — e-mail je jen zdvořilost
+ * a možnost, jak si žadatel ověří, že jsme žádost přijali. Stránka o odeslání nic neslibuje,
+ * a když pošta není zapnutá nebo selže, nic se nestane a nic se netvrdí.
  */
-export async function sendOptoutMail(email: string, confirmUrl: string): Promise<'sent' | 'logged'> {
-  console.info(`optout: potvrzovací odkaz pro ${email}: ${confirmUrl}`);
-  return 'logged';
+export async function sendOptoutMail(email: string, confirmUrl: string): Promise<'sent' | 'disabled' | 'failed'> {
+  return sendMail({
+    to: email,
+    subject: 'Vyřazení ze seznamu · KlientHunter',
+    text: `Dobrý den,\n\npřijali jsme žádost o trvalé vyřazení subjektu z aplikace KlientHunter. Vyřazení platí od této chvíle — subjekt se v aplikaci nezobrazuje, nezapisuje se do nových hledání a neexportuje.\n\nPokud chcete žádost potvrdit i pro naši evidenci, klikněte na odkaz (není to nutné):\n\n${confirmUrl}\n\nKlientHunter`,
+  });
 }

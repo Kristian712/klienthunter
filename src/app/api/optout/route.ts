@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     await recordHit(ipHash, 'optout');
     const { token } = await requestOptout(ico, email);
 
-    // Pošta se dnes neodesílá (viz `sendOptoutMail`); odkaz se jen zaloguje. Odpověď o tom
+    // Pošta jde přes lib/mail.ts (Resend). Vyřazení platí i bez ní; když e-mail nedojde, nic se nestane. Odpověď o tom
     // schválně nic neříká — nesmí vzniknout dojem, že něco odešlo.
     if (email) {
       const base = process.env.NEXT_PUBLIC_APP_URL ?? req.nextUrl.origin;

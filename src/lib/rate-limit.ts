@@ -33,7 +33,7 @@ export function hashIp(req: Request & { ip?: string }): string {
 /** Jak dlouho se záznam počítá — a zároveň jak dlouho vůbec existuje. */
 export const ANONYMOUS_WINDOW_MS = 24 * 60 * 60 * 1000;
 
-export type HitKind = 'search' | 'register' | 'optout';
+export type HitKind = 'search' | 'register' | 'optout' | 'forgot';
 
 /** Kolik požadavků daného druhu přišlo z téhle IP v okně. */
 export async function countHits(ipHash: string, kind: HitKind): Promise<number> {

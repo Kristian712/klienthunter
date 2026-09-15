@@ -22,7 +22,8 @@
     "no_account": "Don't have an account?",
     "have_account": "Already have an account?",
     "register_link": "Register",
-    "login_link": "Sign in"
+    "login_link": "Sign in",
+    "forgot_link": "Forgot your password?"
   },
   "search": {
     "title": "Search Businesses",
