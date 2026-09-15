@@ -34,6 +34,7 @@ const T = {
   rejected: { cs: 'Nezájem', sk: 'Nezáujem', en: 'Not interested' },
   drop:   { cs: 'Sem přetáhnout', sk: 'Sem presunúť', en: 'Drop here' },
   err:    { cs: 'Přesun se nepovedl, karta je zpátky.', sk: 'Presun sa nepodaril, karta je späť.', en: 'The move failed; the card is back.' },
+  loading: { cs: 'Načítám nástěnku…', sk: 'Načítavam nástenku…', en: 'Loading the board…' },
   loadFailed: { cs: 'Nástěnku se teď nepodařilo načíst. Vaše značky jsou v pořádku — obnovte stránku.',
                 sk: 'Nástenku sa teraz nepodarilo načítať. Vaše značky sú v poriadku — obnovte stránku.',
                 en: 'The board could not be loaded right now. Your tags are safe — reload the page.' },
@@ -95,7 +96,19 @@ export function Pipeline({ locale }: { locale: string }) {
       </div>
     );
   }
-  if (!cards) return null;
+  // Načítání: karta s titulkem a jednou větou, aby přehled při doběhnutí odpovědi neposkočil.
+  if (!cards) {
+    return (
+      <div className="card mb-6" aria-busy="true">
+        <h2 className="text-lg font-semibold mb-1 flex items-center gap-2">
+          <span className="icon-tile icon-tile--reach h-7 w-7"><KanbanSquare size={14} /></span>{t(T.title)}
+        </h2>
+        <p className="text-sm text-ink-faint flex items-center gap-2">
+          <span className="h-2 w-2 rounded-full bg-accent animate-pulse" />{t(T.loading)}
+        </p>
+      </div>
+    );
+  }
 
   const head = (
     <h2 className="text-lg font-semibold mb-1 flex items-center gap-2">

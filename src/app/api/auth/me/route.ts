@@ -16,7 +16,7 @@ export const dynamic = 'force-dynamic';
 export async function GET(req: NextRequest) {
   try {
     const token = req.cookies.get('auth-token')?.value;
-    if (!token) return NextResponse.json({ user: null });
+    if (!token) return NextResponse.json({ user: null, reason: 'anonymous' });
     const payload = verifyToken(token);
     const user = await prisma.user.findUnique({
       where: { id: payload.userId },
@@ -26,12 +26,14 @@ export async function GET(req: NextRequest) {
         subscriptionStatus: true, trialEndsAt: true,
       },
     });
-    if (!user) return NextResponse.json({ user: null });
+    if (!user) return NextResponse.json({ user: null, reason: 'anonymous' });
     // Ceník potřebuje vědět, jestli má uživatel co spravovat v portálu. Stačí ano/ne —
     // Stripe ID do prohlížeče nepatří, nemá tam co dělat.
     const { stripeSubscriptionId, ...rest } = user;
     return NextResponse.json({ user: { ...rest, hasSubscription: Boolean(stripeSubscriptionId) } });
   } catch {
-    return NextResponse.json({ user: null });
+    // Neplatný token i výpadek databáze končí stejně: `user: null`. `reason` říká lište, že
+    // tohle není „odhlášen", ale „nevíme" — jméno v liště pak nemaže.
+    return NextResponse.json({ user: null, reason: 'error' });
   }
 }

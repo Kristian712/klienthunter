@@ -47,6 +47,7 @@ const T = {
   noIndex:  { cs: 'Index firem ještě není naplněný. Spusťte import v adminu.',
               sk: 'Index firiem ešte nie je naplnený. Spustite import v admine.',
               en: 'The firm index is empty. Run the import in the admin.' },
+  loading:  { cs: 'Načítám nové firmy…', sk: 'Načítavam nové firmy…', en: 'Loading new firms…' },
   err:      { cs: 'Přehled nových firem se nepodařilo načíst.', sk: 'Prehľad nových firiem sa nepodarilo načítať.', en: 'Could not load the new-firms overview.' },
   errSearch: { cs: 'Hledání se nepodařilo založit. Zkuste to na stránce Vyhledávání.',
                sk: 'Hľadanie sa nepodarilo založiť. Skúste to na stránke Vyhľadávanie.',
@@ -100,14 +101,24 @@ export function NewFirmsDigest({ locale, isAdmin }: { locale: string; isAdmin: b
     }
   };
 
-  if (failed) return <div className="card mb-6 text-sm text-ink-muted">{t(T.err)}</div>;
-  if (!digest) return null;
-
   const head = (
     <h2 className="text-lg font-semibold mb-1 flex items-center gap-2">
       <span className="icon-tile icon-tile--event h-7 w-7"><Sparkles size={14} /></span>{t(T.title)}
     </h2>
   );
+
+  if (failed) return <div className="card mb-6">{head}<p className="text-sm text-ink-muted">{t(T.err)}</p></div>;
+  // Načítání: titulek a jedna věta, aby karta při doběhnutí odpovědi neposkočila.
+  if (!digest) {
+    return (
+      <div className="card mb-6" aria-busy="true">
+        {head}
+        <p className="text-sm text-ink-faint flex items-center gap-2">
+          <span className="h-2 w-2 rounded-full bg-accent animate-pulse" />{t(T.loading)}
+        </p>
+      </div>
+    );
+  }
 
   if (!digest.region) {
     return (

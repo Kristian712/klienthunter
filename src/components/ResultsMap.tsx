@@ -52,6 +52,7 @@ const T = {
   noCoords: { cs: 'U zbylých neznáme souřadnice — ARES je nevrací, jen adresu textem.',
               sk: 'Pri zvyšných nepoznáme súradnice — ARES ich nevracia, len adresu textom.',
               en: 'We have no coordinates for the rest — ARES returns only a postal address.' },
+  showList: { cs: 'Zobrazit seznam', sk: 'Zobraziť zoznam', en: 'Show the list' },
   none:     { cs: 'Žádnou z nalezených firem neumíme umístit na mapu. Zkuste seznam.',
               sk: 'Žiadnu z nájdených firiem nevieme umiestniť na mapu. Skúste zoznam.',
               en: 'None of the firms found can be placed on the map. Try the list.' },
@@ -357,9 +358,11 @@ interface Props {
   /** Kolik firem přepínač právě schoval. Nula znamená, že se o něm nemá co říkat. */
   hiddenDone: number;
   onToggleHideDone: () => void;
+  /** Přepne stránku na seznam — prázdná mapa bez tlačítka jen radila, kam kliknout. */
+  onShowList?: () => void;
 }
 
-export function ResultsMap({ leads, total, locale, onSetStatus, hideDone, hiddenDone, onToggleHideDone }: Props) {
+export function ResultsMap({ leads, total, locale, onSetStatus, hideDone, hiddenDone, onToggleHideDone, onShowList }: Props) {
   const container = useRef<HTMLDivElement | null>(null);
   const map = useRef<MapLibreMap | null>(null);
   const markers = useRef<Marker[]>([]);
@@ -744,10 +747,15 @@ export function ResultsMap({ leads, total, locale, onSetStatus, hideDone, hidden
           )}
 
           {placeable.length === 0 && !loading && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <p className="bg-surface-subtle/95 border border-line-strong rounded-lg shadow-[0_8px_24px_rgba(0,0,0,.5)] px-4 py-3 text-sm text-ink-muted max-w-xs text-center">
-                {localized(T.none, locale)}
-              </p>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="bg-surface-subtle/95 border border-line-strong rounded-lg shadow-[0_8px_24px_rgba(0,0,0,.5)] px-4 py-3 text-sm text-ink-muted max-w-xs text-center">
+                <p>{localized(T.none, locale)}</p>
+                {onShowList && (
+                  <button type="button" onClick={onShowList} className="btn-outline btn-sm mt-3">
+                    {localized(T.showList, locale)}
+                  </button>
+                )}
+              </div>
             </div>
           )}
 

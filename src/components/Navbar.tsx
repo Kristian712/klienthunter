@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
 import { Check, Menu, X } from 'lucide-react';
-import { loadUser, clearUser, type StoredUser } from '@/lib/client-auth';
+import { loadUser, clearUser, type StoredUser, saveUser } from '@/lib/client-auth';
 import { localized } from '@/lib/lead-filters';
 import { LANGUAGES, switchLocale } from '@/lib/locale-switch';
 
@@ -50,8 +50,25 @@ export function Navbar() {
   const dropRef = useRef<HTMLDivElement>(null);
   const langRef = useRef<HTMLDivElement>(null);
 
+  /**
+   * Jméno v liště je z localStorage, takže po vypršení relace tam zůstalo i s odkazem na
+   * Přehled, který pak skončil na přihlášení. Při každé změně cesty se uložený uživatel ověří
+   * u serveru; „nepřihlášen" ho smaže, výpadek serveru (`reason: 'error'`) ho nechá být.
+   */
   useEffect(() => {
-    setUser(loadUser());
+    const stored = loadUser();
+    setUser(stored);
+    if (!stored) return;
+    let alive = true;
+    fetch('/api/auth/me', { credentials: 'include' })
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => {
+        if (!alive || !d) return;
+        if (d.user) { saveUser(d.user); setUser(d.user); }
+        else if (d.reason !== 'error') { clearUser(); setUser(null); }
+      })
+      .catch(err => console.error('navbar/me:', err));
+    return () => { alive = false; };
   }, [pathname]);
 
   useEffect(() => {

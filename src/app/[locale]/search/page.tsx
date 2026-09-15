@@ -483,6 +483,11 @@ const S = {
   // se všechny slily do jedné hlášky (nebo do žádné), nedalo se z ní poznat, jestli má počkat,
   // přihlásit se znovu, nebo zúžit dotaz.
   errLogin:   { cs: 'Přihlaste se prosím znovu.', sk: 'Prihláste sa prosím znova.', en: 'Please sign in again.' },
+  restoring:  { cs: 'Načítám uložené hledání…', sk: 'Načítavam uložené hľadanie…', en: 'Loading the saved search…' },
+  exportRunning: { cs: 'Hledání ještě běží — soubor bude mít jen firmy nalezené do teď.',
+                   sk: 'Hľadanie ešte beží — súbor bude mať len firmy nájdené doteraz.',
+                   en: 'The search is still running — the file will hold only the firms found so far.' },
+  exportBusy: { cs: 'Připravuji…', sk: 'Pripravujem…', en: 'Preparing…' },
   errGone:    { cs: 'Tohle hledání už neexistuje — možná jste ho smazali.',
                 sk: 'Toto hľadanie už neexistuje — možno ste ho zmazali.',
                 en: 'This search no longer exists — you may have deleted it.' },
@@ -939,6 +944,15 @@ export default function SearchPage() {
   const [showSave, setShowSave] = useState(false);
   const [onlyNew, setOnlyNew] = useState(false);
   const [onlyContactNew, setOnlyContactNew] = useState(false);
+  /** Export se otevírá v novém okně a nemá odpověď, na kterou by šlo čekat — po kliknutí se
+      tlačítka na chvíli zamknou, aby dvojklik nestáhl dva soubory. */
+  const [exportBusy, setExportBusy] = useState(false);
+  const openExport = (query: string) => {
+    if (exportBusy) return;
+    setExportBusy(true);
+    window.open(`/api/export/${searchId}?${query}locale=${locale}`, '_blank');
+    setTimeout(() => setExportBusy(false), 2500);
+  };
   const [rerunning, setRerunning] = useState(false);
 
   /**
@@ -1250,6 +1264,8 @@ export default function SearchPage() {
     if (!jobId && !savedId) return;
     setHasSearched(true);
     setLoading(true);
+    // Bez téhle věty byl několik sekund vidět jen prázdný formulář, jako by odkaz z přehledu nic nenesl.
+    setLoadingMsg(localized(S.restoring, locale));
 
     /**
      * Chyba se tu nesmí spolknout. Dřív `r.ok ? r.json() : null` a prázdný `.catch()` znamenaly,
@@ -1287,7 +1303,7 @@ export default function SearchPage() {
         console.error('search/resume:', err);
         setError(localized(S.errNetwork, locale));
       })
-      .finally(() => setLoading(false));
+      .finally(() => { setLoading(false); setLoadingMsg(''); });
   }, [locale]);
 
   /**
@@ -2080,22 +2096,27 @@ export default function SearchPage() {
                     </button>
                   ))}
                   {searchId && (
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <button
-                        onClick={() => window.open(`/api/export/${searchId}?format=csv&locale=${locale}`, '_blank')}
+                        onClick={() => openExport('format=csv&')}
+                        disabled={exportBusy}
                         className="btn-outline btn-sm gap-1.5"
-                        title={isCs ? 'Exportovat do CSV' : 'Export to CSV'}
+                        title={jobRunning ? localized(S.exportRunning, locale) : isCs ? 'Exportovat do CSV' : 'Export to CSV'}
                       >
-                        <FileText size={13} />{isCs ? 'CSV export' : 'CSV'}
+                        <FileText size={13} />{exportBusy ? localized(S.exportBusy, locale) : isCs ? 'CSV export' : 'CSV'}
                       </button>
                       {isPro && (
                         <button
-                          onClick={() => window.open(`/api/export/${searchId}?locale=${locale}`, '_blank')}
+                          onClick={() => openExport('')}
+                          disabled={exportBusy}
                           className="btn-outline btn-sm gap-1.5"
-                          title={isCs ? 'Exportovat do Excelu' : 'Export to Excel'}
+                          title={jobRunning ? localized(S.exportRunning, locale) : isCs ? 'Exportovat do Excelu' : 'Export to Excel'}
                         >
-                          <Table2 size={13} />{t('export_excel')}
+                          <Table2 size={13} />{exportBusy ? localized(S.exportBusy, locale) : t('export_excel')}
                         </button>
+                      )}
+                      {jobRunning && (
+                        <span className="text-[11px] text-ink-faint basis-full">{localized(S.exportRunning, locale)}</span>
                       )}
                       {/* Soubor přímo pro CRM: jen sloupce, které importér zná, věta „proč" v poznámce. */}
                       <div className="relative" ref={crmMenuRef}>
@@ -2107,7 +2128,7 @@ export default function SearchPage() {
                           <div role="menu" className="absolute right-0 top-full mt-1 z-20 w-56 rounded-lg border border-line-strong bg-surface-muted py-1 shadow-pop animate-fade-in">
                             {CRM_FORMATS.map(f => (
                               <button key={f.id} role="menuitem" type="button"
-                                onClick={() => { setCrmMenu(false); window.open(`/api/export/${searchId}?format=${f.id}&locale=${locale}`, '_blank'); }}
+                                onClick={() => { setCrmMenu(false); openExport(`format=${f.id}&`); }}
                                 className="block w-full text-left px-3 py-2 text-sm hover:bg-ink/[0.06]">
                                 {f.label}
                                 <span className="block text-[11px] text-ink-faint">{isCs ? 'CSV k importu bez mapování sloupců' : 'CSV ready to import without mapping'}</span>
@@ -2207,6 +2228,7 @@ export default function SearchPage() {
                 hideDone={hideDone}
                 hiddenDone={hiddenDone}
                 onToggleHideDone={toggleHideDone}
+                onShowList={() => setView('list')}
                 leads={mapLeads.map((b): MapLead => ({
                   id: b.id, name: b.name, address: b.address, phone: b.phone, email: b.email,
                   website: b.website, category: b.category, ico: b.ico,

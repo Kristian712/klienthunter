@@ -53,6 +53,8 @@ export default function DashboardPage() {
   const [rerunning, setRerunning] = useState<string | null>(null);
   const [rerunError, setRerunError] = useState('');
   const [jobs, setJobs] = useState<Record<string, Job>>({});
+  /** Stavy hledání nedorazily — štítky „běží / hotovo" chybí a seznam to má říct, ne mlčet. */
+  const [jobsFailed, setJobsFailed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -115,9 +117,9 @@ export default function DashboardPage() {
    */
   useEffect(() => {
     fetch('/api/jobs', { credentials: 'include' })
-      .then(r => (r.ok ? r.json() : { jobs: [] }))
+      .then(r => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
       .then(d => setJobs(Object.fromEntries((d.jobs ?? []).map((j: Job) => [j.searchId, j]))))
-      .catch(() => {});
+      .catch(err => { console.error('dashboard/jobs:', err); setJobsFailed(true); });
   }, []);
 
   if (loading) return (
@@ -194,7 +196,20 @@ export default function DashboardPage() {
       {/* Nástěnka označených firem napříč hledáními. Viz components/Pipeline.tsx. */}
       <Pipeline locale={locale} />
 
-      {/* Uložená hledání: kombinace, ke které se uživatel vrací, a kolik je v ní nového od minula. */}
+      {/* Uložená hledání: kombinace, ke které se uživatel vrací, a kolik je v ní nového od minula.
+          Bez jediného uloženého by tu nebylo nic — a nováček by o funkci nevěděl. */}
+      {saved.length === 0 && (
+        <div className="card mb-6">
+          <h2 className="text-lg font-semibold mb-1 flex items-center gap-2">
+            <span className="icon-tile icon-tile--who h-7 w-7"><Bookmark size={14} /></span>{isCs ? 'Uložená hledání' : 'Saved searches'}
+          </h2>
+          <p className="text-sm text-ink-muted">
+            {isCs
+              ? 'Zatím žádné. Hledání si pojmenujete tlačítkem „Uložit" nad výsledky; pak ho spustíte znovu jedním klikem a uvidíte, které firmy a kontakty od minula přibyly.'
+              : 'None yet. Name a search with the “Save” button above its results; then rerun it in one click and see which firms and contacts are new since last time.'}
+          </p>
+        </div>
+      )}
       {saved.length > 0 && (
         <div className="card mb-6">
           <h2 className="text-lg font-semibold mb-1 flex items-center gap-2">
@@ -277,6 +292,12 @@ export default function DashboardPage() {
         <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
           <span className="icon-tile icon-tile--standing h-7 w-7"><Clock size={14} /></span>{isCs ? 'Poslední vyhledávání' : 'Recent searches'}
         </h2>
+        {jobsFailed && searches.length > 0 && (
+          <p className="text-xs text-ink-faint mb-3">
+            {isCs ? 'Stavy běžících hledání se nepodařilo načíst — seznam je úplný, jen bez štítků „běží / hotovo".'
+                  : 'Search states could not be loaded — the list is complete, just without the running / done labels.'}
+          </p>
+        )}
         {searches.length === 0 ? (
           <div className="text-center py-10 text-ink-faint">
             <Search size={40} className="mx-auto mb-3 opacity-30" />

@@ -51,6 +51,8 @@ export default function AdminPage() {
   const [codes, setCodes]             = useState<InviteCode[]>([]);
   const [tab, setTab]                 = useState<'users' | 'codes' | 'optouts'>('users');
   const [optouts, setOptouts]         = useState<Optout[]>([]);
+  /** „Zatím žádná žádost" se smí říct až po odpovědi — před ní to byla domněnka. */
+  const [optoutsLoaded, setOptoutsLoaded] = useState(false);
   /** Velikost databáze — Neon free má 0,5 GB a index z ČSÚ (etapa 3) se dimenzuje podle zbytku. */
   const [dbSize, setDbSize]           = useState<{ bytes: number; tables: Array<{ name: string; bytes: number; rows: number }> } | null>(null);
   /** Index firem z ČSÚ (etapa 3): kolik má řádků, kolik zabírá a jak dopadl poslední import. */
@@ -125,6 +127,7 @@ export default function AdminPage() {
       if (!res.ok) throw new Error(`optouts ${res.status}`);
       const d = await res.json();
       setOptouts(d.optouts ?? []);
+      setOptoutsLoaded(true);
     } catch (err) {
       console.error('admin/optouts:', err);
       setLoadFailed(true);
@@ -361,7 +364,8 @@ export default function AdminPage() {
               <p className="text-ink-faint text-xs">{isCs ? 'Správa uživatelů a invite kódů' : 'User and invite code management'}</p>
             </div>
           </div>
-          <button onClick={() => { fetchUsers(); fetchCodes(); }}
+          {/* Obnovit = všechno, co panel ukazuje: i žádosti, velikost databáze a stav indexu. */}
+          <button onClick={() => { fetchUsers(); fetchCodes(); fetchOptouts(); fetchDbSize(); fetchRegistry(); }}
             className="btn-ghost">
             <RefreshCw size={14} />{isCs ? 'Obnovit' : 'Refresh'}
           </button>
@@ -483,7 +487,9 @@ export default function AdminPage() {
                 ? 'Žádost vyřadí subjekt okamžitě. „Potvrzeno" = žadatel klikl na odkaz v e-mailu. Zamítnout jen prokazatelně neoprávněnou žádost — subjekt se pak vrátí do výsledků.'
                 : 'A request removes the entity immediately. “Confirmed” = the requester clicked the e-mail link. Reject only a demonstrably unauthorised request — the entity then returns to results.'}
             </p>
-            {optouts.length === 0 ? (
+            {!optoutsLoaded ? (
+              <p className="text-sm text-ink-faint">{isCs ? 'Načítám žádosti…' : 'Loading requests…'}</p>
+            ) : optouts.length === 0 ? (
               <p className="text-sm text-ink-faint">{isCs ? 'Zatím žádná žádost.' : 'No requests yet.'}</p>
             ) : (
               <div className="overflow-x-auto"><table className="w-full text-sm results-table">
@@ -532,6 +538,12 @@ export default function AdminPage() {
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
                 </svg>
               </div>
+            ) : users.length === 0 ? (
+              <p className="text-sm text-ink-faint py-6 text-center">
+                {loadFailed
+                  ? (isCs ? 'Uživatelé se nenačetli — zkuste Obnovit.' : 'Users did not load — try Refresh.')
+                  : (isCs ? 'Zatím žádný registrovaný uživatel.' : 'No registered users yet.')}
+              </p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm results-table">
