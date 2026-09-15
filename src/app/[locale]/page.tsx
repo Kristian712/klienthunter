@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import { useLocale } from 'next-intl';
 import { ArrowRight, Building2, Calculator, Camera, Code2, Database, ListOrdered, MapPinned, Megaphone, MessageSquareText, Plus, Search as SearchIcon, ShieldCheck, Sparkles, type LucideIcon } from 'lucide-react';
-import { Backdrop } from '@/components/Backdrop';
 import { LeadScore, GOOD_LEAD } from '@/components/LeadScore';
 import { Reveal } from '@/components/Reveal';
 import { LEAD_FILTERS, localized } from '@/lib/lead-filters';
@@ -245,7 +244,6 @@ export default function HomePage() {
 
       {/* ── Hero: štítek, nadpis, jedna věta, dvě tlačítka, tři fakta. Pod tím živé pozadí. ── */}
       <section className="relative overflow-hidden px-5 pt-32 pb-16 md:pt-44 md:pb-24">
-        <Backdrop />
         <div className="relative z-10 max-w-6xl mx-auto">
           <p className="eyebrow animate-fade-up">{t(UI.eyebrow)}</p>
 
@@ -415,7 +413,6 @@ export default function HomePage() {
       <section className="px-5 py-28 border-t border-line">
         <div className="max-w-6xl mx-auto">
           <div className="card-glow relative overflow-hidden px-6 py-14 md:px-14 md:py-20">
-            <Backdrop />
             <div className="relative z-10">
               <h2 className="display max-w-4xl">
                 {t(UI.closing)}<span className="text-accent">?</span>

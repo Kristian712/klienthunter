@@ -44,14 +44,14 @@ const T = {
  * (tmavý text na světle modré; světlý by měl jen 1,45).
  */
 const C = {
-  surface: '#0A0A0B',
-  card: '#141416',
+  surface: '#060607',
+  card: '#111113',
   line: 'rgba(255,255,255,0.12)',
-  ink: '#EDECE8',
-  muted: '#B2B2B8',
-  faint: '#94949B',
-  accent: '#89CFF0',
-  accentInk: '#0A0A0B',
+  ink: '#F5F5F6',
+  muted: '#AAAAB0',
+  faint: '#8C8C93',
+  accent: '#FAFAFA',
+  accentInk: '#080809',
 };
 
 export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {

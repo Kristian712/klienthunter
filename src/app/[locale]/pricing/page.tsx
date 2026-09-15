@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
-import { Backdrop } from '@/components/Backdrop';
 import { Check } from 'lucide-react';
 import { localized } from '@/lib/lead-filters';
 import { OPERATOR } from '@/lib/legal';
@@ -430,7 +429,6 @@ export default function PricingPage() {
     <div className="min-h-screen">
       {/* Navigace je fixní a vysoká h-14. pt-24 / md:pt-28 nechá pod ní 40 / 56 px, ne 136 / 168 px jako `.section`. */}
       <section className="relative overflow-hidden px-5 pt-24 pb-10 md:pt-28">
-        <Backdrop />
         <div className="container relative z-10 grid gap-8 md:grid-cols-2 md:items-end md:gap-12">
           <div>
             <h1 className="display-sm">

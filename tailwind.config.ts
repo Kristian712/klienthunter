@@ -100,9 +100,10 @@ const config: Config = {
       },
       boxShadow: {
         /** Měkká záře pod hlavním tlačítkem a zvýrazněnou kartou — hloubka bez rámečků. */
-        glow:      '0 8px 30px -6px rgb(var(--accent) / 0.45)',
-        'glow-warm': '0 8px 30px -6px rgb(var(--warm) / 0.45)',
-        card:      '0 1px 0 rgb(var(--line) / 0.06) inset, 0 12px 40px -20px rgba(0, 0, 0, .8)',
+        glow:        '0 10px 36px -14px rgb(255 255 255 / 0.30)',
+        'glow-strong': '0 16px 48px -14px rgb(255 255 255 / 0.42)',
+        'glow-warm': '0 10px 36px -14px rgb(255 255 255 / 0.22)',
+        card:      '0 1px 0 rgb(255 255 255 / 0.06) inset, 0 24px 60px -32px rgba(0, 0, 0, .95)',
         pop:       '0 12px 32px rgba(0, 0, 0, .6)',
       },
       fontSize: {

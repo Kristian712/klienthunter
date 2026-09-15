@@ -44,29 +44,42 @@
    *
    * `--line` je jen RGB bílé; průhlednost dodává Tailwind (`line`, `line-strong`, `field`).
    */
+  /*
+   * Redesign 15. 9. 2026: černá, bílá, šedá. Žádná barva v rozhraní — hierarchii nese jas,
+   * váha písma a průhlednost. Barvy zůstaly jen tam, kde nesou data (body a stavy na mapě,
+   * tečky stavů na nástěnce), protože tam je rozlišení odstínem funkce, ne dekorace.
+   *
+   *   text        #F5F5F6   19,1 : 1 na stránce · 17,4 na kartě
+   *   tlumený     #AAAAB0    8,9 : 1 · 8,1
+   *   nejslabší   #8C8C93    6,0 : 1 · 5,5
+   *   akcent      #FAFAFA   bílá jako výplň hlavní akce a výběru; text na ní #080809 (19 : 1)
+   */
   :root {
-    --surface:        10 10 11;
-    --surface-subtle: 20 20 22;
-    --surface-muted:  28 28 31;
-    --ink:            237 236 232;
-    --ink-muted:      178 178 184;
-    --ink-faint:      148 148 155;
+    --surface:        6 6 7;
+    --surface-subtle: 17 17 19;
+    --surface-muted:  26 26 29;
+    --ink:            245 245 246;
+    --ink-muted:      170 170 176;
+    --ink-faint:      140 140 147;
     --line:           255 255 255;
-    --accent:         137 207 240;
-    --accent-hover:   167 216 255;
-    --accent-ink:     10 10 11;
-    /* Teplý akcent (jantar #FFB86C, 12,4 : 1 na stránce). Události a „nové". Text na něm tmavý. */
-    --warm:           255 184 108;
-    --warm-ink:       10 10 11;
-    /* Skupiny filtrů. Jen ikonky, tečky a jemná podbarvení — text zůstává v paletě výš. */
-    --g-who:          137 207 240;
-    --g-event:        255 184 108;
-    --g-standing:     126 224 176;
-    --g-reach:        196 181 253;
+    --accent:         250 250 250;
+    --accent-hover:   255 255 255;
+    --accent-ink:     8 8 9;
+    /* „Teplý" akcent je teď světle šedý: události a „nové" se liší od akcí jasem, ne barvou. */
+    --warm:           214 214 219;
+    --warm-ink:       8 8 9;
+    /* Skupiny filtrů: čtyři stupně šedi místo čtyř barev. */
+    --g-who:          245 245 246;
+    --g-event:        206 206 212;
+    --g-standing:     168 168 175;
+    --g-reach:        132 132 140;
   }
 
+  /* Podklad nese `html`; `body` je průhledné, aby pod obsahem prosvítalo pevné pozadí
+     (`.kh-site-bg`, z-index -1). */
+  html { background-color: rgb(var(--surface)); }
   body {
-    background-color: rgb(var(--surface));
+    background-color: transparent;
     color: rgb(var(--ink));
   }
 
@@ -133,12 +146,24 @@
   }
 
   /**
-   * Hlavní akce je světle modrá s tmavým textem (11,5 : 1, na hoveru 13,1 : 1).
+   * Hlavní akce: bílá plocha, téměř černý text (19 : 1). Na hoveru se tlačítko zvedne o pixel,
+   * záře zesílí a přes plochu přejede jemný lesk — jen `transform`, žádný repaint.
    */
   .btn-primary {
-    @apply btn bg-accent text-accent-ink hover:bg-accent-hover px-5 py-2.5 text-sm font-semibold
-           shadow-glow hover:-translate-y-px transition-[background-color,transform,box-shadow];
+    @apply btn relative isolate overflow-hidden bg-accent text-accent-ink hover:bg-accent-hover
+           px-5 py-2.5 text-sm font-semibold shadow-glow hover:shadow-glow-strong
+           hover:-translate-y-px transition-[background-color,transform,box-shadow] duration-200;
   }
+  .btn-primary::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: linear-gradient(110deg, transparent 35%, rgb(0 0 0 / .09) 50%, transparent 65%);
+    transform: translateX(-120%);
+    transition: transform .7s cubic-bezier(.2, .8, .2, 1);
+  }
+  .btn-primary:hover::after { transform: translateX(120%); }
   /* Teplá varianta pro jednu akci na stránce, která má být vidět jinak než modře (zkušební období). */
   .btn-warm {
     @apply btn bg-warm text-warm-ink hover:brightness-110 px-5 py-2.5 text-sm font-semibold shadow-glow-warm;
@@ -151,8 +176,8 @@
 
   /* Obrys musí být vidět i bez výplně: `field` drží 3,3 : 1 vůči stránce i kartě. */
   .btn-outline {
-    @apply btn border border-field bg-transparent text-ink hover:border-ink hover:bg-ink/[0.04]
-           text-sm px-5 py-2.5;
+    @apply btn border border-field bg-surface/40 text-ink hover:border-ink hover:bg-ink/[0.06]
+           text-sm px-5 py-2.5 transition-[border-color,background-color] duration-200;
   }
 
   .btn-ghost {
@@ -166,9 +191,11 @@
      Pole stojí o stupeň výš než karta a má okraj 3,3 : 1. Jen výplní se od podkladu
      odlišit nedá — tmavé plochy mezi sebou mají kontrast kolem 1,1 : 1. */
   .input {
-    @apply w-full rounded-lg px-4 py-2.5 text-sm bg-surface-muted text-ink
+    @apply w-full rounded-lg px-4 py-2.5 text-sm bg-surface-muted/80 text-ink
            border border-field
-           focus:outline-none focus:border-ink transition-colors duration-150;
+           focus:outline-none focus:border-ink focus:bg-surface-muted
+           focus:shadow-[0_0_0_4px_rgb(255_255_255/0.06)]
+           transition-[border-color,background-color,box-shadow] duration-200;
   }
   .input::placeholder { color: rgb(var(--ink-faint)); }
 
@@ -179,18 +206,21 @@
 
   /* ── Surfaces ──────────────────────────────────────────────────────────────
      Karta je o stupeň světlejší plocha s jemnou linkou. Stránka < karta < pole a menu. */
+  /* Poloprůhledná karta: pevné pozadí (rozostřené slovo) přes ni lehce prosvítá, takže působí
+     jako sklo — bez `backdrop-filter`, který by u stovek výsledků při scrollu dusil GPU. */
   .card {
-    @apply rounded-xl p-6 bg-surface-subtle border border-line shadow-card;
+    @apply rounded-xl p-6 bg-surface-subtle/75 border border-line shadow-card;
   }
   .card-hover {
-    @apply card hover:border-line-strong hover:bg-surface-muted transition-colors duration-150 cursor-pointer;
+    @apply card relative overflow-hidden hover:border-line-strong hover:bg-surface-muted/80
+           transition-[border-color,background-color,transform] duration-200 hover:-translate-y-0.5 cursor-pointer;
   }
   /**
    * Zvýrazněná karta: gradientový rámeček, který se od podkladu odlepí. Rámeček je pseudo-prvek
    * pod obsahem (mask), takže nic uvnitř neposouvá.
    */
   .card-glow {
-    @apply relative rounded-xl p-6 bg-surface-subtle border border-transparent shadow-card;
+    @apply relative rounded-xl p-6 bg-surface-subtle/80 border border-transparent shadow-card;
   }
   .card-glow::before {
     content: '';
@@ -198,13 +228,32 @@
     inset: 0;
     border-radius: inherit;
     padding: 1px;
-    background: linear-gradient(135deg, rgb(var(--accent) / .7), rgb(var(--warm) / .35) 60%, rgb(var(--line) / .08));
+    background: linear-gradient(140deg, rgb(255 255 255 / .55), rgb(255 255 255 / .07) 45%, rgb(255 255 255 / .22));
     -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
     mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
     -webkit-mask-composite: xor;
     mask-composite: exclude;
     pointer-events: none;
   }
+
+  /**
+   * Světlo pod kurzorem. `Spotlight` nastaví `--mx`/`--my` jen kartě pod myší (jeden posluchač
+   * na dokument, přes requestAnimationFrame); tady je jen kruhový přechod, který se na hoveru
+   * rozsvítí. Na dotyku a při reduced-motion se nic nenastavuje a zůstane střed.
+   */
+  .card-hover::after,
+  .card-glow::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background: radial-gradient(360px circle at var(--mx, 50%) var(--my, 50%), rgb(255 255 255 / .07), transparent 65%);
+    opacity: 0;
+    transition: opacity .3s ease-out;
+  }
+  .card-hover:hover::after,
+  .card-glow:hover::after { opacity: 1; }
 
   /* A data row: separated from its neighbour by one line, nothing else. */
   .row {
@@ -243,20 +292,20 @@
 
   /* Štítek nad nadpisem: pilulka s dýchající tečkou. */
   .eyebrow {
-    @apply inline-flex items-center gap-2 rounded-full border border-line-strong bg-surface-subtle/80
-           px-3 py-1 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-muted backdrop-blur;
+    @apply inline-flex items-center gap-2 rounded-full border border-line-strong bg-surface-subtle/60
+           px-3 py-1 font-mono text-[11px] uppercase tracking-[0.18em] text-ink-muted;
   }
   .eyebrow::before {
     content: '';
     width: 6px; height: 6px; border-radius: 50%;
-    background: rgb(var(--warm));
-    box-shadow: 0 0 0 0 rgb(var(--warm) / .6);
+    background: rgb(var(--ink));
+    box-shadow: 0 0 0 0 rgb(var(--ink) / .6);
     animation: kh-breathe 2.4s ease-out infinite;
   }
 
-  /* Slovo v nadpisu, které svítí: přechod z modré do teplé. */
+  /* Slovo v nadpisu, které svítí: bílá, která k patě písmen vyhasne do šedé. */
   .text-gradient {
-    background: linear-gradient(100deg, rgb(var(--accent)) 0%, rgb(var(--accent-hover)) 45%, rgb(var(--warm)) 100%);
+    background: linear-gradient(180deg, rgb(255 255 255) 15%, rgb(255 255 255 / .42) 100%);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
@@ -268,7 +317,7 @@
      filtrů nekřičelo; modrá je dost klidná, aby výběr nesla barva. */
   .chip {
     @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium
-           border border-line-strong text-ink-muted bg-surface-muted
+           border border-line-strong text-ink-muted bg-surface-muted/70
            hover:border-ink hover:text-ink transition-colors duration-150
            focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent
            focus-visible:ring-offset-2 focus-visible:ring-offset-surface
@@ -310,60 +359,72 @@
 .stagger { animation: fadeUp .22s ease-out both; animation-delay: calc(var(--i, 0) * 50ms); }
 
 /* Revealed on scroll by an IntersectionObserver that adds `is-visible`. */
-.reveal { opacity: 0; transform: translateY(12px); transition: opacity .35s ease-out, transform .35s cubic-bezier(.2, .8, .3, 1); }
+.reveal { opacity: 0; transform: translateY(16px) scale(.985); transition: opacity .6s ease-out, transform .7s cubic-bezier(.16, 1, .3, 1); }
 .reveal.is-visible { opacity: 1; transform: none; }
 
 /* Dýchající tečka u štítku. */
 @keyframes kh-breathe {
-  0%   { box-shadow: 0 0 0 0 rgb(var(--warm) / .55); }
-  70%  { box-shadow: 0 0 0 7px rgb(var(--warm) / 0); }
-  100% { box-shadow: 0 0 0 0 rgb(var(--warm) / 0); }
+  0%   { box-shadow: 0 0 0 0 rgb(var(--ink) / .45); }
+  70%  { box-shadow: 0 0 0 7px rgb(var(--ink) / 0); }
+  100% { box-shadow: 0 0 0 0 rgb(var(--ink) / 0); }
 }
 
-/* ── Pozadí úvodky a ceníku ──────────────────────────────────────────────────
-   Dvě měkké barevné skvrny (modrá a teplá), které se pomalu přelévají, a pod nimi jemná
-   mřížka. Jen `transform` a `opacity`, takže to počítá grafická karta; při reduced-motion
-   stojí. Vrstva je `fixed` a `pointer-events: none`, obsah jde přes ni. */
-.kh-backdrop {
-  position: absolute;
+/* ── Pozadí celé aplikace ─────────────────────────────────────────────────────
+   Jedna pevná vrstva pod vším obsahem (components/SiteBackdrop.tsx): světlo shora, velké
+   rozostřené slovo KlientHunter, zrno a vinětace. Při scrollu stojí. Nic se neanimuje;
+   rozostření se spočítá jednou a vrstva má vlastní kompozitní plochu. */
+.kh-site-bg {
+  position: fixed;
   inset: 0;
+  z-index: -1;
   overflow: hidden;
   pointer-events: none;
-  z-index: 0;
-  /* Dole vyhasne, aby oříznutá skvrna nedělala na hraně sekce tvrdou čáru. */
-  -webkit-mask-image: linear-gradient(#000 55%, transparent 100%);
-  mask-image: linear-gradient(#000 55%, transparent 100%);
-}
-.kh-backdrop__grid {
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(rgb(var(--line) / .045) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(var(--line) / .045) 1px, transparent 1px);
-  background-size: 56px 56px;
-  -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 30%, transparent 100%);
-  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 30%, transparent 100%);
-}
-.kh-blob {
-  position: absolute;
-  width: 46vw;
-  height: 46vw;
-  min-width: 420px;
-  min-height: 420px;
-  border-radius: 50%;
-  filter: blur(90px);
-  opacity: .32;
+  contain: strict;
   will-change: transform;
 }
-.kh-blob--accent { background: rgb(var(--accent)); top: -18vw; left: -10vw; animation: kh-drift-a 38s ease-in-out infinite alternate; }
-.kh-blob--warm   { background: rgb(var(--warm)); top: 6vw; right: -14vw; opacity: .22; animation: kh-drift-b 46s ease-in-out infinite alternate; }
-@keyframes kh-drift-a {
-  from { transform: translate3d(0, 0, 0) scale(1); }
-  to   { transform: translate3d(14vw, 10vw, 0) scale(1.15); }
+.kh-site-bg__light {
+  position: absolute;
+  left: -10%;
+  right: -10%;
+  top: -25vh;
+  height: 90vh;
+  background: radial-gradient(ellipse 55% 55% at 50% 30%, rgb(255 255 255 / .085), transparent 70%);
 }
-@keyframes kh-drift-b {
-  from { transform: translate3d(0, 0, 0) scale(1.1); }
-  to   { transform: translate3d(-12vw, 12vw, 0) scale(.9); }
+.kh-site-bg__word {
+  position: absolute;
+  left: 50%;
+  top: 54%;
+  transform: translate(-50%, -50%);
+  font-family: var(--font-display), var(--font-inter), sans-serif;
+  font-weight: 800;
+  font-size: clamp(4.5rem, 17vw, 22rem);
+  line-height: .8;
+  letter-spacing: -.06em;
+  white-space: nowrap;
+  color: transparent;
+  background: linear-gradient(180deg, rgb(255 255 255 / .12) 0%, rgb(255 255 255 / .04) 62%, rgb(255 255 255 / 0) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  filter: blur(7px);
+  user-select: none;
+}
+/* Tenký obrys téhož slova, rozostřený jen lehce: dává rozmazané ploše hranu, aby četla jako
+   ražba do tmavého materiálu, ne jako šmouha. */
+.kh-site-bg__word--edge {
+  background: none;
+  -webkit-text-stroke: 1px rgb(255 255 255 / .05);
+  filter: blur(1.2px);
+}
+.kh-site-bg__grain {
+  position: absolute;
+  inset: 0;
+  opacity: .045;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .7 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+.kh-site-bg__vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 110% 85% at 50% 45%, transparent 50%, rgb(0 0 0 / .7) 100%);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -571,13 +632,13 @@
     --ink-muted: 55 55 55;
     --ink-faint: 85 85 85;
     --line: 0 0 0;
-    /* Světle modrá na bílém papíře nečte (1,7 : 1); tmavá modrá #1D4ED8 má 6,7 : 1. */
-    --accent: 29 78 216;
+    /* Bílý akcent na bílém papíře by zmizel; na tisk je akcentem černá. */
+    --accent: 0 0 0;
     --accent-ink: 255 255 255;
   }
   /* Pozadí se bez tohohle netiskne a bílý text tlačítka by vyšel bílý na bílé. */
   .btn-primary, .chip-active { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  header, footer, .kh-map-frame { display: none !important; }
+  header, footer, .kh-map-frame, .kh-site-bg { display: none !important; }
   /* Bloky s `.reveal` čekají na scroll, aby se objevily. Kdo stránku vytiskne bez proscrollování,
      dostal nadpisy a pod nimi prázdno. Na papíře žádná animace nedává smysl. */
   .reveal { opacity: 1 !important; transform: none !important; }

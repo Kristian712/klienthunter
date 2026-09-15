@@ -3,6 +3,8 @@ import { Bricolage_Grotesque, Inter, JetBrains_Mono } from 'next/font/google';
 import { NextIntlClientProvider, useMessages } from 'next-intl';
 import { Navbar } from '@/components/Navbar';
 import { Footer } from '@/components/Footer';
+import { SiteBackdrop } from '@/components/SiteBackdrop';
+import { Spotlight } from '@/components/Spotlight';
 import { localized } from '@/lib/lead-filters';
 import '../globals.css';
 
@@ -68,7 +70,7 @@ const META = {
  * zůstala světlá nad tmavým webem. V Next 14 patří obojí do `viewport`, ne do `metadata`.
  */
 export const viewport: Viewport = {
-  themeColor: '#0A0A0B',
+  themeColor: '#060607',
   colorScheme: 'dark',
 };
 
@@ -91,6 +93,9 @@ export default function RootLayout({
   return (
     <html lang={locale} className={`${inter.variable} ${bricolage.variable} ${mono.variable}`}>
       <body className="font-sans">
+        {/* Pevné pozadí pod celou aplikací — stojí při scrollu a prosvítá každou sekcí. */}
+        <SiteBackdrop />
+        <Spotlight />
         <NextIntlClientProvider locale={locale} messages={messages}>
           <Navbar />
           <main className="min-h-screen">{children}</main>

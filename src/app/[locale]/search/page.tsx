@@ -1632,7 +1632,7 @@ export default function SearchPage() {
   const jobRunning = Boolean(job && job.status !== 'done' && job.status !== 'failed');
 
   return (
-    <div className="min-h-screen bg-surface pt-16">
+    <div className="min-h-screen pt-16">
       {showOnboarding && (
         <OnboardingModal locale={locale} initial={profile} onDone={closeOnboarding} />
       )}

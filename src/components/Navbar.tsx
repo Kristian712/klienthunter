@@ -114,7 +114,8 @@ export function Navbar() {
 
   if (standalone) return null;
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-surface/90 backdrop-blur-md border-b border-line">
+    // Skleněná lišta: jediný `backdrop-filter` v appce, pod ní prosvítá pozadí i obsah.
+    <header className="fixed top-0 left-0 right-0 z-50 bg-surface/55 backdrop-blur-xl backdrop-saturate-150 border-b border-line">
       <nav className="max-w-6xl mx-auto px-5 flex items-center h-14 gap-8">
 
         <Link href={`/${locale}`} className="font-extrabold text-[17px] tracking-tight shrink-0">
