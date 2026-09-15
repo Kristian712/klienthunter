@@ -175,20 +175,20 @@ export function Pipeline({ locale }: { locale: string }) {
                       <span className="flex shrink-0 gap-1">
                         {COLUMNS.indexOf(status) > 0 && (
                           <button type="button" onClick={() => move(c.id, COLUMNS[COLUMNS.indexOf(status) - 1])}
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-line hover:border-ink hover:text-ink"
+                            className="inline-flex h-10 w-10 sm:h-9 sm:w-9 items-center justify-center rounded-md border border-line hover:border-ink hover:text-ink"
                             aria-label={`${t(T.moveBack)} ${localized(LEAD_STATUSES.find(s => s.id === COLUMNS[COLUMNS.indexOf(status) - 1])!.label, locale)}`}>
                             <ChevronLeft size={14} />
                           </button>
                         )}
                         {COLUMNS.indexOf(status) < COLUMNS.length - 1 && (
                           <button type="button" onClick={() => move(c.id, COLUMNS[COLUMNS.indexOf(status) + 1])}
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-line hover:border-ink hover:text-ink"
+                            className="inline-flex h-10 w-10 sm:h-9 sm:w-9 items-center justify-center rounded-md border border-line hover:border-ink hover:text-ink"
                             aria-label={`${t(T.moveTo)} ${localized(LEAD_STATUSES.find(s => s.id === COLUMNS[COLUMNS.indexOf(status) + 1])!.label, locale)}`}>
                             <ChevronRight size={14} />
                           </button>
                         )}
                         <button type="button" onClick={() => move(c.id, 'rejected')}
-                          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-line hover:border-ink hover:text-ink"
+                          className="inline-flex h-10 w-10 sm:h-9 sm:w-9 items-center justify-center rounded-md border border-line hover:border-ink hover:text-ink"
                           aria-label={`${t(T.moveTo)} ${t(T.rejected)}`} title={t(T.rejected)}>
                           <X size={14} />
                         </button>

@@ -785,13 +785,13 @@ export default function AdminPage() {
                             <td>
                               <div className="flex items-center gap-1">
                                 {!used && (
-                                  <button onClick={() => copyCode(c)} title={isCs ? 'Kopírovat odkaz pro registraci' : 'Copy registration link'}
+                                  <button onClick={() => copyCode(c)} title={isCs ? 'Kopírovat odkaz pro registraci' : 'Copy registration link'} aria-label={isCs ? 'Kopírovat odkaz pro registraci' : 'Copy registration link'}
                                     className={`p-1.5 rounded-lg transition-colors ${isCopied ? 'text-ink bg-ink/10' : 'text-ink-faint hover:text-accent hover:bg-ink/[0.06]'}`}>
                                     {isCopied ? <Check size={14} /> : <Link2 size={14} />}
                                   </button>
                                 )}
                                 {!used && (
-                                  <button onClick={() => deleteCode(c.id)} title={isCs ? 'Smazat kód' : 'Delete code'}
+                                  <button onClick={() => deleteCode(c.id)} title={isCs ? 'Smazat kód' : 'Delete code'} aria-label={isCs ? 'Smazat kód' : 'Delete code'}
                                     className="p-1.5 rounded-lg transition-colors text-ink-faint hover:text-ink hover:bg-ink/10">
                                     <Trash2 size={14} />
                                   </button>

@@ -343,7 +343,8 @@ export default function DashboardPage() {
                     onClick={() => remove(s.id)}
                     disabled={deleting === s.id}
                     title={isCs ? 'Smazat' : 'Delete'}
-                    className="p-1.5 rounded-lg text-ink-faint hover:text-ink hover:bg-ink/[0.06] transition-colors disabled:opacity-40"
+                    aria-label={isCs ? 'Smazat hledání' : 'Delete search'}
+                    className="p-1.5 min-h-[40px] min-w-[40px] sm:min-h-0 sm:min-w-0 flex items-center justify-center rounded-lg text-ink-faint hover:text-ink hover:bg-ink/[0.06] transition-colors disabled:opacity-60"
                   >
                     <Trash2 size={14} />
                   </button>

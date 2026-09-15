@@ -310,7 +310,7 @@ function Legend({ locale, labelsOn }: { locale: string; labelsOn: boolean }) {
         {localized(T.legend, locale)}
       </p>
 
-      <p className="text-[10px] uppercase tracking-wider text-ink-faint mb-1">{localized(T.legWeb, locale)}</p>
+      <p className="text-[11px] uppercase tracking-wider text-ink-faint mb-1">{localized(T.legWeb, locale)}</p>
       <ul className="grid grid-cols-2 md:grid-cols-1 gap-x-3 gap-y-1 mb-3">
         <li className="flex items-center gap-2 text-xs text-ink-muted">
           <Swatch color={WEB_COLORS.has} shape="circle" tagged={false} />
@@ -326,7 +326,7 @@ function Legend({ locale, labelsOn }: { locale: string; labelsOn: boolean }) {
         </li>
       </ul>
 
-      <p className="text-[10px] uppercase tracking-wider text-ink-faint mb-1">{localized(T.legTags, locale)}</p>
+      <p className="text-[11px] uppercase tracking-wider text-ink-faint mb-1">{localized(T.legTags, locale)}</p>
       <ul className="grid grid-cols-2 md:grid-cols-1 gap-x-3 gap-y-1">
         {tags.map(s => (
           <li key={s.id} className="flex items-center gap-2 text-xs text-ink-muted">
@@ -336,10 +336,10 @@ function Legend({ locale, labelsOn }: { locale: string; labelsOn: boolean }) {
         ))}
       </ul>
 
-      <p className="text-[10px] text-ink-faint mt-3 leading-snug">{localized(T.legHint, locale)}</p>
-      <p className="text-[10px] text-ink-faint mt-1 leading-snug">{localized(T.legPulse, locale)}</p>
+      <p className="text-[11px] text-ink-faint mt-3 leading-snug">{localized(T.legHint, locale)}</p>
+      <p className="text-[11px] text-ink-faint mt-1 leading-snug">{localized(T.legPulse, locale)}</p>
       {!labelsOn && (
-        <p className="text-[10px] text-ink-faint mt-1 leading-snug">{localized(T.zoomHint, locale)}</p>
+        <p className="text-[11px] text-ink-faint mt-1 leading-snug">{localized(T.zoomHint, locale)}</p>
       )}
     </aside>
   );
@@ -728,7 +728,7 @@ export function ResultsMap({ leads, total, locale, onSetStatus, hideDone, hidden
             aria-pressed={tilted}
             title={localized(tilted ? T.tiltOff : T.tilt, locale)}
             aria-label={localized(tilted ? T.tiltOff : T.tilt, locale)}
-            className={`absolute z-20 left-3 top-3 text-[11px] font-mono tracking-wider px-2.5 py-1.5 rounded-lg border transition-colors ${
+            className={`absolute z-20 left-3 top-3 text-[11px] font-mono tracking-wider px-2.5 py-1.5 min-h-[40px] md:min-h-0 rounded-lg border transition-colors ${
               tilted
                 ? 'border-ink bg-ink text-surface'
                 : 'border-line-strong bg-surface-subtle/90 backdrop-blur-sm text-ink hover:border-ink'
@@ -768,7 +768,7 @@ export function ResultsMap({ leads, total, locale, onSetStatus, hideDone, hidden
              * na 38 % výšky mapy — plovoucí karta by tam ukrojila skoro celou mapu.
              */
             <div className="absolute z-30 inset-x-2 bottom-2 md:inset-x-auto md:left-3 md:bottom-20
-                            md:w-80 max-h-[33%] md:max-h-none overflow-y-auto
+                            md:w-80 max-h-[45%] md:max-h-none overflow-y-auto
                             bg-surface-subtle border border-line-strong rounded-lg p-3 md:p-3.5
                             shadow-[0_12px_32px_rgba(0,0,0,.55)]">
               <div className="flex items-start justify-between gap-2">
@@ -829,7 +829,7 @@ export function ResultsMap({ leads, total, locale, onSetStatus, hideDone, hidden
                * kartě lámala. „Neosloveno" mezi nimi není: je to výchozí stav, ne volba, a dá se
                * do něj vrátit dalším klikem na už zapnutou možnost.
                */}
-              <div className="grid grid-cols-4 md:grid-cols-2 gap-1 mt-2.5 pt-2.5 md:mt-3 md:pt-3 border-t border-line">
+              <div className="grid grid-cols-2 gap-1 mt-2.5 pt-2.5 md:mt-3 md:pt-3 border-t border-line">
                 {LEAD_STATUSES.filter(st => st.id !== 'new').map(st => {
                   const zapnuto = (selected.status ?? 'new') === st.id;
                   return (
@@ -842,7 +842,7 @@ export function ResultsMap({ leads, total, locale, onSetStatus, hideDone, hidden
                         setSelected({ ...selected, status: dalsi });
                       }}
                       className={`flex items-center justify-center md:justify-start gap-1 md:gap-1.5
-                        text-[10px] md:text-[11px] px-1 md:px-2 py-2 md:py-1.5 min-h-[36px] md:min-h-0 rounded-md border transition-colors ${
+                        text-[11px] px-2 py-2 md:py-1.5 min-h-[40px] md:min-h-0 rounded-md border transition-colors ${
                         zapnuto
                           ? 'border-ink bg-ink text-surface'
                           : 'border-line-strong text-ink-muted hover:border-ink hover:text-ink'

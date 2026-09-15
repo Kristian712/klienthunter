@@ -138,7 +138,7 @@ export function SearchComposer({
         className={on ? 'chip-active' : 'chip'}>
         {localized(f.label, locale)}
         {n !== null && <span className={`tnum ${on ? 'text-accent-ink/70' : 'text-ink-faint'}`}>{n.toLocaleString(locale === 'en' ? 'en-GB' : 'cs-CZ')}</span>}
-        {on && presetIds.includes(f.id) && <span className="text-[9px] uppercase tracking-wider opacity-70">{t(T.preset)}</span>}
+        {on && presetIds.includes(f.id) && <span className="text-[10px] uppercase tracking-wider opacity-70">{t(T.preset)}</span>}
       </button>
     );
   };
@@ -149,7 +149,7 @@ export function SearchComposer({
       if (!items.length) return null;
       return (
         <div key={group} className="flex flex-wrap items-center gap-1.5">
-          <span className="w-full sm:w-24 shrink-0 text-[10px] font-semibold uppercase tracking-wider text-ink-faint">{localized(GROUP_LABELS[group as FilterGroup], locale)}</span>
+          <span className="w-full sm:w-24 shrink-0 text-[11px] font-semibold uppercase tracking-wider text-ink-faint">{localized(GROUP_LABELS[group as FilterGroup], locale)}</span>
           {items.map(f => chip(f, () => onToggle(f), withCount))}
         </div>
       );
@@ -195,11 +195,11 @@ export function SearchComposer({
             <div className="mt-3 space-y-2.5">
               {groupRows(indexFilters, Boolean(nuts3), f => (INDEX_ONLY.has(f.id) ? toggleIndexOnly(f.id) : toggle(f.id)))}
               {counts && (
-                <p className="text-[10px] text-ink-faint pl-0 sm:pl-24">{t(T.unknownEmp).replace('{n}', counts.employees.unknown.toLocaleString('cs-CZ'))}</p>
+                <p className="text-[11px] text-ink-faint pl-0 sm:pl-24">{t(T.unknownEmp).replace('{n}', counts.employees.unknown.toLocaleString('cs-CZ'))}</p>
               )}
               {nuts3 && DISTRICTS[nuts3] && DISTRICTS[nuts3].length > 1 && (
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="w-full sm:w-24 shrink-0 text-[10px] font-semibold uppercase tracking-wider text-ink-faint">{t(T.districts)}</span>
+                  <span className="w-full sm:w-24 shrink-0 text-[11px] font-semibold uppercase tracking-wider text-ink-faint">{t(T.districts)}</span>
                   {DISTRICTS[nuts3].map(d => {
                     const on = districts.includes(d.code);
                     const n = counts?.districts[d.code];
@@ -231,7 +231,7 @@ export function SearchComposer({
 
       {scopeLine && (
         <p className="mt-3 text-xs text-ink-muted">
-          <span className="font-semibold uppercase tracking-wider text-[10px] text-ink-faint mr-2">{t(T.scopeIdx)}</span>
+          <span className="font-semibold uppercase tracking-wider text-[11px] text-ink-faint mr-2">{t(T.scopeIdx)}</span>
           {scopeLine}
         </p>
       )}

@@ -93,7 +93,8 @@ export default function ProfilePage() {
   const [draft, setDraft] = useState<ProfileDraft>(EMPTY_DRAFT);
   const [savingProfile, setSavingProfile] = useState(false);
 
-  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
+  // Pět vteřin, ne dvě a půl: kdo čte pomaleji nebo přes čtečku, dřív zprávu nestihl.
+  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 5000); };
 
   useEffect(() => {
     // Propadlá session je „přihlaste se znovu", ne „nejste přihlášeni" na slepé stránce.
@@ -252,7 +253,7 @@ export default function ProfilePage() {
   return (
     <div className="min-h-screen pt-16">
       {toast && (
-        <div className="fixed top-20 right-4 z-50 bg-surface-muted text-ink border border-line-strong shadow-[0_12px_32px_rgba(0,0,0,.55)] text-sm px-4 py-3 rounded-lg animate-fade-in">
+        <div role="status" className="fixed top-20 right-4 z-50 bg-surface-muted text-ink border border-line-strong shadow-[0_12px_32px_rgba(0,0,0,.55)] text-sm px-4 py-3 rounded-lg animate-fade-in">
           {toast}
         </div>
       )}
@@ -271,7 +272,7 @@ export default function ProfilePage() {
                 {editName ? (
                   <div className="flex items-center gap-2">
                     <input className="input py-1 text-lg font-bold w-48" value={nameVal}
-                      onChange={e => setNameVal(e.target.value)} autoFocus />
+                      onChange={e => setNameVal(e.target.value)} />
                     {/* Ikonová tlačítka bez textu potřebují `aria-label` — lucide ikona žádný
                         `<title>` nenese, takže čtečka hlásila jen „tlačítko". Padding zvětšuje
                         dotykový cíl z 21 px na 40+. */}

@@ -129,7 +129,7 @@
            transition-colors duration-150 select-none focus-visible:outline-none
            focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2
            focus-visible:ring-offset-surface
-           disabled:opacity-40 disabled:pointer-events-none whitespace-nowrap;
+           disabled:opacity-60 disabled:pointer-events-none whitespace-nowrap;
   }
 
   /**
@@ -272,11 +272,17 @@
            hover:border-ink hover:text-ink transition-colors duration-150
            focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent
            focus-visible:ring-offset-2 focus-visible:ring-offset-surface
-           disabled:opacity-40 disabled:pointer-events-none;
+           disabled:text-ink-faint disabled:border-line disabled:pointer-events-none;
   }
   .chip-active {
     @apply chip bg-accent text-accent-ink border-accent
            hover:bg-accent-hover hover:border-accent-hover hover:text-accent-ink;
+  }
+
+  /* Dotyk: chip 28 px a `.btn-sm` 28 px se na telefonu trefují napodruhé. Na zařízení bez
+     kurzoru dostanou 40 px na výšku — stejné třídy, jen víc místa, desktop beze změny. */
+  @media (pointer: coarse) {
+    .chip, .chip-active, .btn-sm, .btn-ghost { min-height: 40px; }
   }
 
   /* ── Layout ── */

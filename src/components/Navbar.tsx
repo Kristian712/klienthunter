@@ -204,7 +204,7 @@ export function Navbar() {
           )}
         </div>
 
-        <button className="md:hidden ml-auto p-2 text-ink" onClick={() => setMobile(v => !v)}
+        <button className="md:hidden ml-auto p-2.5 text-ink" onClick={() => setMobile(v => !v)}
           aria-expanded={mobile}
           aria-controls="kh-mobile-menu"
           aria-label={localized(mobile ? T.menuClose : T.menu, locale)}>

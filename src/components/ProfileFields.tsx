@@ -131,6 +131,7 @@ export function ProfessionField({ draft, patch, locale }: FieldProps) {
                 criteria: untouched ? p.suggests : draft.criteria,
               });
             }}
+            aria-pressed={draft.profession === p.id}
             className={draft.profession === p.id ? 'chip-active' : 'chip'}
           >
             {localized(p.label, locale)}
@@ -147,7 +148,6 @@ export function ProfessionField({ draft, patch, locale }: FieldProps) {
           value={draft.professionText}
           onChange={e => patch({ professionText: e.target.value })}
           maxLength={120}
-          autoFocus
         />
       )}
     </div>
@@ -226,6 +226,7 @@ export function IndustryField({ draft, patch, locale }: FieldProps) {
             key={chip.value}
             type="button"
             onClick={() => patch({ industry: chip.value })}
+            aria-pressed={draft.industry === chip.value}
             className={draft.industry === chip.value ? 'chip-active' : 'chip'}
           >
             {chip.label}
@@ -259,7 +260,6 @@ export function IndustryField({ draft, patch, locale }: FieldProps) {
           value={draft.customIndustry}
           onChange={e => patch({ customIndustry: e.target.value })}
           maxLength={120}
-          autoFocus
         />
       )}
     </div>
@@ -298,7 +298,6 @@ export function RegionField({ draft, patch, locale }: FieldProps) {
           value={draft.customRegion}
           onChange={e => patch({ customRegion: e.target.value })}
           maxLength={120}
-          autoFocus
         />
       )}
 
@@ -333,6 +332,7 @@ export function CriteriaField({ draft, patch, locale }: FieldProps) {
                   key={f.id}
                   type="button"
                   onClick={() => toggle(f.id)}
+                  aria-pressed={draft.criteria.includes(f.id)}
                   className={draft.criteria.includes(f.id) ? 'chip-active' : 'chip'}
                 >
                   {localized(f.label, locale)}

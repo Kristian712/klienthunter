@@ -199,6 +199,7 @@ export function OnboardingModal({ locale, initial, onDone }: Props) {
               <button
                 key={p.id}
                 onClick={() => choose(p.id)}
+                aria-pressed={draft.profession === p.id}
                 className={draft.profession === p.id ? 'chip-active' : 'chip'}
               >
                 {localized(p.label, locale)}
@@ -208,12 +209,12 @@ export function OnboardingModal({ locale, initial, onDone }: Props) {
 
           {draft.profession === 'other' && (
             <div className="mt-4">
-              <label className="label">{localized(T.otherLabel, locale)}</label>
+              <label className="label" htmlFor="kh-onb-other">{localized(T.otherLabel, locale)}</label>
               <input
+                id="kh-onb-other"
                 className="input"
                 value={draft.professionText ?? ''}
                 onChange={e => patch({ professionText: e.target.value })}
-                autoFocus
               />
             </div>
           )}
@@ -235,6 +236,7 @@ export function OnboardingModal({ locale, initial, onDone }: Props) {
                   <button
                     key={value}
                     onClick={() => patch({ industry: value })}
+                    aria-pressed={draft.industry === value}
                     className={draft.industry === value ? 'chip-active' : 'chip'}
                   >
                     {industryLabel(value, locale)}

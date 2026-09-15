@@ -422,14 +422,14 @@ function ContactStrategy({ b, locale }: { b: BusinessResult; locale: string }) {
           {L(CONTACT.heading)}
         </p>
         <span className="flex items-center gap-1.5 shrink-0" title={L(reachHint(b))}>
-          <span className="text-[10px] uppercase tracking-wider text-ink-faint">{L(CONTACT.reach)}</span>
+          <span className="text-[11px] uppercase tracking-wider text-ink-faint">{L(CONTACT.reach)}</span>
           {/* Proužek místo druhého velkého čísla: řádek už jedno má a dvě soutěžící čísla
               se čtou hůř než jedno číslo a jedna délka. Výplň je tlumeně šedá, ne plně světlá —
               na tmavém řádku by jinak svítila víc než název firmy i skóre. */}
           <span className="h-1 w-12 rounded-full bg-ink/15 overflow-hidden" aria-hidden>
             <span className="block h-full bg-ink-muted" style={{ width: `${reach}%` }} />
           </span>
-          <span className="text-[10px] tnum text-ink-muted">{reach}</span>
+          <span className="text-[11px] tnum text-ink-muted">{reach}</span>
         </span>
       </div>
       <div className="space-y-2">
@@ -845,7 +845,7 @@ function SourceBadge({ source, common }: { source?: string; common?: string | nu
   return (
     <>
       {ids.map(id => (
-        <span key={id} className="text-[10px] uppercase tracking-wider text-ink-faint">
+        <span key={id} className="text-[11px] uppercase tracking-wider text-ink-faint">
           {SOURCE_LABELS[id] ?? id}
         </span>
       ))}
@@ -1709,7 +1709,6 @@ export default function SearchPage() {
                   value={customRegion}
                   onChange={e => setCustomRegion(e.target.value)}
                   required
-                  autoFocus
                 />
               )}
             </div>
@@ -1923,7 +1922,7 @@ export default function SearchPage() {
         </form>
 
         {error && (
-          <div className="rounded-lg border border-ink px-4 py-3 text-sm font-medium text-ink mb-4">
+          <div role="alert" className="rounded-lg border border-ink px-4 py-3 text-sm font-medium text-ink mb-4">
             {error}
             {planLimitHit && (
               <>
@@ -1937,7 +1936,7 @@ export default function SearchPage() {
         )}
 
         {job && job.status !== 'done' && (
-          <div className="mb-6 border border-line rounded-xl p-5">
+          <div className="mb-6 border border-line rounded-xl p-5" aria-live="polite">
             <div className="flex items-baseline justify-between flex-wrap gap-2">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
                 {localized(job.status === 'failed' ? S.jobFailed
@@ -2062,6 +2061,7 @@ export default function SearchPage() {
                       <button
                         key={v}
                         onClick={() => setView(v)}
+                        aria-pressed={view === v}
                         className={view === v ? 'chip-active' : 'chip'}
                       >
                         {v === 'list'
@@ -2105,7 +2105,7 @@ export default function SearchPage() {
                     </div>
                   ) : showSave ? (
                     <form onSubmit={e => { e.preventDefault(); void saveSearch(); }} className="flex items-center gap-2">
-                      <input className="input h-9 w-48" autoFocus placeholder={localized(S.saveNamePh, locale)}
+                      <input className="input h-9 w-48" placeholder={localized(S.saveNamePh, locale)}
                              value={saveName} onChange={e => setSaveName(e.target.value)} maxLength={80} />
                       <button type="submit" className="btn-primary btn-sm" disabled={savingSearch || !saveName.trim()}>
                         {localized(S.saveConfirm, locale)}
@@ -2149,7 +2149,7 @@ export default function SearchPage() {
                           <Share2 size={13} />CRM<ChevronDown size={12} />
                         </button>
                         {crmMenu && (
-                          <div role="menu" className="absolute right-0 top-full mt-1 z-20 w-56 rounded-lg border border-line-strong bg-surface-muted py-1 shadow-pop animate-fade-in">
+                          <div role="menu" className="absolute left-0 sm:left-auto sm:right-0 top-full mt-1 z-20 w-56 rounded-lg border border-line-strong bg-surface-muted py-1 shadow-pop animate-fade-in">
                             {CRM_FORMATS.map(f => (
                               <button key={f.id} role="menuitem" type="button"
                                 onClick={() => { setCrmMenu(false); openExport(`format=${f.id}&`); }}
@@ -2191,7 +2191,8 @@ export default function SearchPage() {
                   return (
                     <div key={group} className="flex flex-wrap items-center gap-2">
                       {/* Barevná ikonka skupiny: kdo · co se stalo · jak na tom je · jak oslovit. */}
-                      <span className="flex w-28 shrink-0 items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
+                      {/* Na 375 px popisek zabere celý řádek a chipy jdou pod něj — jinak zbyl vedle něj jeden chip na řádek. */}
+                      <span className="flex w-full sm:w-28 shrink-0 items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
                         <span className={`icon-tile icon-tile--${group} h-7 w-7`}>{GROUP_ICON[group]}</span>
                         {localized(GROUP_LABELS[group], locale)}
                       </span>
@@ -2202,6 +2203,7 @@ export default function SearchPage() {
                           <button
                             key={f.id}
                             onClick={() => toggle(f.id)}
+                            aria-pressed={on}
                             disabled={!on && n === 0}
                             title={f.hint ? localized(f.hint, locale) : undefined}
                             className={on ? 'chip-active' : 'chip'}
@@ -2211,7 +2213,7 @@ export default function SearchPage() {
                             {/* Štítek na chipu, který zapnul profil. Odstín sám by na akcentu nešel
                                 rozeznat; slovo řekne, odkud se filtr vzal. */}
                             {on && presetsOn && presetIds.includes(f.id) && (
-                              <span className="ml-0.5 rounded border border-accent-ink/40 px-1 text-[9px] font-semibold uppercase tracking-wider text-accent-ink/80">
+                              <span className="ml-0.5 rounded border border-accent-ink/40 px-1 text-[10px] font-semibold uppercase tracking-wider text-accent-ink/80">
                                 {localized(S.presetTag, locale)}
                               </span>
                             )}
@@ -2301,7 +2303,7 @@ export default function SearchPage() {
                         {/* Only rows found before Vlna 2 carry a directory link. */}
                         {b.googleMapsUrl && isHistoricalSource(b.source) && (
                           <a href={b.googleMapsUrl} target="_blank" rel="noopener noreferrer"
-                             className="shrink-0 btn-ghost btn-sm p-1.5" title="Původní zdroj záznamu">
+                             className="shrink-0 btn-ghost btn-sm p-1.5" title="Původní zdroj záznamu" aria-label="Původní zdroj záznamu">
                             <ExternalLink size={13} />
                           </a>
                         )}
