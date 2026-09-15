@@ -45,6 +45,8 @@ export interface Digest {
   totalMine: number;
   /** Kolik z `totalMine` (nebo `totalAll` bez oboru) má vznik po minulé návštěvě. Null = první návštěva. */
   newSinceLast: number | null;
+  /** Kdy naposledy doběhl denní feed z ARESu. Null = ještě nikdy; karta pak neslibuje „každý den". */
+  feedAt: string | null;
   preview: DigestFirm[];
 }
 
@@ -73,15 +75,17 @@ export async function buildDigest(userId: string): Promise<Digest> {
   const nuts3 = region ? nuts3ForRegion(region) : null;
   const industry = user?.targetIndustry && !isAllIndustries(user.targetIndustry) ? user.targetIndustry : null;
   const codes = industry ? naceCodesFor(industry) : [];
-  const empty: Digest = { region, industry, windowDays: DIGEST_WINDOW_DAYS, indexUntil: null, totalAll: 0, totalMine: 0, newSinceLast: null, preview: [] };
+  const empty: Digest = { region, industry, windowDays: DIGEST_WINDOW_DAYS, indexUntil: null, totalAll: 0, totalMine: 0, newSinceLast: null, feedAt: null, preview: [] };
   if (!nuts3) return empty;
 
   const since = new Date(Date.now() - DIGEST_WINDOW_DAYS * 24 * 60 * 60 * 1000);
-  const [agg, totalAll, totalMine] = await Promise.all([
+  const [agg, totalAll, totalMine, feed] = await Promise.all([
     prisma.registrySubject.aggregate({ _max: { foundedAt: true } }),
     prisma.registrySubject.count({ where: scopeWhere(nuts3, since, []) }),
     codes.length ? prisma.registrySubject.count({ where: scopeWhere(nuts3, since, codes) }) : Promise.resolve(0),
+    prisma.registryFeedBatch.findFirst({ orderBy: { processedAt: 'desc' }, select: { processedAt: true } }),
   ]);
+  const feedAt = feed?.processedAt.toISOString() ?? null;
   if (!agg._max.foundedAt) return empty;
 
   // Obor bez NACE (volný text) se v indexu nenajde — pak platí čísla za všechny obory. Totéž,
@@ -110,7 +114,7 @@ export async function buildDigest(userId: string): Promise<Digest> {
     region, industry, windowDays: DIGEST_WINDOW_DAYS,
     indexUntil: agg._max.foundedAt.toISOString(),
     totalAll, totalMine: codes.length ? totalMine : totalAll,
-    newSinceLast, preview,
+    newSinceLast, feedAt, preview,
   };
 }
 

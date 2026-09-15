@@ -24,15 +24,19 @@ const T = {
   until:    { cs: 'nejnovější vznik v indexu {d}', sk: 'najnovší vznik v indexe {d}', en: 'newest founding in the index {d}' },
   all:      { cs: 'všechny obory', sk: 'všetky odbory', en: 'all trades' },
   newBadge: { cs: '{n} nových od vaší poslední návštěvy', sk: '{n} nových od vašej poslednej návštevy', en: '{n} new since your last visit' },
-  nothingNew: { cs: 'Od vaší poslední návštěvy nic nového. Index se doplňuje každý den z ARESu.',
-                sk: 'Od vašej poslednej návštevy nič nové. Index sa dopĺňa každý deň z ARESu.',
-                en: 'Nothing new since your last visit. The index is topped up daily from ARES.' },
+  // „Každý den" jen když denní feed opravdu běží (poslední dávka do dvou dnů). Jinak se řekne,
+  // kdy doběhl naposledy, nebo že index drží jen dump ČSÚ.
+  nothingNew: { cs: 'Od vaší poslední návštěvy nic nového.', sk: 'Od vašej poslednej návštevy nič nové.', en: 'Nothing new since your last visit.' },
+  feedDaily:  { cs: 'Index se doplňuje každý den z ARESu.', sk: 'Index sa dopĺňa každý deň z ARESu.', en: 'The index is topped up daily from ARES.' },
+  feedStale:  { cs: 'Denní doplňování z ARESu naposledy proběhlo {d}.', sk: 'Denné dopĺňanie z ARESu naposledy prebehlo {d}.', en: 'The daily top-up from ARES last ran on {d}.' },
+  feedNever:  { cs: 'Index se zatím obnovuje jen z dumpu ČSÚ, dvakrát měsíčně.', sk: 'Index sa zatiaľ obnovuje len z dumpu ČSÚ, dvakrát mesačne.', en: 'For now the index refreshes only from the CZSO dump, twice a month.' },
   latest:   { cs: 'Nejnovější', sk: 'Najnovšie', en: 'Latest' },
   open:     { cs: 'Otevřít jako hledání', sk: 'Otvoriť ako hľadanie', en: 'Open as a search' },
   opening:  { cs: 'Zakládám hledání…', sk: 'Zakladám hľadanie…', en: 'Starting the search…' },
-  openHint: { cs: 'Dohledá jména, sídla a kontakty a seřadí podle vašich kritérií. Počítá se jako jedno hledání.',
-              sk: 'Dohľadá mená, sídla a kontakty a zoradí podľa vašich kritérií. Počíta sa ako jedno hľadanie.',
-              en: 'Looks up names, addresses and contacts and ranks by your criteria. Counts as one search.' },
+  // Šance na kontakt změřená 14. 9. 2026 (11 % všech nových firem, 19 % obchodních společností); píše se míň.
+  openHint: { cs: 'Dohledá jména, sídla a kontakty a seřadí podle vašich kritérií. Počítá se jako jedno hledání. Telefon nebo e-mail se u nové firmy najde zhruba u každé desáté, u obchodních společností asi u každé páté.',
+              sk: 'Dohľadá mená, sídla a kontakty a zoradí podľa vašich kritérií. Počíta sa ako jedno hľadanie. Telefón alebo e-mail sa pri novej firme nájde zhruba pri každej desiatej, pri obchodných spoločnostiach asi pri každej piatej.',
+              en: 'Looks up names, addresses and contacts and ranks by your criteria. Counts as one search. A phone or e-mail turns up for roughly one new firm in ten, about one in five among companies.' },
   noRegion: { cs: 'Nastavte si v profilu kraj a obor a přehled vám bude ukazovat, kolik firem v něm nově vzniklo.',
               sk: 'Nastavte si v profile kraj a odbor a prehľad vám bude ukazovať, koľko firiem v ňom novo vzniklo.',
               en: 'Set your region and trade in the profile and this card will show how many firms were founded there.' },
@@ -159,7 +163,14 @@ export function NewFirmsDigest({ locale, isAdmin }: { locale: string; isAdmin: b
       </div>
       <p className="text-[11px] text-ink-faint mt-2">{t(T.openHint)}</p>
       {openError && <p className="mt-2 text-sm font-medium border border-ink px-3 py-2">{t(T.errSearch)}</p>}
-      {digest.newSinceLast === 0 && <p className="text-xs text-ink-faint mt-2">{t(T.nothingNew)}</p>}
+      {digest.newSinceLast === 0 && (
+        <p className="text-xs text-ink-faint mt-2">
+          {t(T.nothingNew)}{' '}
+          {!digest.feedAt ? t(T.feedNever)
+            : Date.now() - new Date(digest.feedAt).getTime() < 2 * 24 * 60 * 60 * 1000 ? t(T.feedDaily)
+            : t(T.feedStale).replace('{d}', formatDate(digest.feedAt, locale))}
+        </p>
+      )}
 
       {digest.preview.length > 0 && (
         <div className="mt-5 border-t border-line pt-4">

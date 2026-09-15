@@ -4,7 +4,10 @@ import { ArrowRight, Building2, Calculator, Camera, Code2, Database, ListOrdered
 import { Backdrop } from '@/components/Backdrop';
 import { LeadScore, GOOD_LEAD } from '@/components/LeadScore';
 import { Reveal } from '@/components/Reveal';
-import { localized } from '@/lib/lead-filters';
+import { LEAD_FILTERS, localized } from '@/lib/lead-filters';
+
+/** Kolik kritérií skládačka opravdu nabízí — z katalogu, aby číslo na úvodu nezastaralo. */
+const CRITERIA = LEAD_FILTERS.length;
 
 /**
  * The landing page has five seconds and no brand recognition, so it says one thing in type big
@@ -79,9 +82,11 @@ const AUDIENCE: Array<{ who: Text; what: Text }> = [
   },
   {
     who:  { cs: 'Tvůrce webů',       sk: 'Tvorca webov',        en: 'Web developer' },
-    what: { cs: 'Firmy, u kterých jsme web nenašli, nebo mají web, který se načítá přes dvě a půl sekundy.',
-            sk: 'Firmy, pri ktorých sme web nenašli, alebo majú web, ktorý sa načítava vyše dve a pol sekundy.',
-            en: 'Firms we found no website for, or whose site takes over two and a half seconds to load.' },
+    // Jen co se opravdu měří (lib/website-audit.ts): HTTPS, mobilní verze, stáří kódu. Rychlost
+    // načítání se neměří, tak se neslibuje.
+    what: { cs: 'Firmy, u kterých jsme web nenašli, nebo mají web bez HTTPS, bez mobilní verze či s kódem z dob před rokem 2010.',
+            sk: 'Firmy, pri ktorých sme web nenašli, alebo majú web bez HTTPS, bez mobilnej verzie či s kódom z čias pred rokom 2010.',
+            en: 'Firms we found no website for, or whose site has no HTTPS, no mobile version or code from before 2010.' },
   },
 ];
 
@@ -100,9 +105,9 @@ const STEPS: Array<[Text, Text]> = [
   ],
   [
     { cs: 'Ověříme, co je o firmě veřejné', sk: 'Overíme, čo je o firme verejné', en: 'We verify what is public about each firm' },
-    { cs: 'Registrace k DPH a její spolehlivost, ověřený web a jak rychle se načítá, sociální sítě. Robots.txt respektujeme.',
-      sk: 'Registrácia k DPH a jej spoľahlivosť, overený web a ako rýchlo sa načítava, sociálne siete. Robots.txt rešpektujeme.',
-      en: 'VAT registration and its reliability, a verified website and how fast it loads, social profiles. We respect robots.txt.' },
+    { cs: 'Registrace k DPH a její spolehlivost, ověřený web a v jakém je stavu, sociální sítě. Robots.txt respektujeme.',
+      sk: 'Registrácia k DPH a jej spoľahlivosť, overený web a v akom je stave, sociálne siete. Robots.txt rešpektujeme.',
+      en: 'VAT registration and its reliability, a verified website and what shape it is in, social profiles. We respect robots.txt.' },
   ],
   [
     { cs: 'Seřadíme podle tvých kritérií', sk: 'Zoradíme podľa tvojich kritérií', en: 'We rank by your criteria' },
@@ -118,9 +123,9 @@ const STEPS: Array<[Text, Text]> = [
 const FAQ: Array<{ q: Text; a: Text }> = [
   {
     q: { cs: 'Odkud pocházejí data o firmách?', sk: 'Odkiaľ pochádzajú dáta o firmách?', en: 'Where does the business data come from?' },
-    a: { cs: 'Z veřejných zdrojů: rejstřík ARES a živnostenský rejstřík, registr plátců DPH a OpenStreetMap (© přispěvatelé OpenStreetMap, ODbL). Kontakty bereme jen z webů firem, které to v robots.txt dovolují.',
-         sk: 'Z verejných zdrojov: register ARES a živnostenský register, register platiteľov DPH a OpenStreetMap (© prispievatelia OpenStreetMap, ODbL). Kontakty berieme len z webov firiem, ktoré to v robots.txt dovoľujú.',
-         en: 'From public sources: the ARES and trade registries, the VAT payer register and OpenStreetMap (© OpenStreetMap contributors, ODbL). Contacts come only from company websites whose robots.txt allows it.' },
+    a: { cs: 'Z veřejných zdrojů: rejstřík ARES a živnostenský rejstřík, registr plátců DPH a OpenStreetMap (© přispěvatelé OpenStreetMap, ODbL). Telefony a e-maily bereme ze dvou míst: z webů firem, které to v robots.txt dovolují, a z OpenStreetMap, kde je uvedli mapéři. U každého kontaktu vidíš, odkud je.',
+         sk: 'Z verejných zdrojov: register ARES a živnostenský register, register platiteľov DPH a OpenStreetMap (© prispievatelia OpenStreetMap, ODbL). Telefóny a e-maily berieme z dvoch miest: z webov firiem, ktoré to v robots.txt dovoľujú, a z OpenStreetMap, kde ich uviedli mapéri. Pri každom kontakte vidíš, odkiaľ je.',
+         en: 'From public sources: the ARES and trade registries, the VAT payer register and OpenStreetMap (© OpenStreetMap contributors, ODbL). Phones and e-mails come from two places: company websites whose robots.txt allows it, and OpenStreetMap, where mappers listed them. Every contact shows where it came from.' },
   },
   {
     q: { cs: 'Co znamená skóre u každé firmy?', sk: 'Čo znamená skóre pri každej firme?', en: 'What does the score mean?' },
@@ -130,9 +135,10 @@ const FAQ: Array<{ q: Text; a: Text }> = [
   },
   {
     q: { cs: 'Je to jen pro lidi, co dělají weby?', sk: 'Je to len pre ľudí, čo robia weby?', en: 'Is this only for web people?' },
-    a: { cs: 'Ne. Chybějící web je jedno z šestnácti kritérií, která si můžeš zapnout — vedle stáří firmy, registrace k DPH, dostupného telefonu nebo e-mailu a sociálních sítí. Účetní si zapne jiná než fotograf a dostane jiné pořadí výsledků.',
-         sk: 'Nie. Chýbajúci web je jedno zo šestnástich kritérií, ktoré si môžeš zapnúť — popri veku firmy, registrácii k DPH, dostupnom telefóne alebo e-maile a sociálnych sieťach. Účtovník si zapne iné než fotograf a dostane iné poradie výsledkov.',
-         en: 'No. A missing website is one of sixteen criteria you can switch on — alongside company age, VAT registration, an available phone or e-mail, and social profiles. An accountant picks different ones than a photographer and gets a different ranking.' },
+    // Počet kritérií se bere z katalogu, ne z hlavy — tady stálo „šestnácti", když jich bylo přes třicet.
+    a: { cs: `Ne. Chybějící web je jedno z ${CRITERIA} kritérií, která si můžeš zapnout — vedle stáří firmy, registrace k DPH, dostupného telefonu nebo e-mailu a sociálních sítí. Účetní si zapne jiná než fotograf a dostane jiné pořadí výsledků.`,
+         sk: `Nie. Chýbajúci web je jedno z ${CRITERIA} kritérií, ktoré si môžeš zapnúť — popri veku firmy, registrácii k DPH, dostupnom telefóne alebo e-maile a sociálnych sieťach. Účtovník si zapne iné než fotograf a dostane iné poradie výsledkov.`,
+         en: `No. A missing website is one of ${CRITERIA} criteria you can switch on — alongside company age, VAT registration, an available phone or e-mail, and social profiles. An accountant picks different ones than a photographer and gets a different ranking.` },
   },
   {
     q: { cs: 'Co když nechci nic vyplňovat?', sk: 'Čo ak nechcem nič vypĺňať?', en: 'What if I do not want to answer anything?' },
@@ -187,15 +193,16 @@ const UI = {
                 en: 'Sample rows showing what a result looks like. The score is the share of criteria met — another trade ticks different ones and gets a different order.' },
   since:      { cs: 'od',                       sk: 'od',                       en: 'since' },
   audTitle:   { cs: 'Pět lidí, pět hledání.',   sk: 'Päť ľudí, päť hľadaní.',   en: 'Five people, five searches.' },
-  audNote:    { cs: 'Když se ve výčtu nevidíš, poskládáš si kritéria sám — je jich přes dvacet a kombinují se libovolně, i napříč obory.',
-                sk: 'Keď sa vo výpočte nevidíš, poskladáš si kritériá sám — je ich vyše dvadsať a kombinujú sa ľubovoľne, aj naprieč odbormi.',
-                en: 'Not on the list? Build your own combination — there are over twenty criteria and they mix freely, across trades too.' },
+  audNote:    { cs: `Když se ve výčtu nevidíš, poskládáš si kritéria sám — je jich ${CRITERIA} a kombinují se libovolně, i napříč obory.`,
+                sk: `Keď sa vo výpočte nevidíš, poskladáš si kritériá sám — je ich ${CRITERIA} a kombinujú sa ľubovoľne, aj naprieč odbormi.`,
+                en: `Not on the list? Build your own combination — there are ${CRITERIA} criteria and they mix freely, across trades too.` },
   stepsTitle: { cs: 'Čtyři kroky, tři minuty.', sk: 'Štyri kroky, tri minúty.', en: 'Four steps, three minutes.' },
   faqTitle:   { cs: 'Otázky.',                  sk: 'Otázky.',                  en: 'Questions.' },
   closing:    { cs: 'Kdo je na řadě',           sk: 'Kto je na rade',           en: 'Who is next' },
-  closingSub: { cs: 'Účet zdarma, bez karty. Pět hledání za měsíc na vyzkoušení.',
-                sk: 'Účet zadarmo, bez karty. Päť hľadaní za mesiac na vyskúšanie.',
-                en: 'Free account, no card. Five searches a month to try it out.' },
+  // Limit účtu zdarma je za 30 dní (lib/plans.ts), ne kalendářní měsíc — obchodní podmínky říkají totéž.
+  closingSub: { cs: 'Účet zdarma, bez karty. Pět hledání za 30 dní na vyzkoušení.',
+                sk: 'Účet zadarmo, bez karty. Päť hľadaní za 30 dní na vyskúšanie.',
+                en: 'Free account, no card. Five searches every 30 days to try it out.' },
 };
 
 /**

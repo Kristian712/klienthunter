@@ -45,9 +45,11 @@ const T = {
                sk: 'Index ČSÚ · {where} · vznik od {since}{legal} · zodpovedá {n} firiem, stiahne sa najviac {limit}',
                en: 'CZSO index · {where} · founded since {since}{legal} · {n} firms match, at most {limit} will be fetched' },
   idxCounting: { cs: 'Index ČSÚ · {where} · počítám…', sk: 'Index ČSÚ · {where} · počítam…', en: 'CZSO index · {where} · counting…' },
-  aresLine:  { cs: 'ARES · {city} a okolí · všechny stáří firem · nejvýš {limit} firem z dotazu; podmínky vpravo jen prořežou to, co se stáhne',
-               sk: 'ARES · {city} a okolie · všetky veky firiem · najviac {limit} firiem z dotazu; podmienky vpravo len prerežú to, čo sa stiahne',
-               en: 'ARES · {city} and surroundings · firms of any age · at most {limit} firms per query; conditions on the right only prune what is fetched' },
+  // Obor se v ARESu hledá dvěma větvemi: kódem NACE (jistý) a slovem v názvu firmy (sedí zhruba
+  // u poloviny až dvou třetin, změřeno 14. 9. 2026). U každé firmy ve výsledcích je vidět, kterou prošla.
+  aresLine:  { cs: 'ARES · {city} a okolí · obor podle kódu NACE nebo slova v názvu firmy · všechny stáří firem · nejvýš {limit} firem z dotazu; podmínky vpravo jen prořežou to, co se stáhne',
+               sk: 'ARES · {city} a okolie · odbor podľa kódu NACE alebo slova v názve firmy · všetky veky firiem · najviac {limit} firiem z dotazu; podmienky vpravo len prerežú to, čo sa stiahne',
+               en: 'ARES · {city} and surroundings · trade by NACE code or a word in the firm name · firms of any age · at most {limit} firms per query; conditions on the right only prune what is fetched' },
   foreign:   { cs: 'Mimo české kraje index není — hledá se jen v ARESu / OpenStreetMap.',
                sk: 'Mimo českých krajov index nie je — hľadá sa len v ARESe / OpenStreetMap.',
                en: 'Outside Czech regions there is no index — ARES / OpenStreetMap only.' },

@@ -294,10 +294,12 @@ function youngerThanDays(days: number) {
  * Filtry podle vzniku hledají jinak než ostatní: přes index z ČSÚ (etapa 3), který umí datum
  * i celý kraj, a jméno firmy se pak dohledá v ARESu. Jedna věta pod skupinou to říká.
  */
+// Šance na kontakt je změřená (14. 9. 2026, 300 nových firem): telefon nebo e-mail u 11 % všech,
+// u obchodních společností 19 %, u živnostníků v dopravě 3 %. Píše se míň, než vyšlo.
 const REGISTRY_HINT = {
-  cs: 'Firmy podle data vzniku hledáme v indexu z RES ČSÚ — v celém kraji, ne jen v krajském městě. Jméno a sídlo doplní ARES. Index se obnovuje dvakrát měsíčně.',
-  sk: 'Firmy podľa dátumu vzniku hľadáme v indexe z RES ČSÚ — v celom kraji, nie len v krajskom meste. Meno a sídlo doplní ARES. Index sa obnovuje dvakrát mesačne.',
-  en: 'Firms by founding date come from an index built on the Czech Statistical Office register — the whole region, not just its capital. ARES fills in the name and address. The index refreshes twice a month.',
+  cs: 'Firmy podle data vzniku hledáme v indexu z RES ČSÚ — v celém kraji, ne jen v krajském městě. Jméno a sídlo doplní ARES. Index se obnovuje dvakrát měsíčně. Telefon nebo e-mail se u nové firmy dohledá zhruba u každé desáté, u obchodních společností asi u každé páté — zbytek ještě žádný web ani mapový záznam nemá.',
+  sk: 'Firmy podľa dátumu vzniku hľadáme v indexe z RES ČSÚ — v celom kraji, nie len v krajskom meste. Meno a sídlo doplní ARES. Index sa obnovuje dvakrát mesačne. Telefón alebo e-mail sa pri novej firme dohľadá zhruba pri každej desiatej, pri obchodných spoločnostiach asi pri každej piatej — zvyšok ešte žiadny web ani mapový záznam nemá.',
+  en: 'Firms by founding date come from an index built on the Czech Statistical Office register — the whole region, not just its capital. ARES fills in the name and address. The index refreshes twice a month. A phone or e-mail turns up for roughly one new firm in ten, about one in five among companies — the rest have no website or map entry yet.',
 };
 
 /**
@@ -709,6 +711,7 @@ export const LEAD_FILTERS: LeadFilter[] = [
     // The entry date in ARES is exact, so "founded in the last year" is one of the few things
     // we can state without hedging. It is the whole lead list for an accountant or a bookkeeper.
     label: { cs: 'Nová firma (do 1 roku)', sk: 'Nová firma (do 1 roka)', en: 'New firm (under 1 year)' },
+    hint: REGISTRY_HINT,
     source: 'ARES',
     evidence: (b, l) => { const d = fmtDate(b.foundedAt, l); return d ? localized({ cs: `vznik ${d} · ARES`, sk: `vznik ${d} · ARES`, en: `founded ${d} · ARES` }, l) : null; },
     where: { foundedAt: { gt: foundedBefore(1) } },
@@ -722,6 +725,7 @@ export const LEAD_FILTERS: LeadFilter[] = [
     // Užší varianta `new_firm`. Datum vzniku v ARESu je přesné, takže i tenhle půlrok je fakt,
     // ne odhad — a je to celý seznam pro účetní nebo pojišťováka, který chce být první.
     label: { cs: 'Nová firma (do 6 měsíců)', sk: 'Nová firma (do 6 mesiacov)', en: 'New firm (under 6 months)' },
+    hint: REGISTRY_HINT,
     source: 'ARES',
     evidence: (b, l) => { const d = fmtDate(b.foundedAt, l); return d ? localized({ cs: `vznik ${d} · ARES`, sk: `vznik ${d} · ARES`, en: `founded ${d} · ARES` }, l) : null; },
     where: { foundedAt: { gt: foundedBefore(0.5) } },

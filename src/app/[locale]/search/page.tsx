@@ -565,9 +565,9 @@ const S = {
                 sk: 'Toto je prvých päť firiem z hľadania. Telefóny, e-maily a weby posielame len prihláseným — v ukážke sa nesťahujú vôbec, takže tu nie sú ani skryté.',
                 en: 'These are the first five firms from the search. Phones, e-mails and websites go to signed-in users only — the preview never downloads them, so they are not hidden here, they are absent.' },
   demoCta:    { cs: 'Registrovat se zdarma',  sk: 'Registrovať sa zadarmo',  en: 'Register for free' },
-  demoPerk:   { cs: '5 hledání měsíčně, 20 výsledků na hledání, kontakty a export do CSV.',
-                sk: '5 hľadaní mesačne, 20 výsledkov na hľadanie, kontakty a export do CSV.',
-                en: '5 searches a month, 20 results each, contacts and CSV export.' },
+  demoPerk:   { cs: '5 hledání za 30 dní, 20 výsledků na hledání, kontakty a export do CSV.',
+                sk: '5 hľadaní za 30 dní, 20 výsledkov na hľadanie, kontakty a export do CSV.',
+                en: '5 searches every 30 days, 20 results each, contacts and CSV export.' },
   emptyByFilter: {
     cs: 'Firem jsme našli {n}, ale zvolenému filtru nevyhověla ani jedna. To je platný výsledek, ne chyba — zkuste filtr vypnout nebo zvolit jiný scénář.',
     sk: 'Firiem sme našli {n}, ale zvolenému filtru nevyhovela ani jedna. To je platný výsledok, nie chyba — skúste filter vypnúť alebo zvoliť iný scenár.',
