@@ -1,9 +1,7 @@
 {
   "nav": {
-    "home": "Domů",
     "search": "Vyhledávání",
     "dashboard": "Přehled",
-    "saved": "Uložené",
     "pricing": "Ceník",
     "login": "Přihlásit se",
     "register": "Registrovat se",

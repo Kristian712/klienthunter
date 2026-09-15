@@ -30,7 +30,7 @@ interface ProfileData {
   totalResults: number;
 }
 
-const PLAN_LABELS: Record<string, string> = { FREE: 'Zdarma', PRO: 'Pro', BUSINESS: 'Business' };
+const PLAN_LABELS: Record<string, { cs: string; sk: string; en: string }> = { FREE: { cs: 'Zdarma', sk: 'Zadarmo', en: 'Free' }, PRO: { cs: 'Pro', sk: 'Pro', en: 'Pro' }, BUSINESS: { cs: 'Business', sk: 'Business', en: 'Business' } };
 
 /** „zbývá 1 den / zbývají 3 dny / zbývá 5 dní“ — čeština se skloňuje podle čísla. */
 function daysLeftText(n: number, cs: boolean): string {
@@ -307,7 +307,7 @@ export default function ProfilePage() {
               {/* Badges */}
               <div className="flex flex-wrap gap-2">
                 <span className={user.plan === 'PRO' ? 'badge-purple' : user.plan === 'BUSINESS' ? 'badge-green' : 'badge-yellow'}>
-                  {PLAN_LABELS[user.plan] ?? user.plan}
+                  {PLAN_LABELS[user.plan] ? localized(PLAN_LABELS[user.plan], locale) : user.plan}
                 </span>
                 {user.isVip && (
                   <span className="badge badge-yellow">
@@ -335,7 +335,7 @@ export default function ProfilePage() {
           {[
             { label: isCs ? 'Vyhledávání' : 'Searches',  value: user._count.searches, icon: <Search size={18} /> },
             { label: isCs ? 'Firem nalezeno' : 'Businesses found', value: totalResults, icon: <BarChart3 size={18} /> },
-            { label: isCs ? 'Plán' : 'Plan', value: PLAN_LABELS[user.plan] ?? user.plan, icon: <User size={18} /> },
+            { label: isCs ? 'Plán' : 'Plan', value: PLAN_LABELS[user.plan] ? localized(PLAN_LABELS[user.plan], locale) : user.plan, icon: <User size={18} /> },
           ].map(s => (
             <div key={s.label} className="card text-center">
               <div className="flex justify-center mb-2 text-ink-faint">{s.icon}</div>
@@ -397,7 +397,7 @@ export default function ProfilePage() {
               >
                 {portalBusy
                   ? (isCs ? 'Přesměrovávám…' : 'Redirecting…')
-                  : (isCs ? 'Správa předplatného' : 'Manage subscription')}
+                  : localized({ cs: 'Správa předplatného', sk: 'Správa predplatného', en: 'Manage subscription' }, locale)}
               </button>
               <p className="mt-2 text-xs text-ink-faint">
                 {isCs

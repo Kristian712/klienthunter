@@ -311,7 +311,7 @@ export default function HomePage() {
                     className="stagger row flex items-center gap-5 py-5 pl-4 pr-3 border-l-[3px] rounded-r-lg"
                     style={{ '--i': i, borderLeftColor: score >= GOOD_LEAD ? 'rgb(var(--accent))' : 'transparent' } as React.CSSProperties}
                   >
-                    <LeadScore value={score} />
+                    <LeadScore value={score} locale={locale} />
                     <div className="min-w-0 flex-1">
                       <p className="font-semibold truncate">{d.name}</p>
                       <p className="text-sm text-ink-muted truncate">{t(d.trade)} · Brno</p>

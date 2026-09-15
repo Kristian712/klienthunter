@@ -17,7 +17,7 @@ export default function ContactPage() {
     setLoading(true);
     // Aplikace poštu neodesílá, formulář jen připraví zprávu v e-mailovém klientovi. Stejná karta,
     // ne `window.open`: to v některých prohlížečích nechá po `mailto:` otevřenou prázdnou kartu.
-    const subject = encodeURIComponent(isCs ? `KlientHunter – zpráva od ${form.name}` : `KlientHunter – message from ${form.name}`);
+    const subject = encodeURIComponent(locale === 'sk' ? `KlientHunter – správa od ${form.name}` : isCs ? `KlientHunter – zpráva od ${form.name}` : `KlientHunter – message from ${form.name}`);
     const body = encodeURIComponent(`${isCs ? 'Jméno' : 'Name'}: ${form.name}\n${isCs ? 'E-mail' : 'E-mail'}: ${form.email}\n\n${form.message}`);
     window.location.href = `mailto:${OPERATOR.email}?subject=${subject}&body=${body}`;
     setSent(true);

@@ -1,9 +1,7 @@
 {
   "nav": {
-    "home": "Domov",
     "search": "Vyhľadávanie",
     "dashboard": "Prehľad",
-    "saved": "Uložené",
     "pricing": "Cenník",
     "login": "Prihlásiť sa",
     "register": "Registrovať sa",

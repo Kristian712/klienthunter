@@ -224,7 +224,7 @@ const T = {
       q: { cs: 'Jak předplatné zruším?', sk: 'Ako predplatné zruším?', en: 'How do I cancel?' },
       a: {
         cs: 'V sekci „Můj profil" klikněte na „Správa předplatného". Otevře se zákaznický portál Stripe, kde předplatné zrušíte. Zrušení platí ke konci zaplaceného období (ve zkušebním období k jeho konci) a do té doby vám tarif zůstává.',
-        sk: 'V profile kliknite na „Správa předplatného". Otvorí sa zákaznícky portál Stripe, kde predplatné zrušíte. Zrušenie platí ku koncu zaplateného obdobia (v skúšobnom období k jeho koncu) a dovtedy vám tarif zostáva.',
+        sk: 'V profile kliknite na „Správa predplatného". Otvorí sa zákaznícky portál Stripe, kde predplatné zrušíte. Zrušenie platí ku koncu zaplateného obdobia (v skúšobnom období k jeho koncu) a dovtedy vám tarif zostáva.',
         en: 'Go to My profile → Manage subscription. It opens the Stripe customer portal, where you can cancel. Cancellation takes effect at the end of the paid period (during a trial, at the end of the trial), and your plan stays active until then.',
       },
     },

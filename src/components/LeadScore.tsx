@@ -1,3 +1,4 @@
+import { localized } from '@/lib/lead-filters';
 /**
  * The number the whole product is for: how good a sales opportunity this lead is.
  *
@@ -16,14 +17,18 @@ export function LeadScore({
   value,
   size = 'md',
   title,
+  locale = 'cs',
 }: {
   value: number;
   size?: 'md' | 'lg';
   title?: string;
+  /** Jazyk výchozí bubliny, když volající vlastní `title` neposílá. */
+  locale?: string;
 }) {
   const good = value >= GOOD_LEAD;
+  const fallback = localized({ cs: `Skóre příležitosti ${value} / 100`, sk: `Skóre príležitosti ${value} / 100`, en: `Opportunity score ${value} / 100` }, locale);
   return (
-    <div className="shrink-0 w-14 text-right" title={title ?? `Skóre příležitosti ${value} / 100`}>
+    <div className="shrink-0 w-14 text-right" title={title ?? fallback}>
       <div
         className={`tnum font-extrabold leading-none tracking-tight ${
           size === 'lg' ? 'text-[40px]' : 'text-[32px]'

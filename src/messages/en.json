@@ -1,9 +1,7 @@
 {
   "nav": {
-    "home": "Home",
     "search": "Search",
     "dashboard": "Dashboard",
-    "saved": "Saved",
     "pricing": "Pricing",
     "login": "Login",
     "register": "Register",

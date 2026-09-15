@@ -7,6 +7,7 @@ import { Search, ArrowRight, Crown, Clock, BarChart3, Upload, Trash2, Bookmark, 
 import { clearUser } from '@/lib/client-auth';
 import { industryLabel } from '@/lib/search-options';
 import { formatDate } from '@/lib/format-date';
+import { localized } from '@/lib/lead-filters';
 import { NewFirmsDigest } from '@/components/NewFirmsDigest';
 import { Pipeline } from '@/components/Pipeline';
 
@@ -20,14 +21,14 @@ interface Job {
   foundCount: number; processedCount: number; error: string | null;
 }
 
-const JOB_LABEL: Record<Job['status'], { cs: string; en: string }> = {
-  queued:  { cs: 'čeká',    en: 'queued' },
-  running: { cs: 'běží',    en: 'running' },
+const JOB_LABEL: Record<Job['status'], { cs: string; sk: string; en: string }> = {
+  queued:  { cs: 'čeká',    sk: 'čaká',   en: 'queued' },
+  running: { cs: 'běží',    sk: 'beží',   en: 'running' },
   // Hledání po městech, které vyčerpalo čas jedné invokace. Naváže samo, jakmile uživatel
   // otevře jeho výsledky — proto „pokračuje", ne „stojí".
-  paused:  { cs: 'pokračuje', en: 'continues' },
-  done:    { cs: 'hotovo',  en: 'done' },
-  failed:  { cs: 'spadlo',  en: 'failed' },
+  paused:  { cs: 'pokračuje', sk: 'pokračuje', en: 'continues' },
+  done:    { cs: 'hotovo',  sk: 'hotovo', en: 'done' },
+  failed:  { cs: 'spadlo',  sk: 'spadlo', en: 'failed' },
 };
 interface User {
   name?: string; email: string; plan: string; isAdmin: boolean; isVip: boolean;
@@ -42,7 +43,7 @@ interface SavedSearch {
   origin: string | null;
 }
 
-const PLAN_LABELS: Record<string, string> = { FREE: 'Zdarma', PRO: 'Pro', BUSINESS: 'Business' };
+const PLAN_LABELS: Record<string, { cs: string; sk: string; en: string }> = { FREE: { cs: 'Zdarma', sk: 'Zadarmo', en: 'Free' }, PRO: { cs: 'Pro', sk: 'Pro', en: 'Pro' }, BUSINESS: { cs: 'Business', sk: 'Business', en: 'Business' } };
 
 export default function DashboardPage() {
   const locale = useLocale();
@@ -156,7 +157,7 @@ export default function DashboardPage() {
         <Link href={`/${locale}/pricing`} className="flex items-center gap-2 rounded-full border border-line-strong bg-surface-subtle px-4 py-2 hover:border-ink transition-colors">
           <Crown size={14} className="text-warm" />
           <span className="text-sm font-medium text-ink">
-            {PLAN_LABELS[user?.plan ?? 'FREE']}
+            {localized(PLAN_LABELS[user?.plan ?? 'FREE'] ?? PLAN_LABELS.FREE, locale)}
             {user?.isVip && ' · VIP'}
           </span>
         </Link>
@@ -328,7 +329,7 @@ export default function DashboardPage() {
                     <span className={`badge ml-2 ${job.status === 'failed' ? 'badge-red' : ''}`}>
                       {/* Přes `?.`, protože stav přichází ze serveru jako řetězec: nový stav
                           přidaný v budoucnu má zůstat neznámým štítkem, ne pádem stránky. */}
-                      {isCs ? JOB_LABEL[job.status]?.cs ?? job.status : JOB_LABEL[job.status]?.en ?? job.status}
+                      {JOB_LABEL[job.status] ? localized(JOB_LABEL[job.status], locale) : job.status}
                       {job.status === 'running' && ` ${job.processedCount}/${job.foundCount}`}
                     </span>
                   )}

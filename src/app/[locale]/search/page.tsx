@@ -545,6 +545,10 @@ const S = {
                    sk: 'Firma v zozname už bola, ale telefón ani e-mail pri nej doteraz nebol. Tentoraz sa dohľadal.',
                    en: 'The firm was already on the list, but had no phone or e-mail until now.' },
   contactFound: { cs: 'kontakt nalezen {d}', sk: 'kontakt nájdený {d}', en: 'contact found {d}' },
+  vatBad:     { cs: 'Nespolehlivý plátce DPH', sk: 'Nespoľahlivý platiteľ DPH', en: 'Unreliable VAT payer' },
+  vatBadTip:  { cs: 'Finanční správa firmu vede jako nespolehlivého plátce DPH', sk: 'Finančná správa firmu vedie ako nespoľahlivého platiteľa DPH', en: 'The tax office lists the firm as an unreliable VAT payer' },
+  icoTip:     { cs: 'IČO z veřejného rejstříku ARES', sk: 'IČO z verejného registra ARES', en: 'Company ID from the public ARES register' },
+  origSource: { cs: 'Původní zdroj záznamu', sk: 'Pôvodný zdroj záznamu', en: 'Original source of the record' },
   // Provozovny z RŽP: nula je odpověď („bez provozovny"), NULL = neptali jsme se a nepíše se nic.
   premises0: { cs: 'bez provozovny', sk: 'bez prevádzky', en: 'no premises' },
   premisesTip: { cs: 'Provozovny s aktivním živnostenským oprávněním · RŽP', sk: 'Prevádzky s aktívnym živnostenským oprávnením · RŽP', en: 'Premises with an active trade licence · trade register' },
@@ -817,13 +821,13 @@ const GROUP_ICON: Record<FilterGroup, React.ReactNode> = {
   reach:    <PhoneCall size={13} />,
 };
 
-const SOURCE_LABELS: Record<string, string> = {
-  ares:   'ARES',
-  res:    'RES ČSÚ + ARES',
-  osm:    'OpenStreetMap',
-  csv:    'Vlastní import',
-  google: 'Google Maps (historické)',
-  firmy:  'Firmy.cz (historické)',
+const SOURCE_LABELS: Record<string, { cs: string; sk: string; en: string }> = {
+  ares:   { cs: 'ARES', sk: 'ARES', en: 'ARES' },
+  res:    { cs: 'RES ČSÚ + ARES', sk: 'RES ČSÚ + ARES', en: 'CZSO register + ARES' },
+  osm:    { cs: 'OpenStreetMap', sk: 'OpenStreetMap', en: 'OpenStreetMap' },
+  csv:    { cs: 'Vlastní import', sk: 'Vlastný import', en: 'Own import' },
+  google: { cs: 'Google Maps (historické)', sk: 'Google Maps (historické)', en: 'Google Maps (historical)' },
+  firmy:  { cs: 'Firmy.cz (historické)', sk: 'Firmy.cz (historické)', en: 'Firmy.cz (historical)' },
 };
 
 function isHistoricalSource(source?: string): boolean {
@@ -838,7 +842,7 @@ function isHistoricalSource(source?: string): boolean {
  * šest řádků, které přišly z mapy, a u kterých proto bývá telefon. Tady je štítek informace,
  * všude jinde šum. Když je zdroj v tabulce jediný, nezobrazí se vůbec nic.
  */
-function SourceBadge({ source, common }: { source?: string; common?: string | null }) {
+function SourceBadge({ source, common, locale }: { source?: string; common?: string | null; locale: string }) {
   const own = source ?? 'ares';
   if (own === common) return null;
   const ids = own.split('+').filter(Boolean);
@@ -846,7 +850,7 @@ function SourceBadge({ source, common }: { source?: string; common?: string | nu
     <>
       {ids.map(id => (
         <span key={id} className="text-[11px] uppercase tracking-wider text-ink-faint">
-          {SOURCE_LABELS[id] ?? id}
+          {SOURCE_LABELS[id] ? localized(SOURCE_LABELS[id], locale) : id}
         </span>
       ))}
     </>
@@ -2292,7 +2296,7 @@ export default function SearchPage() {
                         <div>
                           <div className="flex items-center gap-2 flex-wrap">
                             <h3 className="font-semibold text-ink leading-tight">{b.name}</h3>
-                            <SourceBadge source={b.source} common={commonSource} />
+                            <SourceBadge source={b.source} common={commonSource} locale={locale} />
                           </div>
                           {b.address && (
                             <p className="text-xs text-ink-faint mt-1 flex items-center gap-1">
@@ -2303,7 +2307,7 @@ export default function SearchPage() {
                         {/* Only rows found before Vlna 2 carry a directory link. */}
                         {b.googleMapsUrl && isHistoricalSource(b.source) && (
                           <a href={b.googleMapsUrl} target="_blank" rel="noopener noreferrer"
-                             className="shrink-0 btn-ghost btn-sm p-1.5" title="Původní zdroj záznamu" aria-label="Původní zdroj záznamu">
+                             className="shrink-0 btn-ghost btn-sm p-1.5" title={localized(S.origSource, locale)} aria-label={localized(S.origSource, locale)}>
                             <ExternalLink size={13} />
                           </a>
                         )}
@@ -2351,7 +2355,7 @@ export default function SearchPage() {
                         )}
                         <SocialLinks b={b} locale={locale} />
                         {b.ico && (
-                          <span className="badge" title="IČO z veřejného rejstříku ARES">IČO {b.ico}</span>
+                          <span className="badge" title={localized(S.icoTip, locale)}>IČO {b.ico}</span>
                         )}
 
                         {/* Kde jsem s touhle firmou. Select, ne pět chipů — pět tlačítek na
@@ -2383,8 +2387,8 @@ export default function SearchPage() {
                           </span>
                         )}
                         {b.vatUnreliable && (
-                          <span className="badge-red" title="Finanční správa firmu vede jako nespolehlivého plátce DPH">
-                            Nespolehlivý plátce DPH
+                          <span className="badge-red" title={localized(S.vatBadTip, locale)}>
+                            {localized(S.vatBad, locale)}
                           </span>
                         )}
                       </div>
@@ -2505,7 +2509,7 @@ export default function SearchPage() {
           <div className="card text-center py-16 text-ink-faint border-dashed border-line-strong">
             <Search size={40} className="mx-auto mb-3 opacity-30" />
             <p className="font-medium text-ink-muted mb-1">{isCs ? 'Vyber kraj a obor výše' : 'Select region and industry above'}</p>
-            <p className="text-sm">{isCs ? 'např. Jihomoravský kraj + Instalatér, nebo Celá ČR + Kadeřnictví' : 'e.g. London + Plumber'}</p>
+            <p className="text-sm">{isCs ? 'např. Jihomoravský kraj + Instalatér, nebo Celá ČR + Kadeřnictví' : 'e.g. South Moravia + Plumber, or Whole Czechia + Hairdresser'}</p>
           </div>
         )}
       </div>
