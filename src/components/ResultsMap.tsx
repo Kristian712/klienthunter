@@ -427,8 +427,21 @@ export function ResultsMap({ leads, total, locale, onSetStatus, hideDone, hidden
       // mapu…" napořád nad hotovou mapou). Skončit načítání, jakmile mapa dojede do klidu —
       // a nejpozději po deseti vteřinách, kdyby `idle` kvůli dlaždicím nepřišel.
       m.once('idle', () => setLoading(false));
-      setTimeout(() => setLoading(false), 10_000);
     });
+    /**
+     * Štítek „Načítám mapu…" nesmí záviset na pořadí událostí MapLibre: na produkci zůstal
+     * viset nad hotovou mapou i přes `load`, `style.load` a `idle`. Proto se stav mapy čte
+     * přímo (`isStyleLoaded` + zdroj dlaždic) každou půlvteřinu, nejdéle 15 s — pak štítek
+     * zmizí tak jako tak, protože mapa, která za 15 s nic neukázala, hlásí chybu jinudy.
+     */
+    const startedAt = Date.now();
+    const probe = window.setInterval(() => {
+      const ready = m.isStyleLoaded() && Boolean(m.getSource('openmaptiles'));
+      if (ready || Date.now() - startedAt > 15_000) {
+        window.clearInterval(probe);
+        setLoading(false);
+      }
+    }, 500);
     // První vykreslení s daty. Přiblížení na výsledky se tu opakuje pro případ, že se
     // vykonalo dřív, než mapa znala svou velikost (mount ve skryté záložce, přepnutí pohledu).
     m.once('load', () => {
@@ -454,6 +467,7 @@ export function ResultsMap({ leads, total, locale, onSetStatus, hideDone, hidden
     map.current = m;
     return () => {
       alive = false;
+      window.clearInterval(probe);
       m.remove();
       map.current = null;
       // Nová instance mapy (StrictMode, návrat na stránku) musí na výsledky doskočit znovu.
