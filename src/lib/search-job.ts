@@ -5,7 +5,7 @@ import { enrichAndVerify, mergeLeads } from './lead-pipeline';
 import { fillCoordinates } from './ruian';
 import { CZ_STAGES } from './search-options';
 import { ALL_INDUSTRIES, isAllIndustries, splitIndustries } from './industries';
-import { SOLE_TRADER_FORMS, indexConstraints, registryWindowDays } from './lead-filters';
+import { SOLE_TRADER_FORMS, effectiveWindowDays, indexConstraints } from './lead-filters';
 import { scenarioById } from './scenarios';
 import { discoverAll, type RawLead } from './sources';
 import { notifySearchDone } from './webhook';
@@ -101,7 +101,8 @@ export async function runSearchJob(jobId: string): Promise<void> {
     : null;
   const criteria = root ?? search;
   const filterIds = [...(criteria?.filters ?? []), ...scenarioById(criteria?.scenario).filters];
-  const windowDays = registryWindowDays(filterIds);
+  // Bez oboru se hledá v indexu v celém jeho okně (pět let) — viz `effectiveWindowDays`.
+  const windowDays = effectiveWindowDays(filterIds, job.industry);
   const districts = criteria?.districts ?? [];
   // Právní forma zužuje i dotaz do ARESu (filtr `pravniForma`), ne jen index — ať uživatel,
   // který chce jen s.r.o., nedostane pět set živnostníků a z nich po prořezání dvacet firem.

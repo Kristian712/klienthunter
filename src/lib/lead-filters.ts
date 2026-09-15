@@ -18,6 +18,7 @@
  * the two shared primitives below live here and not there — the dependency runs one way,
  * lead-score → lead-filters, and never back.
  */
+import { isAllIndustries } from './industries';
 
 export function yearsSince(date: Date | string | null | undefined): number | null {
   if (!date) return null;
@@ -340,6 +341,18 @@ export const NEW_FIRM_WINDOW_DAYS: Record<string, number> = {
 export function registryWindowDays(filterIds: readonly string[]): number | null {
   const days = filterIds.map(id => NEW_FIRM_WINDOW_DAYS[id]).filter((d): d is number => d !== undefined);
   return days.length ? Math.min(...days) : null;
+}
+
+/**
+ * Okno indexu i bez filtru podle vzniku, když chybí obor.
+ *
+ * Hledání bez oboru („jen živnostníci ve Zlínském kraji") umí jen index z ČSÚ — ARES potřebuje
+ * NACE nebo slovo v názvu. Index sahá pět let zpět (`REGISTRY_INDEX_MONTHS`), takže se bez oboru
+ * hledá v celém kraji mezi firmami vzniklými za posledních pět let; starší bez oboru najít nejdou
+ * a UI to říká. S oborem a bez filtru podle vzniku se hledá po staru v ARESu.
+ */
+export function effectiveWindowDays(filterIds: readonly string[], industry: string): number | null {
+  return registryWindowDays(filterIds) ?? (isAllIndustries(industry) ? NEW_FIRM_WINDOW_DAYS.new_firm_5y : null);
 }
 
 /** No founding date means no opinion about the firm's age — only ARES ever supplies one. */

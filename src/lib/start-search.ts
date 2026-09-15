@@ -2,8 +2,7 @@ import { waitUntil } from '@vercel/functions';
 import { activeAccount, getPlanLimits } from './auth';
 import { prisma } from './db';
 import { isAllIndustries } from './industries';
-import { registryWindowDays } from './lead-filters';
-import { scenarioById } from './scenarios';
+import { nuts3ForRegion } from './regions-nuts';
 import { runSearchJob } from './search-job';
 
 /**
@@ -44,11 +43,11 @@ export async function startSearch(opts: {
   /** Okresy (LAU 1) ze skládačky; platí jen pro hledání přes index. */
   districts?: string[];
 }): Promise<StartSearchResult> {
-  // „Všechny obory" umí jen index z ČSÚ, a ten potřebuje filtr podle vzniku (lib/industries.ts).
-  // Bez něj by běh šel do ARESu bez NACE a ten ho odmítne — lepší říct to hned než po minutě.
-  if (isAllIndustries(opts.industry)) {
-    const ids = [...(opts.filters ?? []), ...scenarioById(opts.scenario).filters];
-    if (registryWindowDays(ids) === null) return { ok: false, status: 422, code: 'ALL_NEEDS_EVENT' };
+  // „Všechny obory" (i prázdný obor) umí jen index z ČSÚ, a ten pokrývá jen české kraje. Bez filtru
+  // podle vzniku se vezme celé okno indexu (viz `effectiveWindowDays`); mimo české kraje by běh šel
+  // do ARESu bez NACE a ten ho odmítne — lepší říct to hned než po minutě.
+  if (isAllIndustries(opts.industry) && nuts3ForRegion(opts.region) === null) {
+    return { ok: false, status: 422, code: 'ALL_NEEDS_EVENT' };
   }
 
   // Počítáme už založená hledání, ne dokončená — jinak by série souběžných požadavků

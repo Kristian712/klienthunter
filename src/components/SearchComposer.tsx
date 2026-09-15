@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, Database, Filter, Scissors } from 'lucide-react';
 import {
-  GROUP_LABELS, GROUP_ORDER, LEAD_FILTERS, NEW_FIRM_WINDOW_DAYS, SCOPE_TEXT, localized, registryWindowDays, scopeOf,
+  GROUP_LABELS, GROUP_ORDER, LEAD_FILTERS, NEW_FIRM_WINDOW_DAYS, SCOPE_TEXT, effectiveWindowDays, localized, registryWindowDays, scopeOf,
   type FilterGroup, type LeadFilter,
 } from '@/lib/lead-filters';
 import { DISTRICTS, nuts3ForRegion } from '@/lib/regions-nuts';
@@ -37,13 +37,18 @@ const T = {
   districts: { cs: 'Okresy', sk: 'Okresy', en: 'Districts' },
   allKraj:   { cs: 'celý kraj', sk: 'celý kraj', en: 'whole region' },
   unknownEmp:{ cs: 'počet neuveden u {n} firem', sk: 'počet neuvedený pri {n} firmách', en: 'count not stated for {n} firms' },
+  noIndustry:{ cs: 'Bez oboru se hledá jen v indexu ČSÚ: celý kraj, firmy vzniklé za posledních 5 let. Starší firmy bez oboru najít nejdou — ARES potřebuje obor nebo slovo v názvu.',
+               sk: 'Bez odboru sa hľadá len v indexe ČSÚ: celý kraj, firmy vzniknuté za posledných 5 rokov. Staršie firmy bez odboru nájsť nejdú — ARES potrebuje odbor alebo slovo v názve.',
+               en: 'Without a trade the search uses the CZSO index only: the whole region, firms founded in the last 5 years. Older firms cannot be found without a trade — ARES needs a trade or a word in the name.' },
   autoWindow:{ cs: 'Okres a zaměstnanci jsou jen v indexu, proto se zapnulo „Vznik do 5 let".',
                sk: 'Okres a zamestnanci sú len v indexe, preto sa zaplo „Vznik do 5 rokov".',
                en: 'Districts and employees exist only in the index, so “Founded within 5 years” was turned on.' },
   scopeIdx:  { cs: 'Co se prohledá', sk: 'Čo sa prehľadá', en: 'What will be searched' },
-  idxLine:   { cs: 'Index ČSÚ · {where} · vznik od {since}{legal} · odpovídá {n} firem, stáhne se nejvýš {limit}',
-               sk: 'Index ČSÚ · {where} · vznik od {since}{legal} · zodpovedá {n} firiem, stiahne sa najviac {limit}',
-               en: 'CZSO index · {where} · founded since {since}{legal} · {n} firms match, at most {limit} will be fetched' },
+  // „nejnovějších": index řadí podle vzniku sestupně (sources/registry.ts), takže strop tarifu
+  // ořízne ty starší — uživatel s 2 000 shodami a stropem 500 má vědět, které dostane.
+  idxLine:   { cs: 'Index ČSÚ · {where} · vznik od {since}{legal} · odpovídá {n} firem, stáhne se nejvýš {limit} nejnovějších',
+               sk: 'Index ČSÚ · {where} · vznik od {since}{legal} · zodpovedá {n} firiem, stiahne sa najviac {limit} najnovších',
+               en: 'CZSO index · {where} · founded since {since}{legal} · {n} firms match, at most the {limit} newest will be fetched' },
   idxCounting: { cs: 'Index ČSÚ · {where} · počítám…', sk: 'Index ČSÚ · {where} · počítam…', en: 'CZSO index · {where} · counting…' },
   // Obor se v ARESu hledá dvěma větvemi: kódem NACE (jistý) a slovem v názvu firmy (sedí zhruba
   // u poloviny až dvou třetin, změřeno 14. 9. 2026). U každé firmy ve výsledcích je vidět, kterou prošla.
@@ -86,7 +91,9 @@ export function SearchComposer({
 
   const nuts3 = region ? nuts3ForRegion(region) : null;
   const ids = useMemo(() => Array.from(active), [active]);
-  const windowDays = registryWindowDays(ids);
+  // Bez oboru se hledá v indexu i bez filtru podle vzniku (celé okno, pět let) — viz lead-filters.
+  const windowDays = effectiveWindowDays(ids, industry);
+  const implicitWindow = windowDays !== null && registryWindowDays(ids) === null;
   const indexMode = Boolean(nuts3) && windowDays !== null;
   // Zdroj bez klíče (Meta) se neukazuje vůbec: zamčený chip je slib, který nasazení neplní.
   // Rozhodnutí majitele 15. 9. 2026 — token s 60denní platností teď udržovat nechce.
@@ -115,7 +122,9 @@ export function SearchComposer({
 
   /** Volba, která existuje jen v indexu, si okno zapne sama a řekne to. */
   const ensureWindow = () => {
-    if (windowDays === null) { toggle('new_firm_5y', true); setAutoNote(true); }
+    // I při implicitním oknu (bez oboru) se chip zapne výslovně: kdyby uživatel obor dodatečně
+    // vybral, okres by jinak potichu přestal platit.
+    if (registryWindowDays(ids) === null) { toggle('new_firm_5y', true); setAutoNote(true); }
   };
   const toggleIndexOnly = (id: string) => {
     if (!active.has(id)) ensureWindow();
@@ -217,6 +226,7 @@ export function SearchComposer({
                 </div>
               )}
               {autoNote && windowDays !== null && <p className="text-[11px] text-warm">{t(T.autoWindow)}</p>}
+              {implicitWindow && nuts3 && <p className="text-[11px] text-ink-muted">{t(T.noIndustry)}</p>}
               {nuts3 && !indexMode && <p className="text-[11px] text-ink-faint">{t(T.noCountArs)}</p>}
             </div>
           </section>

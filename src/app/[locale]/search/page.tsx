@@ -13,7 +13,7 @@ import { CRM_FORMATS } from '@/lib/crm-export';
 import { formatDate } from '@/lib/format-date';
 import { SearchComposer } from '@/components/SearchComposer';
 import { PLAN_LIMITS } from '@/lib/plans';
-import { LEAD_FILTERS, GROUP_LABELS, GROUP_ORDER, employeeLabel, matchesAll, localized, registryWindowDays, type FilterGroup } from '@/lib/lead-filters';
+import { LEAD_FILTERS, GROUP_LABELS, GROUP_ORDER, employeeLabel, matchesAll, localized, type FilterGroup } from '@/lib/lead-filters';
 import { leadReason } from '@/lib/lead-reason';
 import { reachHint, reachScore } from '@/lib/reach-score';
 import { scoreBreakdown } from '@/lib/lead-score';
@@ -22,6 +22,7 @@ import { YIELD_NOTE, yieldFor } from '@/lib/nace-map';
 import { SCENARIOS, SCENARIO_BY_PROFESSION, scenarioById } from '@/lib/scenarios';
 import { EMPTY_PROFILE, industriesFor, presetFiltersFor, type UserProfile } from '@/lib/profile';
 import { ALL_INDUSTRIES, ALL_INDUSTRIES_LABEL, MAX_INDUSTRIES, isAllIndustries, joinIndustries } from '@/lib/industries';
+import { nuts3ForRegion } from '@/lib/regions-nuts';
 import { compareRanked, type ClaimMark } from '@/lib/claim-order';
 
 /** Totéž, co vrací `searchMeta` v lib/saved-search.ts. */
@@ -687,10 +688,9 @@ const S = {
                 sk: 'Hľadanie cez celú ČR nestihlo dobehnúť v časovom limite. Zvoľte prosím jeden kraj — nad celou republikou je firiem toľko, že sa overovanie webov do limitu nezmestí.',
                 en: 'A nationwide search ran out of time. Please pick a single region — across the whole country there are too many firms for the website checks to finish in time.' },
   /** „Všechny obory" umí jen index z ČSÚ, a ten hledá podle data vzniku — bez toho není co spustit. */
-  allNeedsEvent: { cs: 'Všechny obory naráz jdou jen podle data vzniku — zapněte scénář „Nové firmy" nebo filtr „Nová firma". Hledá se pak v celém kraji v indexu RES ČSÚ.',
-                   sk: 'Všetky odbory naraz idú len podľa dátumu vzniku — zapnite scenár „Nové firmy" alebo filter „Nová firma". Hľadá sa potom v celom kraji v indexe RES ČSÚ.',
-                   en: 'All trades at once work only by founding date — turn on the “New firms” scenario or a “New firm” filter. The search then covers the whole region from the CZSO index.' },
-  turnOnNew:  { cs: 'Zapnout „Nové firmy"', sk: 'Zapnúť „Nové firmy"', en: 'Turn on “New firms”' },
+  allNeedsEvent: { cs: 'Hledání bez oboru jde jen v českých krajích (z indexu RES ČSÚ, firmy do 5 let). Pro jiné území vyberte obor.',
+                   sk: 'Hľadanie bez odboru ide len v českých krajoch (z indexu RES ČSÚ, firmy do 5 rokov). Pre iné územie vyberte odbor.',
+                   en: 'Searching without a trade works only in Czech regions (from the CZSO index, firms under 5 years). Pick a trade for other areas.' },
   maxIndustries: { cs: `Nejvýš ${MAX_INDUSTRIES} oborů naráz.`, sk: `Najviac ${MAX_INDUSTRIES} odborov naraz.`, en: `At most ${MAX_INDUSTRIES} trades at once.` },
   industriesHint: { cs: 'Obory se sčítají — přidejte další, nebo zvolte „Všechny obory".',
                     sk: 'Odbory sa sčítavajú — pridajte ďalší, alebo zvoľte „Všetky odbory".',
@@ -1182,7 +1182,11 @@ export default function SearchPage() {
    * jeho text — pipeline si s ním poradí (`resolveNiche` hledá i podle českých slov), takže
    * „jiný obor" už nepotřebuje vlastní volbu v seznamu.
    */
-  const effectiveIndustry = industries.length ? joinIndustries(industries) : industryQuery.trim() || customIndustry;
+  // Obor je nepovinný: prázdný = všechny obory v kraji (jde jen přes index, tedy v českých krajích
+  // a mezi firmami do 5 let — viz `effectiveWindowDays`). Ukázka bez přihlášení obor potřebuje.
+  const effectiveIndustry = industries.length ? joinIndustries(industries)
+    : industryQuery.trim() || customIndustry
+    || (!isDemo && effectiveRegion && nuts3ForRegion(effectiveRegion) ? ALL_INDUSTRIES : '');
   const allPicked = industries.length === 1 && isAllIndustries(industries[0]);
   /** Scénář, jehož filtry jsou všechny zapnuté; `custom`, když uživatel kombinaci rozbil. */
   const effectiveScenario = (() => {
@@ -1191,7 +1195,8 @@ export default function SearchPage() {
     return scenario === 'all' ? 'all' : 'custom';
   })();
   /** „Všechny obory" bez filtru podle vzniku nejde spustit — index z ČSÚ hledá jen podle data. */
-  const allBlocked = allPicked && registryWindowDays([...Array.from(active), ...scenarioById(scenario).filters]) === null;
+  // „Všechny obory" mimo české kraje nejdou (index je jen pro ně a ARES bez oboru nehledá).
+  const allBlocked = isAllIndustries(effectiveIndustry) && Boolean(effectiveRegion) && nuts3ForRegion(effectiveRegion) === null;
 
   const addIndustry = (value: string) => {
     setIndustries(prev => {
@@ -1781,10 +1786,7 @@ export default function SearchPage() {
                 </div>
               )}
               {allBlocked && (
-                <p className="mb-2 text-xs text-ink-muted leading-snug">
-                  {localized(S.allNeedsEvent, locale)}{' '}
-                  <button type="button" onClick={() => setScenario('new')} className="underline text-accent">{localized(S.turnOnNew, locale)}</button>
-                </p>
+                <p className="mb-2 text-xs text-ink-muted leading-snug">{localized(S.allNeedsEvent, locale)}</p>
               )}
 
               <div className="relative">
@@ -1794,7 +1796,7 @@ export default function SearchPage() {
                   value={industryQuery}
                   placeholder={industries.length
                     ? (isCs ? 'Přidat další obor…' : 'Add another trade…')
-                    : (isCs ? 'Začněte psát: zubaři, restaurace, autoservis…' : 'Start typing: dentists, restaurants…')}
+                    : (isCs ? 'Nepovinné — prázdné = všechny obory v kraji. Nebo pište: zubaři, restaurace…' : 'Optional — empty = every trade in the region. Or type: dentists, restaurants…')}
                   disabled={allPicked}
                   onChange={e => { setIndustryQuery(e.target.value); setIndustryOpen(true); setIndustryActive(-1); }}
                   // Text se označí, aby první stisknutá klávesa přepsala vybraný obor a nepsala se
