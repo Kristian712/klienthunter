@@ -3,6 +3,7 @@ import { activeAccount, getPlanLimits } from './auth';
 import { prisma } from './db';
 import { isAllIndustries } from './industries';
 import { isWholeCz, nuts3ForRegion } from './regions-nuts';
+import { normalizeFilters } from './lead-filters';
 import { runSearchJob } from './search-job';
 
 /**
@@ -77,7 +78,8 @@ export async function startSearch(opts: {
       query: opts.industry,
       region: opts.region,
       savedId: opts.savedId ?? null,
-      filters: opts.filters ?? [],
+      // Protichůdné podmínky by vrátily vždy nulu — uloží se bez nich (pozdější vyhrává).
+      filters: normalizeFilters(opts.filters ?? []),
       scenario: opts.scenario ?? null,
       districts: opts.districts ?? [],
     },

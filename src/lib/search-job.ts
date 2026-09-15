@@ -6,7 +6,7 @@ import { fillCoordinates } from './ruian';
 import { CZ_STAGES } from './search-options';
 import { isWholeCz } from './regions-nuts';
 import { ALL_INDUSTRIES, isAllIndustries, splitIndustries } from './industries';
-import { SOLE_TRADER_FORMS, effectiveWindowDays, indexConstraints } from './lead-filters';
+import { SOLE_TRADER_FORMS, effectiveWindowDays, indexConstraints, normalizeFilters } from './lead-filters';
 import { scenarioById } from './scenarios';
 import { discoverAll, type RawLead } from './sources';
 import { notifySearchDone } from './webhook';
@@ -106,7 +106,8 @@ export async function runSearchJob(jobId: string): Promise<void> {
     ? await prisma.search.findUnique({ where: { id: search.savedId }, select: { filters: true, scenario: true, districts: true } })
     : null;
   const criteria = root ?? search;
-  const filterIds = [...(criteria?.filters ?? []), ...scenarioById(criteria?.scenario).filters];
+  // Protiklady pryč i u starých uložených hledání (dřív šlo zapnout „živnostník" i „společnost").
+  const filterIds = normalizeFilters([...(criteria?.filters ?? []), ...scenarioById(criteria?.scenario).filters]);
   // Bez oboru se hledá v indexu v celém jeho okně (pět let) — viz `effectiveWindowDays`.
   const windowDays = effectiveWindowDays(filterIds, job.industry);
   const districts = criteria?.districts ?? [];

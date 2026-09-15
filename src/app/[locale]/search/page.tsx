@@ -13,7 +13,7 @@ import { CRM_FORMATS } from '@/lib/crm-export';
 import { formatDate } from '@/lib/format-date';
 import { SearchComposer } from '@/components/SearchComposer';
 import { PLAN_LIMITS } from '@/lib/plans';
-import { LEAD_FILTERS, GROUP_LABELS, GROUP_ORDER, effectiveWindowDays, employeeLabel, matchesAll, localized, type FilterGroup } from '@/lib/lead-filters';
+import { LEAD_FILTERS, GROUP_LABELS, GROUP_ORDER, addFilter, effectiveWindowDays, employeeLabel, matchesAll, localized, normalizeFilters, type FilterGroup } from '@/lib/lead-filters';
 import { leadReason } from '@/lib/lead-reason';
 import { reachHint, reachScore } from '@/lib/reach-score';
 import { scoreBreakdown } from '@/lib/lead-score';
@@ -342,6 +342,14 @@ function hostOfUrl(url: string): string {
   try { return new URL(url.startsWith('http') ? url : `https://${url}`).hostname.replace(/^www\./, ''); } catch { return url; }
 }
 
+/** „1 firma / 2 firmy / 5 firem" (sk „firiem", en „firms"). */
+function firmsCount(n: number, locale: string): string {
+  if (locale === 'en') return `${n} ${n === 1 ? 'firm' : 'firms'}`;
+  const few = n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20);
+  if (locale === 'sk') return `${n} ${n === 1 ? 'firma' : few ? 'firmy' : 'firiem'}`;
+  return `${n} ${n === 1 ? 'firma' : few ? 'firmy' : 'firem'}`;
+}
+
 /** „1 provozovna / 2 provozovny / 5 provozoven", nula slovy. */
 function premisesLabel(n: number, locale: string): string {
   if (n === 0) return localized(S.premises0, locale);
@@ -608,6 +616,15 @@ const S = {
   emptyTitle: { cs: 'V tomhle kraji jsme v daném oboru nenašli žádnou firmu.',
                 sk: 'V tomto kraji sme v danom odbore nenašli žiadnu firmu.',
                 en: 'We found no business in this trade and region.' },
+  emptyConditions: { cs: 'Těmto podmínkám neodpovídá žádná firma.', sk: 'Týmto podmienkam nezodpovedá žiadna firma.', en: 'No firm matches these conditions.' },
+  emptyConditionsHint: { cs: 'Nejde o chybu: podmínky se sčítají, a všechny naráz nesplnila žádná firma v kraji. Zapnuté: {list}.',
+                         sk: 'Nejde o chybu: podmienky sa sčítavajú a všetky naraz nesplnila žiadna firma v kraji. Zapnuté: {list}.',
+                         en: 'Not a fault: conditions add up, and no firm in the region met all of them at once. On: {list}.' },
+  clearConditions: { cs: 'Zrušit podmínky', sk: 'Zrušiť podmienky', en: 'Clear conditions' },
+  districtsLabel: { cs: 'vybrané okresy', sk: 'vybrané okresy', en: 'selected districts' },
+  blocker:    { cs: 'Nejvíc ubírá {f} — bez ní by zbylo {n}.', sk: 'Najviac uberá {f} — bez nej by zostalo {n}.', en: '{f} removes the most — without it {n} would remain.' },
+  blockerMany: { cs: 'Firmy vyřazují podmínky {f} — bez nich by zbylo {n}.', sk: 'Firmy vyraďujú podmienky {f} — bez nich by zostalo {n}.', en: 'Conditions {f} rule the firms out — without them {n} would remain.' },
+  blockerOff: { cs: 'Vypnout', sk: 'Vypnúť', en: 'Turn off' },
   emptyHint:  { cs: 'Zkuste jiný kraj, širší obor, nebo obor napsaný vlastními slovy.',
                 sk: 'Skúste iný kraj, širší odbor, alebo odbor napísaný vlastnými slovami.',
                 en: 'Try another region, a broader trade, or type the trade in your own words.' },
@@ -944,8 +961,9 @@ export default function SearchPage() {
     setActive(prev => {
       const next = new Set(prev);
       for (const sc of SCENARIOS) for (const f of sc.filters) next.delete(f);
-      for (const f of scenarioById(id).filters) next.add(f);
-      return next;
+      let out = next;
+      for (const f of scenarioById(id).filters) out = addFilter(out, f);
+      return out;
     });
   };
   /** Nabídka „CRM" u exportu; zavírá se kliknutím mimo. */
@@ -972,6 +990,8 @@ export default function SearchPage() {
   const [profile, setProfile] = useState<UserProfile>(EMPTY_PROFILE);
   /** Co je v nasazení zapnuté (`/api/features`): bez tokenu Meta jsou filtry `ads_*` zamčené. */
   const [metaAds, setMetaAds] = useState(false);
+  /** Kolik firem index pro podmínky ve skládačce najde; 0 = hledání by skončilo prázdné, proto se zamkne. */
+  const [indexTotal, setIndexTotal] = useState<number | null>(null);
   useEffect(() => {
     fetch('/api/features').then(r => (r.ok ? r.json() : null)).then(d => { if (d) setMetaAds(Boolean(d.metaAds)); }).catch(err => console.error('features:', err));
   }, []);
@@ -1021,12 +1041,14 @@ export default function SearchPage() {
    */
   function applySavedMeta(meta: SavedMeta | null) {
     setSavedMeta(meta);
-    if (!meta?.rootName) return;
-    // Uložené filtry se obnoví přesně — i prázdné. Profil od téhle chvíle nezasahuje.
+    if (!meta) return;
+    // Filtry se obnoví přesně podle hledání — i nepojmenovaného. Dřív se u nepojmenovaného
+    // nechalo přednastavení z profilu a skládačka ukazovala jiné podmínky, než se kterými
+    // hledání běželo („0 firem" pak nešlo vysvětlit). Profil od téhle chvíle nezasahuje.
     savedLockRef.current = true;
     dirtyRef.current = false;
     setPresetsOn(false);
-    setActive(new Set(meta.filters));
+    setActive(new Set(normalizeFilters(meta.filters)));
     if (meta.scenario) setScenario(meta.scenario);
     if (meta.rootName) {
       fetch(`/api/searches/${meta.id}`, {
@@ -1113,7 +1135,7 @@ export default function SearchPage() {
       setScenario(sc => (sc === 'all' ? def : sc));
       // Scénář je přednastavení = jeho filtry musí být opravdu zapnuté, ne jen vybraný chip:
       // do hledání jde to, co je v `active`. U uloženého hledání se nic nepřidává.
-      if (!savedLockRef.current && !dirtyRef.current) setActive(prev => new Set([...Array.from(prev), ...scenarioById(def).filters]));
+      if (!savedLockRef.current && !dirtyRef.current) setActive(prev => new Set(normalizeFilters([...Array.from(prev), ...scenarioById(def).filters])));
     }
   }
 
@@ -1275,11 +1297,13 @@ export default function SearchPage() {
   const toggle = (id: string, on?: boolean) => {
     dirtyRef.current = true;
     setActive(prev => {
-      const next = new Set(prev);
-      if (on === true) next.add(id);
-      else if (on === false) next.delete(id);
-      else if (!next.delete(id)) next.add(id);
-      return next;
+      // Zapnutí vypne protichůdné podmínky (lib/lead-filters `addFilter`) — jinak by AND vrátil nulu.
+      if (on === false || (on === undefined && prev.has(id))) {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      }
+      return addFilter(prev, id);
     });
   };
 
@@ -1510,14 +1534,15 @@ export default function SearchPage() {
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!effectiveRegion || !effectiveIndustry) return;
+    if (!effectiveRegion || !effectiveIndustry || indexTotal === 0) return;
     setLoading(true);
     setError('');
     setPlanLimitHit(false);
     setResults([]);
     resultsRef.current = 0;
     setJob(null);
-    setActive(new Set());
+    // Podmínky se NEmažou: server hledá s nimi a výsledky se mají zobrazit s nimi. Dřív se tu
+    // vyprázdnily a uživatel viděl nefiltrovaný seznam i prázdný stav bez vysvětlení.
     setHasSearched(true);
     setLoadingMsg(localized(wholeCzByCities ? S.loadingWholeCz : S.loadingCity, locale));
     try {
@@ -1936,7 +1961,7 @@ export default function SearchPage() {
                 utrácí dotazy do vyhledávače z téhož měsíčního stropu, o kterém uživatel na
                 obrazovce už neví. */}
             <button type="submit"
-              disabled={loading || jobRunning || !effectiveRegion || !effectiveIndustry || allBlocked}
+              disabled={loading || jobRunning || !effectiveRegion || !effectiveIndustry || allBlocked || indexTotal === 0}
               className="btn-primary h-[42px] md:mt-[23px]">
               {loading || jobRunning ? (
                 <span className="flex items-center gap-2">
@@ -1964,6 +1989,7 @@ export default function SearchPage() {
             // Admin a VIP mají limit VIP (500), ne podle tarifu — dřív řádek „Co se prohledá" slíbil 20 a přišlo 500.
             limit={unlimited ? PLAN_LIMITS.VIP.resultsPerSearch : PLAN_LIMITS[(userPlan as keyof typeof PLAN_LIMITS)]?.resultsPerSearch ?? PLAN_LIMITS.FREE.resultsPerSearch}
             metaAds={metaAds}
+            onIndexTotal={setIndexTotal}
           />
 
           {yieldNote && (
@@ -2072,10 +2098,29 @@ export default function SearchPage() {
 
         {hasSearched && !loading && !error && results.length === 0 && !savedMeta?.rootName
           && (!job || job.status === 'done') && (
-          <div className="text-center py-16 text-ink-faint">
-            <p className="mb-2 text-ink-muted">{localized(S.emptyTitle, locale)}</p>
-            <p className="text-sm">{localized(S.emptyHint, locale)}</p>
-          </div>
+          (() => {
+            // Nula s podmínkami je něco jiného než nula bez nich: rada „zkuste jiný kraj" by
+            // byla falešná stopa, když výsledek zabily podmínky. Tlačítko je rovnou vypne.
+            const ids = active.size ? Array.from(active) : (savedMeta?.filters ?? []);
+            const labels = LEAD_FILTERS.filter(f => ids.includes(f.id)).map(f => localized(f.label, locale));
+            const withConditions = labels.length > 0 || districts.length > 0;
+            return (
+              <div className="text-center py-16 text-ink-faint">
+                <p className="mb-2 text-ink-muted">{localized(withConditions ? S.emptyConditions : S.emptyTitle, locale)}</p>
+                <p className="text-sm max-w-2xl mx-auto">
+                  {withConditions
+                    ? localized(S.emptyConditionsHint, locale).replace('{list}', [...labels, ...(districts.length ? [localized(S.districtsLabel, locale)] : [])].join(' · '))
+                    : localized(S.emptyHint, locale)}
+                </p>
+                {withConditions && (
+                  <button type="button" className="btn-outline btn-sm mt-4"
+                    onClick={() => { dirtyRef.current = true; setActive(new Set()); setDistricts([]); setPresetsOn(false); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>
+                    {localized(S.clearConditions, locale)}
+                  </button>
+                )}
+              </div>
+            );
+          })()
         )}
 
         {results.length > 0 && (
@@ -2556,6 +2601,33 @@ export default function SearchPage() {
                       ? localized(S.emptyByFilter, locale).replace('{n}', String(results.length))
                       : t('no_results')}
                   </p>
+                  {/* Nejmenší sada podmínek, bez které by něco zbylo: po jedné odebírá tu, jejíž
+                      vypnutí nechá nejvíc firem, dokud výsledek není nenulový. Jedna podmínka často
+                      nestačí (profil zapne tři a každá vyřadí jiné firmy). */}
+                  {(() => {
+                    if (results.length === 0 || active.size === 0) return null;
+                    let left = Array.from(active);
+                    const drop: string[] = [];
+                    let n = 0;
+                    while (left.length > 0 && n === 0) {
+                      const best = left
+                        .map(id => ({ id, n: results.filter(b => matchesAll(b, left.filter(x => x !== id))).length }))
+                        .sort((a, b) => b.n - a.n)[0];
+                      drop.push(best.id);
+                      left = left.filter(x => x !== best.id);
+                      n = best.n;
+                    }
+                    if (n === 0) return null;
+                    const names = drop.map(id => LEAD_FILTERS.find(x => x.id === id)).filter(Boolean).map(f => `„${localized(f!.label, locale)}"`);
+                    return (
+                      <p className="mb-4 text-sm text-ink-muted">
+                        {localized(drop.length === 1 ? S.blocker : S.blockerMany, locale).replace('{f}', names.join(', ')).replace('{n}', firmsCount(n, locale))}{' '}
+                        <button type="button" onClick={() => { for (const id of drop) toggle(id, false); }} className="underline underline-offset-2 text-ink hover:no-underline">
+                          {localized(S.blockerOff, locale)}
+                        </button>
+                      </p>
+                    );
+                  })()}
                   {active.size > 0 && (
                     <button onClick={() => setActive(new Set())} className="btn-outline btn-sm mx-auto">
                       {isCs ? 'Zrušit filtry' : 'Clear filters'}

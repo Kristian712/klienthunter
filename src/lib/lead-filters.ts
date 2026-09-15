@@ -971,6 +971,76 @@ export function indexConstraints(filterIds: readonly string[]) {
     hasEmployees: ids.has('has_employees'),
     noEmployees: ids.has('no_employees'),
     noCategory: ids.has('no_category'),
+    /**
+     * „Firma 3+ / 10+ let" jde v režimu indexu rovnou do dotazu (index zná datum vzniku). Dřív se
+     * uplatnila až nad staženými firmami — a protože index vrací nejnovější, z dvaceti stažených
+     * neprošla žádná a uživatel viděl „0 z 20".
+     */
+    olderThanYears: ids.has('established_10y') ? 10 : ids.has('established_3y') ? 3 : null,
     windowDays: registryWindowDays(filterIds),
   };
+}
+
+/**
+ * Podmínky, které nemůžou platit současně.
+ *
+ * Filtry se kombinují přes AND, takže „živnostník" a „obchodní společnost" naráz vrátí vždy
+ * nulu. 15. 9. 2026 majitel zapnul všech 34 chipů, hledání doběhlo s 0 firmami a vypadalo to
+ * jako pád. Teď zapnutí jedné podmínky vypne ty, se kterými se vylučuje (`addFilter`), a server
+ * totéž udělá s tím, co přijde (`normalizeFilters`, pozdější vyhrává).
+ */
+const NEW_WINDOWS = ['new_firm_30d', 'new_firm_90d', 'new_firm_6m', 'new_firm', 'new_firm_5y'];
+const WEB_REQUIRED = ['has_website', 'old_website', 'insecure_website', 'has_contact_page', 'ads_dated_web'];
+const WEB_ABSENT = ['no_web_found', 'no_website', 'web_unknown', 'no_web_has_fb', 'ads_no_web'];
+const EXCLUSIVE_SETS: string[][] = [
+  ['sole_trader', 'company_form'],
+  ['has_employees', 'no_employees'],
+  ['no_insolvency', 'in_insolvency'],
+  ['vat_payer', 'vat_none'],
+  ['vat_reliable_only', 'vat_unreliable'],
+  // Okna podle vzniku jsou do sebe vnořená; dvě naráz by platilo jen to užší a chip by lhal.
+  NEW_WINDOWS,
+  ['established_3y', 'established_10y'],
+  ['has_website', 'no_web_found', 'no_website', 'web_unknown'],
+  ['has_contact', 'no_contact'],
+];
+const EXTRA_CONFLICTS: Array<[string, string]> = [
+  ['vat_none', 'vat_unreliable'],
+  ['no_contact', 'has_phone'],
+  ['no_contact', 'has_email'],
+  ['no_contact', 'can_reach'],
+  ['no_social', 'no_web_has_fb'],
+  ...WEB_REQUIRED.flatMap(a => WEB_ABSENT.map(b => [a, b] as [string, string])),
+  ...['new_firm_30d', 'new_firm_90d', 'new_firm_6m', 'new_firm'].map(w => ['established_3y', w] as [string, string]),
+  ...NEW_WINDOWS.map(w => ['established_10y', w] as [string, string]),
+];
+const CONFLICTS = new Map<string, Set<string>>();
+function linkConflict(a: string, b: string) {
+  if (a === b) return;
+  if (!CONFLICTS.has(a)) CONFLICTS.set(a, new Set());
+  if (!CONFLICTS.has(b)) CONFLICTS.set(b, new Set());
+  CONFLICTS.get(a)!.add(b);
+  CONFLICTS.get(b)!.add(a);
+}
+for (const set of EXCLUSIVE_SETS) for (const a of set) for (const b of set) linkConflict(a, b);
+for (const [a, b] of EXTRA_CONFLICTS) linkConflict(a, b);
+
+/** Id podmínek, které s `id` nemůžou platit současně. */
+export function conflictsWith(id: string): string[] {
+  return Array.from(CONFLICTS.get(id) ?? []);
+}
+
+/** Zapne `id` a vypne všechno, s čím se vylučuje. Vrací novou množinu. */
+export function addFilter(active: Iterable<string>, id: string): Set<string> {
+  const next = new Set(active);
+  for (const c of conflictsWith(id)) next.delete(c);
+  next.add(id);
+  return next;
+}
+
+/** Odstraní protiklady z uloženého nebo poslaného seznamu; pozdější podmínka vyhrává. */
+export function normalizeFilters(ids: readonly string[]): string[] {
+  let set = new Set<string>();
+  for (const id of ids) set = addFilter(set, id);
+  return Array.from(set);
 }

@@ -64,12 +64,17 @@ const T = {
   legalCo:   { cs: ' · obchodní společnosti', sk: ' · obchodné spoločnosti', en: ' · companies' },
   preset:    { cs: 'profil', sk: 'profil', en: 'profile' },
   noCountArs:{ cs: 'bez indexu se počty neukazují', sk: 'bez indexu sa počty neukazujú', en: 'no counts without the index' },
+  zeroTitle: { cs: 'Těmto podmínkám neodpovídá žádná firma', sk: 'Týmto podmienkam nezodpovedá žiadna firma', en: 'No firm matches these conditions' },
+  zeroBody:  { cs: 'Index pro ně nenašel ani jednu firmu, takže hledání je zamčené — skončilo by prázdné a spotřebovalo by jedno z vašich hledání. Uberte některou podmínku: {list}.',
+               sk: 'Index pre ne nenašiel ani jednu firmu, takže hľadanie je zamknuté — skončilo by prázdne a spotrebovalo by jedno z vašich hľadaní. Uberte niektorú podmienku: {list}.',
+               en: 'The index found not a single firm for them, so the search is locked — it would come back empty and use up one of your searches. Remove a condition: {list}.' },
+  districtsSel: { cs: 'vybrané okresy', sk: 'vybrané okresy', en: 'selected districts' },
 };
 
 const INDEX_ONLY = new Set(['has_employees', 'no_employees']);
 
 export function SearchComposer({
-  locale, region, industry, active, toggle, districts, setDistricts, presetIds, limit, metaAds = true,
+  locale, region, industry, active, toggle, districts, setDistricts, presetIds, limit, metaAds = true, onIndexTotal,
 }: {
   locale: string;
   region: string;
@@ -83,6 +88,8 @@ export function SearchComposer({
   limit: number;
   /** Je nastavený token Meta Ad Library API? Bez něj se filtry se zdrojem Meta vůbec nenabízejí. */
   metaAds?: boolean;
+  /** Kolik firem index pro současné podmínky najde; null = neví (ARES režim, počítá se). Stránka podle toho zamkne hledání. */
+  onIndexTotal?: (total: number | null) => void;
 }) {
   const t = (x: { cs: string; sk?: string; en: string }) => localized(x, locale);
   const [open, setOpen] = useState(false);
@@ -124,6 +131,11 @@ export function SearchComposer({
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [region, industry, ids.join(','), districts.join(',')]);
+
+  // Stránka potřebuje vědět, že by hledání skončilo nulou — zamkne tlačítko Vyhledat.
+  useEffect(() => {
+    onIndexTotal?.(indexMode && counts && !counting ? counts.total : null);
+  }, [indexMode, counts, counting, onIndexTotal]);
 
   /** Volba, která existuje jen v indexu, si okno zapne sama a řekne to. */
   const ensureWindow = () => {
@@ -254,6 +266,17 @@ export function SearchComposer({
           <span className="font-semibold uppercase tracking-wider text-[11px] text-ink-faint mr-2">{t(T.scopeIdx)}</span>
           {scopeLine}
         </p>
+      )}
+      {indexMode && counts && !counting && counts.total === 0 && (
+        <div role="alert" className="mt-3 rounded-lg border border-ink bg-ink/[0.06] px-3 py-2.5">
+          <p className="text-xs font-semibold text-ink">{t(T.zeroTitle)}</p>
+          <p className="mt-0.5 text-xs leading-relaxed text-ink-muted">
+            {t(T.zeroBody).replace('{list}', [
+              ...LEAD_FILTERS.filter(f => active.has(f.id)).map(f => t(f.label)),
+              ...(districts.length ? [t(T.districtsSel)] : []),
+            ].join(' · ') || '—')}
+          </p>
+        </div>
       )}
       {/* Mez hledání bez oboru patří PŘED spuštění a mimo sbalený panel: kdo zvolí kraj nebo celou
           ČR a obor nechá prázdný, musí vědět, že starší firmy nedostane a proč. */}

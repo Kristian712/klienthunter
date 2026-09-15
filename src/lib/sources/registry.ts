@@ -64,6 +64,7 @@ export function indexWhere(q: { nuts3: string | null; districts?: readonly strin
   if (c.hasEmployees) and.push({ employeeCategory: { notIn: ['000', '110'], not: null } });
   if (c.noEmployees) and.push({ employeeCategory: '110' });
   if (c.noCategory) and.push({ OR: [{ nace: null }, { nace: '' }, { nace: '00' }] });
+  if (c.olderThanYears) and.push({ foundedAt: { lte: new Date(Date.now() - c.olderThanYears * 365.25 * 86_400_000) } });
   return { AND: and };
 }
 

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { sessionFrom } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { NEW_FIRM_WINDOW_DAYS, registryWindowDays } from '@/lib/lead-filters';
+import { NEW_FIRM_WINDOW_DAYS, normalizeFilters, registryWindowDays } from '@/lib/lead-filters';
 import { isWholeCz, nuts3ForRegion } from '@/lib/regions-nuts';
 import { indexWhere, naceCodesFor } from '@/lib/sources/registry';
 import { isAllIndustries } from '@/lib/industries';
@@ -31,7 +31,8 @@ export async function POST(req: NextRequest) {
   const payload = sessionFrom(req);
   if (!payload) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   try {
-    const body = Body.parse(await req.json());
+    const parsed = Body.parse(await req.json());
+    const body = { ...parsed, filters: normalizeFilters(parsed.filters) };
     const nuts3 = nuts3ForRegion(body.region);
     // Celá ČR: index pokrývá celou republiku, počítá se bez omezení na kraj.
     if (!nuts3 && !isWholeCz(body.region)) return NextResponse.json({ counts: null });
