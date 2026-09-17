@@ -6,6 +6,7 @@ import { naceLabel } from '@/lib/nace-codes';
 import { markNew, searchMeta } from '@/lib/saved-search';
 import { prisma } from '@/lib/db';
 import { cityOf, resolveFilters } from '@/lib/lead-filters';
+import { cleanEmail } from '@/lib/sources/site-contacts';
 
 /**
  * Reads back the rows of one search.
@@ -62,7 +63,9 @@ export async function GET(
     const marked = await markClaims(visible, payload.userId, Boolean(account && isPaying(account)));
     const meta = await searchMeta(params.id, payload.userId);
     const withNew = await markNew(meta, payload.userId, marked);
-    const labeled = withNew.map(r => ({ ...r, categoryLabel: naceLabel(r.category) }));
+    // Řádky uložené dřív, než se e-maily čistily při zápisu, se uklidí aspoň při čtení —
+    // „%20info@firma.cz" by uživatel zkopíroval do pošty a nedoručilo by se to.
+    const labeled = withNew.map(r => ({ ...r, email: cleanEmail(r.email), categoryLabel: naceLabel(r.category) }));
     return NextResponse.json({ results: labeled, total: labeled.length, salt: orderSalt(payload.userId), search: meta });
   } catch (err) {
     console.error('/api/searches/[id]/results:', err);

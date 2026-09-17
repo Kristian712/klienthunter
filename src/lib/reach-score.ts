@@ -78,3 +78,65 @@ export function reachHint(b: FilterableLead): { cs: string; sk: string; en: stri
            sk: 'Kontakt nemáme žiadny — dohľadajte ju podľa názvu.',
            en: 'No contact at all — look the firm up by name.' };
 }
+
+/**
+ * Pořadí, ve kterém má smysl obvolávat: „jde oslovit" a zároveň „něco jí chybí".
+ *
+ * Skóre leadu odpovídá na otázku uživatele (jeho kritéria), tohle na otázku produktu: komu volat
+ * první. Firma bez jediného kanálu je pro oslovování k ničemu, i kdyby splnila všechna kritéria —
+ * proto padá dolů. Nahoru jde ta, která se dá oslovit (telefon, e-mail, sítě) a přitom nemá web
+ * nebo má zastaralý: to je přesně firma, které má tvůrce webů co nabídnout.
+ *
+ * Váhy jsou dohodnuté, ne změřené, a v UI se to říká: řádek ukazuje dosažitelnost i důvod.
+ */
+const GAP_NO_WEB = 18;
+const GAP_OLD_WEB = 12;
+const SOCIAL_NO_WEB = 8;
+const ACTIVE_BONUS = 6;
+const UNREACHABLE_FACTOR = 0.15;
+const UNRELIABLE_MALUS = 15;
+
+export function opportunityScore(b: FilterableLead): number {
+  const reach = reachScore(b);
+  // Bez kanálu není co dělat: taková firma nesmí předběhnout tu, které jde napsat.
+  if (!hasReachChannel(b)) return Math.round(reach * UNREACHABLE_FACTOR);
+
+  let score = reach * 0.7;
+  const web = webStatusOf(b);
+  if (web !== 'HAS') score += GAP_NO_WEB;
+  else if (b.websiteIsOld) score += GAP_OLD_WEB;
+  if (web !== 'HAS' && (b.hasFacebook || b.hasInstagram || b.hasLinkedIn)) score += SOCIAL_NO_WEB;
+  // Známky toho, že firma opravdu běží — jinak by nahoru šly prázdné schránky bez činnosti.
+  if ((b.activePremises ?? 0) > 0 || b.vatPayer === true) score += ACTIVE_BONUS;
+  if (b.vatUnreliable === true) score -= UNRELIABLE_MALUS;
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
+
+/** Jednou větou, proč je firma v pořadí tam, kde je. */
+export function opportunityReason(b: FilterableLead): { cs: string; sk: string; en: string } {
+  if (!hasReachChannel(b)) {
+    return { cs: 'Nemáme na ni žádný kontakt — oslovit ji zatím nejde.',
+             sk: 'Nemáme na ňu žiadny kontakt — osloviť ju zatiaľ nejde.',
+             en: 'We have no contact for it — there is no way to reach out yet.' };
+  }
+  const web = webStatusOf(b);
+  const social = Boolean(b.hasFacebook || b.hasInstagram || b.hasLinkedIn);
+  if (web !== 'HAS' && social) {
+    return { cs: 'Jde oslovit a web jsme jí nenašli — na sítích aktivní je.',
+             sk: 'Dá sa osloviť a web sme jej nenašli — na sieťach aktívna je.',
+             en: 'Reachable and we found no website — yet it is active on social media.' };
+  }
+  if (web !== 'HAS') {
+    return { cs: 'Jde oslovit a web jsme jí nenašli.',
+             sk: 'Dá sa osloviť a web sme jej nenašli.',
+             en: 'Reachable and we found no website.' };
+  }
+  if (b.websiteIsOld) {
+    return { cs: 'Jde oslovit a její web propadl v auditu.',
+             sk: 'Dá sa osloviť a jej web prepadol v audite.',
+             en: 'Reachable and its website failed the audit.' };
+  }
+  return { cs: 'Jde oslovit; web má a vypadá v pořádku.',
+           sk: 'Dá sa osloviť; web má a vyzerá v poriadku.',
+           en: 'Reachable; it has a website and it looks fine.' };
+}

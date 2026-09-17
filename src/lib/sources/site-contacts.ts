@@ -64,6 +64,28 @@ export function normalizeCzPhone(raw: string): string | null {
   return null;
 }
 
+/**
+ * Uklidí e-mail do tvaru, který jde rovnou použít.
+ *
+ * `mailto:` odkazy nesou i procenta („mailto:%20info@firma.cz" = mezera před adresou), lomítka,
+ * uvozovky a interpunkci z okolního textu. Do 18. 9. 2026 se ukládalo, co přišlo, a v seznamu
+ * i v exportu pak svítilo „%20objednavky@dastransport.cz" — adresa, na kterou nikdo nenapíše.
+ * Vrací `null`, když z toho e-mail nezbude; radši prázdno než nepoužitelná adresa.
+ */
+export function cleanEmail(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  let value = String(raw).trim();
+  try { value = decodeURIComponent(value); } catch { /* neúplné procento — bereme, jak přišlo */ }
+  value = value
+    .replace(/^mailto:/i, '')
+    .replace(/[?#].*$/, '')
+    .replace(/^[^a-z0-9._%+-]+/i, '')
+    .replace(/[^a-z0-9]+$/i, '')
+    .trim()
+    .toLowerCase();
+  return /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(value) ? value : null;
+}
+
 export function extractContacts(html: string, siteUrl?: string): Pick<RawLead, 'email' | 'phone'> {
   const siteHost = registrableHost(siteUrl);
   const out: Pick<RawLead, 'email' | 'phone'> = {};
@@ -74,7 +96,8 @@ export function extractContacts(html: string, siteUrl?: string): Pick<RawLead, '
 
   let best = 0;
   for (const raw of candidates) {
-    const email = raw.trim().toLowerCase();
+    const email = cleanEmail(raw);
+    if (!email) continue;
     const score = scoreEmail(email, siteHost) + (mailtos.includes(raw) ? 1 : 0);
     if (score > best) {
       best = score;

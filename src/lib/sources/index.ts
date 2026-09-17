@@ -9,7 +9,7 @@ export type { DiscoveryOptions } from './types';
 export type { TradeLicence } from './types';
 
 export type { RawLead, DiscoverySource, EnrichmentSource, MatchedBy } from './types';
-export { extractContacts, contactPageUrl } from './site-contacts';
+export { cleanEmail, extractContacts, contactPageUrl } from './site-contacts';
 export { OSM_ATTRIBUTION } from './osm';
 export { registryCanServe } from './registry';
 export type { RegistryQuery } from './registry';

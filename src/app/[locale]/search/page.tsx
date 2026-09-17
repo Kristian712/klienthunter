@@ -15,7 +15,7 @@ import { SearchComposer } from '@/components/SearchComposer';
 import { PLAN_LIMITS } from '@/lib/plans';
 import { LEAD_FILTERS, GROUP_LABELS, GROUP_ORDER, addFilter, effectiveWindowDays, employeeLabel, matchesAll, localized, normalizeFilters, type FilterGroup } from '@/lib/lead-filters';
 import { leadReason } from '@/lib/lead-reason';
-import { reachHint, reachScore } from '@/lib/reach-score';
+import { opportunityReason, opportunityScore, reachHint, reachScore } from '@/lib/reach-score';
 import { scoreBreakdown } from '@/lib/lead-score';
 import { websiteAudit } from '@/lib/website-audit';
 import { YIELD_NOTE, yieldFor } from '@/lib/nace-map';
@@ -23,7 +23,7 @@ import { SCENARIOS, SCENARIO_BY_PROFESSION, scenarioById } from '@/lib/scenarios
 import { EMPTY_PROFILE, industriesFor, presetFiltersFor, type UserProfile } from '@/lib/profile';
 import { ALL_INDUSTRIES, ALL_INDUSTRIES_LABEL, MAX_INDUSTRIES, isAllIndustries, joinIndustries, splitIndustries } from '@/lib/industries';
 import { isWholeCz, nuts3ForRegion } from '@/lib/regions-nuts';
-import { compareRanked, type ClaimMark } from '@/lib/claim-order';
+import { compareRanked, rankedScore, type ClaimMark } from '@/lib/claim-order';
 
 /** Totéž, co vrací `searchMeta` v lib/saved-search.ts. */
 interface SavedMeta {
@@ -186,16 +186,16 @@ function rowSummary(b: BusinessResult, criteria: string[], locale: string) {
 // ── Icons ─────────────────────────────────────────────────────────────────────
 
 function FbIcon() {
-  return <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>;
+  return <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>;
 }
 function IgIcon() {
-  return <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>;
+  return <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>;
 }
 function LiIcon() {
-  return <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>;
+  return <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>;
 }
 function WaIcon() {
-  return <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>;
+  return <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>;
 }
 
 /** Lidský název oboru podle slugu. Slug, který v nabídce není, se ukáže tak, jak přišel. */
@@ -244,6 +244,18 @@ function lookupHref(b: BusinessResult): string {
   return `https://www.google.com/search?q=${encodeURIComponent([b.name, town].filter(Boolean).join(' '))}`;
 }
 
+/**
+ * Odkaz do Google Map na hledání firmy podle názvu a města.
+ *
+ * Jen odkaz, který si uživatel otevře sám — žádné API a žádné stahování dat, takže se ho
+ * netýkají podmínky Places (viz paměť `data-sources-constraints`). U firmy bez kontaktu je to
+ * nejrychlejší cesta, jak si telefon dohledat ručně: na mapách ho firmy uvádějí běžně.
+ */
+function mapsHref(b: BusinessResult): string {
+  const q = [b.name, b.address].filter(Boolean).join(', ');
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;
+}
+
 function whatsappHref(phone: string): string {
   const d = phone.replace(/[\s\-()+]/g, '');
   const num = d.startsWith('420') ? d : `420${d}`;
@@ -281,6 +293,10 @@ const CONTACT = {
   liTip:   { cs: 'Profil firmy, na který odkazuje její web. Zpráva jde správci stránky.',
              sk: 'Profil firmy, na ktorý odkazuje jej web. Správa ide správcovi stránky.',
              en: 'The company profile its own website links to. Messages reach the page admin.' },
+  maps:    { cs: 'Mapy', sk: 'Mapy', en: 'Maps' },
+  mapsTip: { cs: 'Otevře firmu v Google Mapách. Telefon, který nemáme, tam firmy obvykle uvádějí — appka odtud nic nestahuje, jen vás tam pošle.',
+             sk: 'Otvorí firmu v Google Mapách. Telefón, ktorý nemáme, tam firmy zvyčajne uvádzajú — appka odtiaľ nič nesťahuje, len vás tam pošle.',
+             en: 'Opens the firm in Google Maps. A phone number we do not have is usually listed there — the app downloads nothing from it, it just takes you there.' },
   fb:      { cs: 'Zpráva na Facebooku', sk: 'Správa na Facebooku', en: 'Facebook message' },
   fbTip:   { cs: 'Stránku spravuje někdo z firmy; zpráva od cizího účtu často končí v žádostech.',
              sk: 'Stránku spravuje niekto z firmy; správa od cudzieho účtu často končí v žiadostiach.',
@@ -377,18 +393,21 @@ function ContactStrategy({ b, locale }: { b: BusinessResult; locale: string }) {
    */
   type Method = { key: string; icon: React.ReactNode; label: string; href: string; tip: string; value?: string };
   const methods: Method[] = [];
+  /** Web nebo stránka „Kontakt" — zařadí se až za telefon a e-mail. */
+  let webMethod: Method | null = null;
 
-  // First, because it is the page the firm itself keeps for being contacted on.
-  if (b.contactUrl) {
-    methods.push({ key: 'contact', icon: <ExternalLink size={11} />, label: L(CONTACT.contact),
-                   href: b.contactUrl, tip: L(CONTACT.contactTip) });
-  } else if (b.website) {
+  // Web a kontaktní stránka až za telefonem a e-mailem: uživatel chce volat a psát, ne procházet
+  // cizí weby. Dřív stála kontaktní stránka první a číslo bylo až druhé v pořadí.
+  if (b.website && !b.contactUrl) {
     // I web, který zdroj uvedl a nám neodpověděl. Stránka může být chvíli mimo provoz a mrtvý
     // web je sám o sobě důvod firmu oslovit — jen se u něj nesmí tvrdit, že jsme ho ověřili.
     const overeny = webStatus(b) === 'HAS';
-    methods.push({ key: 'web', icon: <Globe size={11} />, label: L(CONTACT.web),
-                   href: b.website, tip: L(overeny ? CONTACT.webTip : CONTACT.webUnv),
-                   value: b.website.replace(/^https?:\/\//, '') });
+    webMethod = { key: 'web', icon: <Globe size={12} />, label: L(CONTACT.web),
+                  href: b.website, tip: L(overeny ? CONTACT.webTip : CONTACT.webUnv),
+                  value: b.website.replace(/^https?:\/\//, '') };
+  } else if (b.contactUrl) {
+    webMethod = { key: 'contact', icon: <ExternalLink size={12} />, label: L(CONTACT.contact),
+                  href: b.contactUrl, tip: L(CONTACT.contactTip) };
   }
 
   if (b.phone) {
@@ -400,6 +419,15 @@ function ContactStrategy({ b, locale }: { b: BusinessResult; locale: string }) {
                      href: whatsappHref(b.phone), tip: L(CONTACT.waTip) });
     }
   }
+
+  // E-mail hned za telefon: psát se dá kdykoli, volat jen v pracovní době. Sítě až za ním —
+  // zpráva z neznámého účtu končívá v žádostech.
+  if (b.email) {
+    methods.push({ key: 'email', icon: <Mail size={12} />, label: L(CONTACT.email),
+                   href: `mailto:${b.email}`, tip: L(CONTACT.emailTip), value: b.email });
+  }
+
+  if (webMethod) methods.push(webMethod);
 
   if (b.hasInstagram && b.instagramUrl) {
     methods.push({ key: 'ig', icon: <IgIcon />, label: L(CONTACT.ig),
@@ -417,11 +445,6 @@ function ContactStrategy({ b, locale }: { b: BusinessResult; locale: string }) {
                    href: b.linkedInUrl, tip: L(CONTACT.liTip) });
   }
 
-  if (b.email) {
-    methods.push({ key: 'email', icon: <Mail size={11} />, label: L(CONTACT.email),
-                   href: `mailto:${b.email}`, tip: L(CONTACT.emailTip), value: b.email });
-  }
-
   /**
    * Firma bez webu, u které profil neznáme — přesně ta skupina, kterou uživatel oslovuje přes
    * sítě a dosud si ji dohledával ručně. Nabídneme vyhledávání, ne výsledek.
@@ -431,55 +454,57 @@ function ContactStrategy({ b, locale }: { b: BusinessResult; locale: string }) {
                    href: facebookSearchHref(b), tip: L(CONTACT.fbSearchTip) });
   }
 
+  // Mapy má každá firma: telefon, který nemáme z webu ani z OpenStreetMap, bývá na jejím
+  // zápisu v mapách. Je to obyčejný odkaz na vyhledávání, nic se odtud nestahuje.
+  methods.push({ key: 'maps', icon: <MapPin size={12} />, label: L(CONTACT.maps),
+                 href: mapsHref(b), tip: L(CONTACT.mapsTip) });
+
   // Only when nothing else worked. A row from ARES has a name, an address and an IČO and
   // nothing you can call — leaving it with no action at all is what made the whole list feel
   // broken, even though every fact on it was true.
-  if (methods.length === 0) {
-    methods.push({ key: 'lookup', icon: <Search size={11} />, label: L(CONTACT.lookup),
+  if (methods.filter(m => m.key !== 'maps').length === 0) {
+    methods.push({ key: 'lookup', icon: <Search size={12} />, label: L(CONTACT.lookup),
                    href: lookupHref(b), tip: L(CONTACT.lookupTip) });
   }
 
   return (
-    <div className="mt-3 border-t border-line pt-3">
-      <div className="flex items-baseline justify-between gap-3 mb-2">
-        <p className="text-[11px] font-semibold text-ink-faint uppercase tracking-wider">
+    <div className="mt-4 border-t border-line pt-4">
+      <div className="flex items-baseline justify-between gap-3 mb-2.5">
+        <p className="text-xs font-semibold text-ink uppercase tracking-wider">
           {L(CONTACT.heading)}
         </p>
-        <span className="flex items-center gap-1.5 shrink-0" title={L(reachHint(b))}>
+        <span className="flex items-center gap-2 shrink-0" title={L(reachHint(b))}>
           <span className="text-[11px] uppercase tracking-wider text-ink-faint">{L(CONTACT.reach)}</span>
-          {/* Proužek místo druhého velkého čísla: řádek už jedno má a dvě soutěžící čísla
-              se čtou hůř než jedno číslo a jedna délka. Výplň je tlumeně šedá, ne plně světlá —
-              na tmavém řádku by jinak svítila víc než název firmy i skóre. */}
-          <span className="h-1 w-12 rounded-full bg-ink/15 overflow-hidden" aria-hidden>
-            <span className="block h-full bg-ink-muted" style={{ width: `${reach}%` }} />
+          <span className="h-1.5 w-16 rounded-full bg-ink/15 overflow-hidden" aria-hidden>
+            <span className="block h-full bg-ink transition-[width] duration-500" style={{ width: `${reach}%` }} />
           </span>
-          <span className="text-[11px] tnum text-ink-muted">{reach}</span>
+          <span className="text-xs tnum text-ink-muted">{reach}</span>
         </span>
       </div>
-      <div className="space-y-2">
+      {/*
+        Kontakt je to hlavní, kvůli čemu tu řádek je, takže je z něj tlačítko s hodnotou uvnitř:
+        telefonní číslo a e-mail jdou přečíst i zkopírovat rovnou, bez rozklikávání. Dřív byla
+        hodnota drobným písmem vedle a tlačítko neslo jen sloveso. Vysvětlivka zůstává v bublině.
+      */}
+      <div className="flex flex-wrap gap-2">
         {methods.map((m, i) => (
-          <div key={m.key} className="flex items-start gap-2.5">
-            <a
-              href={m.href}
-              target={m.key !== 'call' && m.key !== 'email' ? '_blank' : undefined}
-              // A search engine has no business knowing which firm our user is about to call.
-              referrerPolicy="no-referrer"
-              rel="noopener noreferrer"
-              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs shrink-0 border transition-colors ${
-                i === 0
-                  ? 'border-ink text-ink font-semibold hover:bg-ink hover:text-surface'
-                  : 'border-field text-ink-muted hover:border-ink hover:text-ink'
-              }`}
-            >
-              {m.icon}
-              {m.label}
-            </a>
-            <span className="text-[11px] text-ink-faint leading-tight pt-1 min-w-0">
-              {m.value && <span className="font-mono text-ink-muted break-all">{m.value}</span>}
-              {m.value && ' · '}
-              {m.tip}
-            </span>
-          </div>
+          <a
+            key={m.key}
+            href={m.href}
+            target={m.key !== 'call' && m.key !== 'email' ? '_blank' : undefined}
+            // A search engine has no business knowing which firm our user is about to call.
+            referrerPolicy="no-referrer"
+            rel="noopener noreferrer"
+            title={m.tip}
+            className={`kh-contact inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm min-h-[40px] ${
+              i === 0
+                ? 'border-ink bg-ink text-surface font-semibold hover:bg-ink/90'
+                : 'border-field text-ink hover:border-ink hover:bg-ink/[0.06]'
+            }`}
+          >
+            <span className="shrink-0 opacity-90">{m.icon}</span>
+            <span className={m.value ? 'font-mono tracking-tight' : 'font-medium'}>{m.value ?? m.label}</span>
+          </a>
         ))}
       </div>
     </div>
@@ -574,6 +599,10 @@ const S = {
   icoTip:     { cs: 'IČO z veřejného rejstříku ARES', sk: 'IČO z verejného registra ARES', en: 'Company ID from the public ARES register' },
   origSource: { cs: 'Původní zdroj záznamu', sk: 'Pôvodný zdroj záznamu', en: 'Original source of the record' },
   adsBadge:   { cs: 'Inzeruje na Meta', sk: 'Inzeruje na Meta', en: 'Advertises on Meta' },
+  sortLabel:  { cs: 'Řadit', sk: 'Zoradiť', en: 'Sort' },
+  sortReach:  { cs: 'Nejdřív ty, co jde oslovit', sk: 'Najprv tie, čo sa dá osloviť', en: 'Reachable ones first' },
+  sortScore:  { cs: 'Podle mých kritérií', sk: 'Podľa mojich kritérií', en: 'By my criteria' },
+  sortName:   { cs: 'Podle názvu', sk: 'Podľa názvu', en: 'By name' },
   adsTipWeb:  { cs: 'Stránka „{p}" má v Knihovně reklam Meta {n} aktivních reklam, vedou na {d}.',
                 sk: 'Stránka „{p}" má v Knižnici reklám Meta {n} aktívnych reklám, vedú na {d}.',
                 en: 'Page “{p}” has {n} active ads in the Meta Ad Library, linking to {d}.' },
@@ -1025,6 +1054,8 @@ export default function SearchPage() {
   const [showSave, setShowSave] = useState(false);
   const [onlyNew, setOnlyNew] = useState(false);
   const [onlyContactNew, setOnlyContactNew] = useState(false);
+  /** Čím se řadí seznam. Výchozí „reach" = nejdřív firmy, které jde oslovit a něco jim chybí. */
+  const [sortMode, setSortMode] = useState<'reach' | 'score' | 'name'>('reach');
   /** Export se otevírá v novém okně a nemá odpověď, na kterou by šlo čekat — po kliknutí se
       tlačítka na chvíli zamknou, aby dvojklik nestáhl dva soubory. */
   const [exportBusy, setExportBusy] = useState(false);
@@ -1285,11 +1316,26 @@ export default function SearchPage() {
   // Dva účty tak vidí u stejně bodovaných firem jiné pořadí; tentýž účet vždy stejné.
   const newCount = results.filter(b => b.isNew).length;
   const contactNewCount = results.filter(b => b.contactNew).length;
+  /**
+   * Pořadí seznamu. Výchozí je „nejdřív ty, co jde oslovit": firma bez kontaktu je pro
+   * oslovování k ničemu, i kdyby splnila všechna kritéria, a firma, která jde oslovit a nemá
+   * web, je přesně ta, které má uživatel co nabídnout (lib/reach-score `opportunityScore`).
+   * Skóre podle vlastních kritérií zůstává druhou volbou, aby se nikomu neschovalo.
+   */
   const filtered = results
     .filter(b => matchesAll(b, active))
     .filter(b => !onlyNew || b.isNew)
     .filter(b => !onlyContactNew || b.contactNew)
-    .sort(compareRanked(salt));
+    .sort(
+      sortMode === 'name'
+        ? (a, b) => (a.name ?? '').localeCompare(b.name ?? '', locale === 'en' ? 'en' : 'cs')
+        : sortMode === 'score'
+          ? compareRanked(salt)
+          : (a, b) => {
+              const diff = rankedScore(opportunityScore(b), b.claim ?? null) - rankedScore(opportunityScore(a), a.claim ?? null);
+              return diff !== 0 ? diff : b.leadScore - a.leadScore;
+            },
+    );
 
   /**
    * Nejčastější zdroj mezi zobrazenými řádky. Řádky, které z něj pocházejí, štítek nedostanou —
@@ -2169,6 +2215,16 @@ export default function SearchPage() {
                 </div>
 
                 <div className="flex items-center gap-4 flex-wrap">
+                  {/* Řazení. Výchozí je dosažitelnost, protože k čemu je firma, kterou nejde oslovit. */}
+                  <label className="flex items-center gap-2 text-xs text-ink-muted">
+                    <span className="uppercase tracking-wider text-[11px] text-ink-faint">{localized(S.sortLabel, locale)}</span>
+                    <select value={sortMode} onChange={e => setSortMode(e.target.value as typeof sortMode)}
+                      className="input h-9 w-auto py-0 pr-8 text-xs cursor-pointer">
+                      <option value="reach">{localized(S.sortReach, locale)}</option>
+                      <option value="score">{localized(S.sortScore, locale)}</option>
+                      <option value="name">{localized(S.sortName, locale)}</option>
+                    </select>
+                  </label>
                   {/* Seznam / mapa. Mapa umí zobrazit jen firmy se souřadnicemi, takže je to
                       druhý pohled na tatáž data, ne náhrada seznamu. */}
                   <div className="flex gap-1">
@@ -2407,12 +2463,12 @@ export default function SearchPage() {
                       <div className="flex items-start justify-between gap-2">
                         <div>
                           <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="font-semibold text-ink leading-tight">{b.name}</h3>
+                            <h3 className="text-base md:text-lg font-bold text-ink leading-tight tracking-tight">{b.name}</h3>
                             <SourceBadge source={b.source} common={commonSource} locale={locale} />
                           </div>
                           {b.address && (
-                            <p className="text-xs text-ink-faint mt-1 flex items-center gap-1">
-                              <MapPin size={11} />{b.address}
+                            <p className="text-sm text-ink-muted mt-1 flex items-center gap-1.5">
+                              <MapPin size={13} className="shrink-0 text-ink-faint" />{b.address}
                             </p>
                           )}
                         </div>
@@ -2529,7 +2585,7 @@ export default function SearchPage() {
                       {/* Věta „proč oslovit" pro úzké obrazovky. Pravý sloupec se pod 1024 px
                           schovává, takže na telefonu by ji jinak nikdo nikdy neviděl — a je to
                           ta jediná věta, kvůli které má řádek smysl číst. */}
-                      <p className="lg:hidden text-xs text-ink-muted leading-relaxed mt-3">{reason}</p>
+                      <p className="lg:hidden text-sm text-ink-muted leading-relaxed mt-3">{reason}</p>
                       {/* Čím se zapnuté filtry u téhle firmy opírají — „vznik 14. 9. 2026 · ARES". Filtr,
                           který důkaz nemá, tu nic netvrdí. */}
                       {(() => {
@@ -2545,7 +2601,7 @@ export default function SearchPage() {
                         else if (b.matchedBy === 'name') proofs.push(localized(S.matchedName, locale));
                         else if (b.matchedBy === 'osm') proofs.push(localized(S.matchedOsm, locale));
                         return proofs.length > 0 ? (
-                          <p className="text-[11px] text-ink-faint leading-relaxed mt-2">
+                          <p className="text-xs text-ink-faint leading-relaxed mt-2">
                             <span className="text-ink-muted">{localized(S.provenBy, locale)}</span> {Array.from(new Set(proofs)).join(' · ')}
                           </p>
                         ) : null;
@@ -2560,7 +2616,7 @@ export default function SearchPage() {
                         const changed = b.registryUpdatedAt ? formatDate(b.registryUpdatedAt, locale) : '';
                         if (subjects.length === 0 && !changed) return null;
                         return (
-                          <p className="text-[11px] text-ink-faint leading-relaxed mt-1" title={subjects.join(' · ')}>
+                          <p className="text-xs text-ink-faint leading-relaxed mt-1" title={subjects.join(' · ')}>
                             {subjects.length > 0 && (
                               <><span className="text-ink-muted">{localized(S.tradesLabel, locale)}</span> {subjects.slice(0, 3).map(short).join(' · ')}
                               {subjects.length > 3 && ` ${localized(S.tradesMore, locale).replace('{n}', String(subjects.length - 3))}`}</>
@@ -2587,17 +2643,17 @@ export default function SearchPage() {
                           odlišuje doložené „web nemá" od domněnky, a kvůli tomu se celá detekce
                           přepisovala. Na úzkých obrazovkách proto stojí v textu. */}
                       {b.websiteEvidence && (
-                        <p className="lg:hidden text-[11px] text-ink-faint leading-relaxed mt-1">{b.websiteEvidence}</p>
+                        <p className="lg:hidden text-xs text-ink-faint leading-relaxed mt-1">{b.websiteEvidence}</p>
                       )}
                     </div>
 
                     {/* Why this score (desktop) */}
                     {(
-                      <div className="hidden lg:block shrink-0 w-52 min-w-0 text-right">
+                      <div className="hidden lg:block shrink-0 w-56 min-w-0 text-right">
                         <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint mb-1">
                           {isCs ? 'Proč' : 'Why'}
                         </p>
-                        <p className="text-xs text-ink-muted leading-relaxed">{reason}</p>
+                        <p className="text-sm text-ink-muted leading-relaxed">{reason}</p>
                       </div>
                     )}
                   </div>

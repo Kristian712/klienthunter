@@ -255,6 +255,17 @@
   .card-hover:hover::after,
   .card-glow:hover::after { opacity: 1; }
 
+  /**
+   * Kontaktní tlačítko na řádku výsledku. Kvůli tomuhle tlačítku tu celý řádek je, takže se
+   * na hover zvedne a lehce prosvítí. Animuje se jen `transform` a barvy — pět set řádků
+   * v seznamu nesmí při scrollu nic přepočítávat.
+   */
+  .kh-contact {
+    @apply transition-[transform,background-color,border-color,box-shadow] duration-200;
+  }
+  .kh-contact:hover { transform: translateY(-1px); box-shadow: 0 6px 18px -10px rgb(255 255 255 / .5); }
+  .kh-contact:active { transform: translateY(0); }
+
   /* A data row: separated from its neighbour by one line, nothing else. */
   .row {
     @apply border-b border-line transition-colors duration-150 hover:bg-surface-subtle;

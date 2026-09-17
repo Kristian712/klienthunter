@@ -739,6 +739,21 @@ export const LEAD_FILTERS: LeadFilter[] = [
     test: b => Boolean(b.email),
   },
   {
+    id: 'has_social',
+    group: 'reach',
+    label: { cs: 'Má sociální sítě', sk: 'Má sociálne siete', en: 'Has social profiles' },
+    source: 'web',
+    hint: { cs: 'Odkaz na Facebook, Instagram nebo LinkedIn našel náš robot na webu firmy, nebo ho uvedl mapér v OpenStreetMap. Firma, která sítě spravuje, obvykle odpoví i na zprávu.',
+            sk: 'Odkaz na Facebook, Instagram alebo LinkedIn našiel náš robot na webe firmy, alebo ho uviedol mapér v OpenStreetMap. Firma, ktorá siete spravuje, obvykle odpovie aj na správu.',
+            en: 'A link to Facebook, Instagram or LinkedIn found on the firm’s own site, or tagged by a mapper in OpenStreetMap. A firm that keeps its profiles usually answers a message too.' },
+    where: { OR: [{ hasFacebook: true }, { hasInstagram: true }, { hasLinkedIn: true }] },
+    test: b => hasSocial(b),
+    unknown: b => !hasSocial(b) && !b.socialsChecked,
+    evidence: (b, l) => hasSocial(b)
+      ? localized({ cs: 'profil na sociální síti · web firmy / OpenStreetMap', sk: 'profil na sociálnej sieti · web firmy / OpenStreetMap', en: 'social profile · firm’s website / OpenStreetMap' }, l)
+      : null,
+  },
+  {
     id: 'no_social',
     group: 'reach',
     /**

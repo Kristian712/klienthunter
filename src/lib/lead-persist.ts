@@ -2,7 +2,7 @@ import { analyzeBusinessFull } from './business-checks';
 import { prisma } from './db';
 import type { Prisma } from '@prisma/client';
 import { leadScore } from './lead-score';
-import { contactPageUrl, extractContacts } from './sources';
+import { cleanEmail, contactPageUrl, extractContacts } from './sources';
 import { socialFromUrl } from './website-status';
 import type { VerifiedCandidate } from './lead-pipeline';
 import { withoutOptouts } from './optout';
@@ -44,7 +44,7 @@ export async function persistResults(
 
     const row = {
       phone:         c.phone ?? contacts.phone,
-      email:         c.email ?? contacts.email ?? checks?.email,
+      email:         cleanEmail(c.email ?? contacts.email ?? checks?.email),
       websiteStatus: verdict.status,
       websiteIsOld:  checks?.websiteIsOld ?? false,
       // Pořadí zdrojů: odkaz z vlastní homepage firmy je její vlastní tvrzení a vyhrává;
@@ -159,7 +159,7 @@ export async function persistFromPrior(
   const data: Prisma.BusinessResultCreateManyInput[] = pairs.filter(p => allowed.has(p.c)).map(({ c, prior }) => {
     const row = {
       phone:         c.phone ?? prior.phone,
-      email:         c.email ?? prior.email,
+      email:         cleanEmail(c.email ?? prior.email),
       website:       prior.website,
       contactUrl:    prior.contactUrl,
       websiteStatus: prior.websiteStatus,

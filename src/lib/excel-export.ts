@@ -5,6 +5,7 @@ import { websiteAudit } from './website-audit';
 import { naceLabel } from './nace-codes';
 import { employeeLabel, localized } from './lead-filters';
 import type { TradeLicence } from './sources';
+import { cleanEmail } from './sources/site-contacts';
 import { reachScore } from './reach-score';
 import { resolveStatus, type WebsiteStatus } from './website-status';
 
@@ -103,7 +104,7 @@ export function exportRow(b: BusinessResult, criteria: readonly string[] | null 
     b.name,
     b.ico || '',
     b.phone || '',
-    b.email || '',
+    cleanEmail(b.email) || '',
     b.address || '',
     b.website || '',
     b.contactUrl || '',
