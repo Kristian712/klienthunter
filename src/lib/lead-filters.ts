@@ -590,6 +590,24 @@ export const LEAD_FILTERS: LeadFilter[] = [
     unknown: b => webStatusOf(b) === 'UNKNOWN',
   },
   {
+    /**
+     * Jedna podmínka pro „tady je práce s webem": web jsme nenašli, nebo ho firma má a propadl
+     * v auditu (zastaralý, bez HTTPS). Filtry se kombinují přes AND, takže tři samostatné
+     * podmínky by se vylučovaly a uživatel by musel hledat třikrát.
+     */
+    id: 'weak_web',
+    group: 'reach',
+    label: { cs: 'Web chybí nebo pokulhává', sk: 'Web chýba alebo pokuľháva', en: 'Website missing or weak' },
+    hint: { cs: 'Web jsme nenašli, nebo ho firma má a propadl v auditu — bez HTTPS, bez mobilní verze, starý kód. Přesně firmy, kterým má tvůrce webů co nabídnout.',
+            sk: 'Web sme nenašli, alebo ho firma má a prepadol v audite — bez HTTPS, bez mobilnej verzie, starý kód. Presne firmy, ktorým má tvorca webov čo ponúknuť.',
+            en: 'We found no website, or the firm has one and it failed the audit — no HTTPS, no mobile version, old code. Exactly the firms a web developer can help.' },
+    where: { OR: [{ NOT: STATUS_HAS }, { websiteIsOld: true }] },
+    test: b => webStatusOf(b) !== 'HAS' || Boolean(b.websiteIsOld),
+    evidence: (b, l) => webStatusOf(b) !== 'HAS'
+      ? localized({ cs: 'web jsme nenašli', sk: 'web sme nenašli', en: 'we found no website' }, l)
+      : b.websiteIsOld ? localized({ cs: 'web propadl v auditu', sk: 'web prepadol v audite', en: 'the website failed the audit' }, l) : null,
+  },
+  {
     id: 'old_website',
     group: 'reach',
     label: { cs: 'Zastaralý web', sk: 'Zastaraný web', en: 'Outdated website' },

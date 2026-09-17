@@ -60,6 +60,23 @@ export const SCENARIOS: Scenario[] = [
     filters: ['no_web_found'],
   },
   {
+    /**
+     * Výchozí scénář pro tvůrce webů. Samotné „web jsme nenašli" vrací seznam, na který se nedá
+     * zavolat: kontakty sbíráme z webu firmy, takže firma bez webu obvykle nemá ani telefon
+     * (změřeno 18. 9. 2026 na 500 firmách ze Zlínského kraje: ze 404 bez webu 0 s kontaktem).
+     * Tenhle scénář přidá podmínku „mám jak oslovit", takže zbydou firmy, které jde oslovit
+     * a zároveň jim web chybí nebo pokulhává.
+     */
+    id: 'reach_weak_web',
+    label: { cs: 'Jde oslovit a web pokulhává', sk: 'Dá sa osloviť a web pokuľháva', en: 'Reachable, weak website' },
+    hint: {
+      cs: 'Firmy, na které máme telefon, e-mail nebo profil na síti, a jejichž web jsme nenašli nebo propadl v auditu. Tohle je seznam, který jde rovnou obvolat.',
+      sk: 'Firmy, na ktoré máme telefón, e-mail alebo profil na sieti, a ktorých web sme nenašli alebo prepadol v audite. Toto je zoznam, ktorý sa dá rovno obvolať.',
+      en: 'Firms we have a phone, e-mail or social profile for, whose website we did not find or which failed the audit. A list you can start calling.',
+    },
+    filters: ['can_reach', 'weak_web'],
+  },
+  {
     id: 'old_web',
     label: { cs: 'Firmy se zastaralým webem', sk: 'Firmy so zastaraným webom', en: 'Firms with a dated website' },
     hint: {
@@ -106,7 +123,7 @@ export function scenarioLabel(id: string | null | undefined, locale: string): st
  * formulářem a uživatel ho může kdykoli změnit.
  */
 export const SCENARIO_BY_PROFESSION: Record<string, string> = {
-  web: 'no_web',
+  web: 'reach_weak_web',
   marketing: 'old_web',
   finance: 'new',
   legal: 'all',
