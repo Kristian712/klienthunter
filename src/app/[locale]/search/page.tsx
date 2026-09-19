@@ -232,11 +232,6 @@ function isCzMobile(phone: string): boolean {
  * takže stránku profilu nesmíme ani načíst, natož ověřit, že patří té firmě. Tlačítko tedy
  * nic netvrdí, jen ušetří opsání názvu do vyhledávacího pole.
  */
-function facebookSearchHref(b: BusinessResult): string {
-  const town = (b.address ?? '').split(',').pop()?.replace(/\d/g, '').trim() ?? '';
-  return `https://www.facebook.com/search/top?q=${encodeURIComponent([b.name, town].filter(Boolean).join(' '))}`;
-}
-
 function lookupHref(b: BusinessResult): string {
   // The last part of an ARES address is "70030 Ostrava"; the postcode only narrows a web search
   // by accident, so it goes.
@@ -309,10 +304,6 @@ const CONTACT = {
   webTip:  { cs: 'Web firmy tak, jak jsme ho ověřili. Kontakty bývají v patičce nebo v menu.',
              sk: 'Web firmy tak, ako sme ho overili. Kontakty bývajú v pätičke alebo v menu.',
              en: 'The website as we verified it. Contacts are usually in the footer or the menu.' },
-  fbSearch:{ cs: 'Hledat na Facebooku', sk: 'Hľadať na Facebooku', en: 'Search on Facebook' },
-  fbSearchTip: { cs: 'Profil jsme nedohledali — Facebook to automatizovaně neumožňuje. Tohle otevře jeho vyhledávání podle názvu a města, ať to nemusíte psát ručně.',
-             sk: 'Profil sme nedohľadali — Facebook to automatizovane neumožňuje. Toto otvorí jeho vyhľadávanie podľa názvu a mesta, aby ste to nemuseli písať ručne.',
-             en: 'We could not find the profile — Facebook does not allow that automatically. This opens its search by name and town so you do not have to type it.' },
   lookup:  { cs: 'Najít firmu na webu', sk: 'Nájsť firmu na webe', en: 'Look the firm up' },
   lookupTip: { cs: 'Otevře vyhledávání podle názvu a města. Její web ani profil jsme nedohledali — tohle je nejrychlejší způsob, jak zkusit najít, kde se firma prezentuje.',
              sk: 'Otvorí vyhľadávanie podľa názvu a mesta. Jej web ani profil sme nedohľadali — toto je najrýchlejší spôsob, ako skúsiť nájsť, kde sa firma prezentuje.',
@@ -446,13 +437,11 @@ function ContactStrategy({ b, locale }: { b: BusinessResult; locale: string }) {
   }
 
   /**
-   * Firma bez webu, u které profil neznáme — přesně ta skupina, kterou uživatel oslovuje přes
-   * sítě a dosud si ji dohledával ručně. Nabídneme vyhledávání, ne výsledek.
+   * Žádné „Hledat na Facebooku". Tlačítko s logem Facebooku tu smí být jedině tehdy, když známe
+   * konkrétní adresu profilu — z webu firmy nebo z OpenStreetMap. Odkaz na vyhledávání vypadal
+   * jako nalezený profil a u firmy, která na Facebooku není, sliboval něco, co neexistuje
+   * (rozhodnutí majitele 19. 9. 2026).
    */
-  if (webStatus(b) !== 'HAS' && !b.facebookUrl && !b.hasFacebook) {
-    methods.push({ key: 'fbSearch', icon: <FbIcon />, label: L(CONTACT.fbSearch),
-                   href: facebookSearchHref(b), tip: L(CONTACT.fbSearchTip) });
-  }
 
   // Mapy má každá firma: telefon, který nemáme z webu ani z OpenStreetMap, bývá na jejím
   // zápisu v mapách. Je to obyčejný odkaz na vyhledávání, nic se odtud nestahuje.
@@ -818,20 +807,21 @@ function SocialLinks({ b, locale }: { b: BusinessResult; locale: string }) {
     );
   }
   /**
-   * Náhradní odkaz, když víme o profilu, ale neznáme jeho adresu, je vždycky *vyhledávání*,
-   * nikdy uhodnutá adresa profilu. `instagram.com/<název firmy>` tu dřív stálo jako by to byl
-   * její profil — přitom to je adresa, kterou jsme si vymysleli, a klidně patří někomu jinému.
+   * Ikona sítě jen s konkrétní adresou profilu. Dřív tu byl náhradní odkaz na vyhledávání
+   * („facebook.com/search?q=…"), který vypadal jako nalezený profil — a u firmy, která na síti
+   * není, sliboval něco, co neexistuje. Profil bez známé adresy se neukazuje vůbec; příznak
+   * `hasFacebook` bez URL nesou jen staré řádky (rozhodnutí majitele 19. 9. 2026).
    */
-  const q = encodeURIComponent(b.name ?? '');
-  const links: Array<[boolean, string, React.ReactNode, string]> = [
-    [b.hasFacebook,  b.facebookUrl  ?? `https://www.facebook.com/search/top?q=${q}`,                       <FbIcon key="f" />, 'Facebook'],
-    [b.hasInstagram, b.instagramUrl ?? `https://www.instagram.com/explore/search/keyword/?q=${q}`,         <IgIcon key="i" />, 'Instagram'],
-    [b.hasLinkedIn,  b.linkedInUrl  ?? `https://www.linkedin.com/search/results/all/?keywords=${q}`,       <LiIcon key="l" />, 'LinkedIn'],
+  const links: Array<[boolean, string | null | undefined, React.ReactNode, string]> = [
+    [Boolean(b.facebookUrl),  b.facebookUrl,  <FbIcon key="f" />, 'Facebook'],
+    [Boolean(b.instagramUrl), b.instagramUrl, <IgIcon key="i" />, 'Instagram'],
+    [Boolean(b.linkedInUrl),  b.linkedInUrl,  <LiIcon key="l" />, 'LinkedIn'],
   ];
+  if (!links.some(([on]) => on)) return null;
   return (
     <span className="flex items-center gap-1.5 flex-wrap">
       {links.filter(([on]) => on).map(([, href, icon, label]) => (
-        <a key={label} href={href} target="_blank" rel="noopener noreferrer"
+        <a key={label} href={href!} target="_blank" rel="noopener noreferrer"
            title={`${label} — ${localized(S.socialSourceTip, locale)}`}
            className="badge hover:border-ink hover:text-ink transition-colors">
           {icon} {label}
