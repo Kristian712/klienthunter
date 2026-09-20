@@ -559,9 +559,11 @@ const S = {
                    sk: 'Hľadanie ešte beží — súbor bude mať len firmy nájdené doteraz.',
                    en: 'The search is still running — the file will hold only the firms found so far.' },
   exportBusy: { cs: 'Připravuji…', sk: 'Pripravujem…', en: 'Preparing…' },
-  errGone:    { cs: 'Tohle hledání už neexistuje — možná jste ho smazali.',
-                sk: 'Toto hľadanie už neexistuje — možno ste ho zmazali.',
-                en: 'This search no longer exists — you may have deleted it.' },
+  // 404 znamená „pod tímhle účtem takové hledání není": buď smazané, nebo patří jinému účtu
+  // (přihlášení v jiné kartě). Obě možnosti se řeknou, jinak uživatel hledá chybu u sebe.
+  errGone:    { cs: 'Pod tímto účtem takové hledání není — buď bylo smazané, nebo jste ho spustili přihlášeni jako někdo jiný.',
+                sk: 'Pod týmto účtom také hľadanie nie je — buď bolo zmazané, alebo ste ho spustili prihlásení ako niekto iný.',
+                en: 'There is no such search under this account — it was deleted, or you ran it while signed in as someone else.' },
   errPollLost:{ cs: 'Ztratili jsme spojení s hledáním. Co se stihlo najít, zůstalo uložené — obnovte stránku.',
                 sk: 'Stratili sme spojenie s hľadaním. Čo sa stihlo nájsť, zostalo uložené — obnovte stránku.',
                 en: 'Lost contact with the search. Whatever was found is saved — reload the page.' },

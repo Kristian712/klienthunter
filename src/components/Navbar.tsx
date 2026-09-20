@@ -56,16 +56,18 @@ export function Navbar() {
    * u serveru; „nepřihlášen" ho smaže, výpadek serveru (`reason: 'error'`) ho nechá být.
    */
   useEffect(() => {
+    // Pravdu má cookie, ne localStorage. Dřív se server ptal jen když v localStorage někdo byl —
+    // po přihlášení v jiné kartě nebo po smazání dat webu lišta tvrdila „odhlášen", zatímco
+    // hledání běželo pod platnou relací (viděno 20. 9. 2026).
     const stored = loadUser();
     setUser(stored);
-    if (!stored) return;
     let alive = true;
     fetch('/api/auth/me', { credentials: 'include' })
       .then(r => (r.ok ? r.json() : null))
       .then(d => {
         if (!alive || !d) return;
         if (d.user) { saveUser(d.user); setUser(d.user); }
-        else if (d.reason !== 'error') { clearUser(); setUser(null); }
+        else if (d.reason !== 'error' && stored) { clearUser(); setUser(null); }
       })
       .catch(err => console.error('navbar/me:', err));
     return () => { alive = false; };
