@@ -292,6 +292,25 @@ export default function AdminPage() {
     }
   };
 
+  /** Test pošty na vlastní adresu; výsledek i chyba se ukážou rovnou, ne až v logu Vercelu. */
+  const [mailTesting, setMailTesting] = useState(false);
+  const testMail = async () => {
+    setMailTesting(true);
+    try {
+      const res = await fetch('/api/admin/mail-test', { method: 'POST' });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) { failToast(); return; }
+      if (d.result === 'sent') showToast(isCs ? `Odesláno přes ${d.transport} na ${d.to} (${d.ms} ms) — zkontrolujte schránku i spam.` : `Sent via ${d.transport} to ${d.to} (${d.ms} ms) — check inbox and spam.`);
+      else if (d.result === 'disabled') showToast(isCs ? 'Pošta je vypnutá: chybí GMAIL_USER + GMAIL_APP_PASSWORD (nebo RESEND_API_KEY) ve Vercelu.' : 'Mail is off: GMAIL_USER + GMAIL_APP_PASSWORD (or RESEND_API_KEY) missing in Vercel.');
+      else window.alert((isCs ? 'Odeslání selhalo: ' : 'Sending failed: ') + (d.error || '—'));
+    } catch (err) {
+      console.error('admin/testMail:', err);
+      failToast();
+    } finally {
+      setMailTesting(false);
+    }
+  };
+
   const toggleVip = async (user: AdminUser) => {
     setUpdating(user.id + '-vip');
     try {
@@ -451,6 +470,9 @@ export default function AdminPage() {
         {loadFailed && (
           <div className="card mb-6 border-ink text-sm font-medium flex flex-wrap items-center gap-3">
             <span>{isCs ? 'Data se nepodařilo načíst, čísla níž tedy nic neříkají.' : 'The data could not be loaded, so the numbers below mean nothing.'}</span>
+            <button className="btn-outline btn-sm" onClick={testMail} disabled={mailTesting} title={isCs ? 'Pošle testovací e-mail na vaši adresu a ukáže výsledek' : 'Sends a test e-mail to your address and shows the result'}>
+              {mailTesting ? (isCs ? 'Posílám…' : 'Sending…') : (isCs ? 'Test pošty' : 'Test mail')}
+            </button>
             <button className="btn-outline btn-sm" onClick={() => { void fetchUsers(); void fetchCodes(); }}>
               {isCs ? 'Zkusit znovu' : 'Try again'}
             </button>

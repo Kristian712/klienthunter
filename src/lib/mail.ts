@@ -44,6 +44,12 @@ export function mailEnabled(): boolean {
 let resend: Resend | null = null;
 let gmail: Transporter | null = null;
 
+/** Poslední chyba odesílání (jen text), pro admin test pošty — jinak se příčina dozví jen z logu Vercelu. */
+let lastError: string | null = null;
+export function lastMailError(): string | null { return lastError; }
+/** Který odesílatel je zapnutý — pro admin test pošty. */
+export function mailTransport(): Transport | null { return transport(); }
+
 export async function sendMail(mail: Mail): Promise<'sent' | 'disabled' | 'failed'> {
   const via = transport();
   if (!via) {
@@ -65,6 +71,7 @@ export async function sendMail(mail: Mail): Promise<'sent' | 'disabled' | 'faile
         text: mail.text,
         html,
       });
+      lastError = null;
       return 'sent';
     }
     resend ??= new Resend(process.env.RESEND_API_KEY);
@@ -76,11 +83,13 @@ export async function sendMail(mail: Mail): Promise<'sent' | 'disabled' | 'faile
       text: mail.text,
       html,
     });
-    if (error) { console.error('mail:', error); return 'failed'; }
+    if (error) { lastError = `${error.name}: ${error.message}`; console.error('mail:', error); return 'failed'; }
+    lastError = null;
     return 'sent';
   } catch (err) {
     // Špatné heslo aplikace, vypnuté SMTP, síť — volající dostane 'failed' a zaloguje si to sám.
-    console.error(`mail (${via}):`, err instanceof Error ? err.message : err);
+    lastError = err instanceof Error ? err.message : String(err);
+    console.error(`mail (${via}):`, lastError);
     return 'failed';
   }
 }
