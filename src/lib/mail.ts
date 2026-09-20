@@ -1,18 +1,34 @@
 import { Resend } from 'resend';
+import nodemailer, { type Transporter } from 'nodemailer';
 
 /**
- * Jedna poštovní služba pro celou aplikaci (Resend).
+ * Jedna poštovní služba pro celou aplikaci. Dva možné odesílatelé, vybírá se z prostředí:
  *
- * Odesílatel je na subdoméně `mail.webovkyvanek.cz` — vlastní subdoména kvůli reputaci
- * (kdyby se něco pokazilo, nestrhne to hlavní doménu) a kvůli DKIM/SPF, které se nastavují
- * jen pro ni. Bez `RESEND_API_KEY` se nic neposílá a funkce to řekne návratovou hodnotou,
- * nikdy výjimkou: reset hesla nebo opt-out nesmí spadnout kvůli poště.
+ * 1. **Gmail** (`GMAIL_USER` + `GMAIL_APP_PASSWORD`, heslo aplikace z Google účtu) — start bez
+ *    jakéhokoli DNS: Google má svou doménu ověřenou sám. Odesílatel je ta gmailová adresa
+ *    (Gmail cizí `From` stejně přepíše), limit zhruba 500 e-mailů za den. Volba majitele
+ *    20. 9. 2026: „nic složitého na založení".
+ * 2. **Resend** (`RESEND_API_KEY`) — odesílatel na subdoméně `mail.webovkyvanek.cz`; vlastní
+ *    subdoména kvůli reputaci a kvůli DKIM/SPF, které se nastavují jen pro ni. Vyžaduje DNS
+ *    záznamy u Wedosu; až bude pošty víc než na Gmail.
+ *
+ * Když je nastavené obojí, má přednost Gmail (je to ten, který majitel zapne první; přepnutí
+ * na Resend = smazat proměnné Gmailu). Bez obojího se nic neposílá a funkce to řekne návratovou
+ * hodnotou, nikdy výjimkou: reset hesla nebo opt-out nesmí spadnout kvůli poště.
  *
  * Co se posílá: reset hesla, potvrzení opt-outu. Nic marketingového, žádné hromadné
  * rozesílky — na to appka nemá souhlasy a nikdy je nesbírala.
  */
-export const MAIL_FROM = process.env.MAIL_FROM || 'KlientHunter <klienthunter@mail.webovkyvanek.cz>';
+const RESEND_FROM = process.env.MAIL_FROM || 'KlientHunter <klienthunter@mail.webovkyvanek.cz>';
 const REPLY_TO = process.env.MAIL_REPLY_TO || undefined;
+
+type Transport = 'gmail' | 'resend';
+
+function transport(): Transport | null {
+  if (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) return 'gmail';
+  if (process.env.RESEND_API_KEY) return 'resend';
+  return null;
+}
 
 export interface Mail {
   to: string;
@@ -22,30 +38,49 @@ export interface Mail {
 }
 
 export function mailEnabled(): boolean {
-  return Boolean(process.env.RESEND_API_KEY);
+  return transport() !== null;
 }
 
-let client: Resend | null = null;
+let resend: Resend | null = null;
+let gmail: Transporter | null = null;
 
 export async function sendMail(mail: Mail): Promise<'sent' | 'disabled' | 'failed'> {
-  if (!mailEnabled()) {
-    console.info(`mail: vypnuto (chybí RESEND_API_KEY) — ${mail.subject} → ${mail.to}`);
+  const via = transport();
+  if (!via) {
+    console.info(`mail: vypnuto (chybí GMAIL_USER+GMAIL_APP_PASSWORD nebo RESEND_API_KEY) — ${mail.subject} → ${mail.to}`);
     return 'disabled';
   }
+  const html = mail.html ?? textToHtml(mail.text);
   try {
-    client ??= new Resend(process.env.RESEND_API_KEY);
-    const { error } = await client.emails.send({
-      from: MAIL_FROM,
+    if (via === 'gmail') {
+      gmail ??= nodemailer.createTransport({
+        service: 'gmail',
+        auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_APP_PASSWORD },
+      });
+      await gmail.sendMail({
+        from: `KlientHunter <${process.env.GMAIL_USER}>`,
+        to: mail.to,
+        replyTo: REPLY_TO,
+        subject: mail.subject,
+        text: mail.text,
+        html,
+      });
+      return 'sent';
+    }
+    resend ??= new Resend(process.env.RESEND_API_KEY);
+    const { error } = await resend.emails.send({
+      from: RESEND_FROM,
       to: mail.to,
       replyTo: REPLY_TO,
       subject: mail.subject,
       text: mail.text,
-      html: mail.html ?? textToHtml(mail.text),
+      html,
     });
     if (error) { console.error('mail:', error); return 'failed'; }
     return 'sent';
   } catch (err) {
-    console.error('mail:', err);
+    // Špatné heslo aplikace, vypnuté SMTP, síť — volající dostane 'failed' a zaloguje si to sám.
+    console.error(`mail (${via}):`, err instanceof Error ? err.message : err);
     return 'failed';
   }
 }

@@ -22,7 +22,7 @@ const T = {
   done:    { cs: 'Pokud k tomuto e-mailu existuje účet, odkaz je na cestě. Platí hodinu. Nepřišel? Zkontrolujte spam a překlepy v adrese.',
              sk: 'Ak k tomuto e-mailu existuje účet, odkaz je na ceste. Platí hodinu. Neprišiel? Skontrolujte spam a preklepy v adrese.',
              en: 'If an account exists for this e-mail, the link is on its way. It is valid for an hour. Nothing arrived? Check spam and typos in the address.' },
-  // Pošta se zapíná proměnnou RESEND_API_KEY; dokud není, heslo obnoví ručně provozovatel
+  // Pošta se zapíná proměnnými GMAIL_USER+GMAIL_APP_PASSWORD (nebo RESEND_API_KEY); dokud není, heslo obnoví ručně provozovatel
   // (admin má v přehledu uživatelů tlačítko „Odkaz na nové heslo").
   noMail:  { cs: 'Automatické e-maily zatím nejsou zapnuté. Napište z registrované adresy na {email} — heslo vám nastavíme ručně, obvykle do 24 hodin.',
              sk: 'Automatické e-maily zatiaľ nie sú zapnuté. Napíšte z registrovanej adresy na {email} — heslo vám nastavíme ručne, zvyčajne do 24 hodín.',
