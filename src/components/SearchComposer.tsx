@@ -38,25 +38,26 @@ const T = {
   allKraj:   { cs: 'celý kraj', sk: 'celý kraj', en: 'whole region' },
   wholeCz:   { cs: 'celá ČR', sk: 'celá ČR', en: 'whole Czechia' },
   unknownEmp:{ cs: 'počet neuveden u {n} firem', sk: 'počet neuvedený pri {n} firmách', en: 'count not stated for {n} firms' },
-  noIndustryTitle: { cs: 'Bez oboru jen firmy do 5 let', sk: 'Bez odboru len firmy do 5 rokov', en: 'Without a trade: firms under 5 years only' },
-  noIndustry:{ cs: 'Dostanete jen firmy vzniklé od {since}. Proč: ARES neumí hledat bez oboru, takže hledání přes celé území jde jen přes náš index z registru ČSÚ, a ten sahá 5 let zpět. Starší firmy najdete, když vyberete obor.',
-               sk: 'Dostanete len firmy vzniknuté od {since}. Prečo: ARES nevie hľadať bez odboru, takže hľadanie cez celé územie ide len cez náš index z registra ČSÚ, a ten siaha 5 rokov späť. Staršie firmy nájdete, keď vyberiete odbor.',
-               en: 'You will get only firms founded since {since}. Why: ARES cannot search without a trade, so a search across the whole area goes through our index of the CZSO register only, and it reaches back 5 years. Pick a trade to find older firms.' },
+  // Mez „bez oboru jen 5 let" musí být vidět PŘED spuštěním (majitel 15. 9. 2026) — ale jednou
+  // větou, ne odstavcem (majitel 20. 9. 2026). Proč: ARES bez oboru nehledá, index ČSÚ sahá 5 let.
+  noIndustryLead: { cs: 'Bez oboru jen firmy vzniklé od {since} (starší najdete s oborem).',
+                    sk: 'Bez odboru len firmy vzniknuté od {since} (staršie nájdete s odborom).',
+                    en: 'Without a trade only firms founded since {since} (pick a trade for older ones).' },
+  windowLead:     { cs: 'Firmy vzniklé od {since}.', sk: 'Firmy vzniknuté od {since}.', en: 'Firms founded since {since}.' },
   autoWindow:{ cs: 'Okres a zaměstnanci jsou jen v indexu, proto se zapnulo „Vznik do 5 let".',
                sk: 'Okres a zamestnanci sú len v indexe, preto sa zaplo „Vznik do 5 rokov".',
                en: 'Districts and employees exist only in the index, so “Founded within 5 years” was turned on.' },
-  scopeIdx:  { cs: 'Co se prohledá', sk: 'Čo sa prehľadá', en: 'What will be searched' },
   // „nejnovějších": index řadí podle vzniku sestupně (sources/registry.ts), takže strop tarifu
   // ořízne ty starší — uživatel s 2 000 shodami a stropem 500 má vědět, které dostane.
-  idxLine:   { cs: 'Index ČSÚ · {where} · vznik od {since}{legal} · odpovídá {n} firem, stáhne se nejvýš {limit} nejnovějších',
-               sk: 'Index ČSÚ · {where} · vznik od {since}{legal} · zodpovedá {n} firiem, stiahne sa najviac {limit} najnovších',
-               en: 'CZSO index · {where} · founded since {since}{legal} · {n} firms match, at most the {limit} newest will be fetched' },
-  idxCounting: { cs: 'Index ČSÚ · {where} · počítám…', sk: 'Index ČSÚ · {where} · počítam…', en: 'CZSO index · {where} · counting…' },
+  idxLine:   { cs: 'Odpovídá {n} firem, stáhne se {limit} nejnovějších · index ČSÚ, {where}{legal}',
+               sk: 'Zodpovedá {n} firiem, stiahne sa {limit} najnovších · index ČSÚ, {where}{legal}',
+               en: '{n} firms match, the {limit} newest will be fetched · CZSO index, {where}{legal}' },
+  idxCounting: { cs: 'Počítám firmy · index ČSÚ, {where}…', sk: 'Počítam firmy · index ČSÚ, {where}…', en: 'Counting firms · CZSO index, {where}…' },
   // Obor se v ARESu hledá dvěma větvemi: kódem NACE (jistý) a slovem v názvu firmy (sedí zhruba
   // u poloviny až dvou třetin, změřeno 14. 9. 2026). U každé firmy ve výsledcích je vidět, kterou prošla.
-  aresLine:  { cs: 'ARES · {city} a okolí · obor podle kódu NACE nebo slova v názvu firmy · všechny stáří firem · nejvýš {limit} firem z dotazu; podmínky vpravo jen prořežou to, co se stáhne',
-               sk: 'ARES · {city} a okolie · odbor podľa kódu NACE alebo slova v názve firmy · všetky veky firiem · najviac {limit} firiem z dotazu; podmienky vpravo len prerežú to, čo sa stiahne',
-               en: 'ARES · {city} and surroundings · trade by NACE code or a word in the firm name · firms of any age · at most {limit} firms per query; conditions on the right only prune what is fetched' },
+  aresLine:  { cs: 'ARES · {city} a okolí · obor podle NACE nebo slova v názvu · všechny stáří · nejvýš {limit} firem',
+               sk: 'ARES · {city} a okolie · odbor podľa NACE alebo slova v názve · všetky veky · najviac {limit} firiem',
+               en: 'ARES · {city} and surroundings · trade by NACE or a word in the name · any age · at most {limit} firms' },
   foreign:   { cs: 'Mimo české kraje index není — hledá se jen v ARESu / OpenStreetMap.',
                sk: 'Mimo českých krajov index nie je — hľadá sa len v ARESe / OpenStreetMap.',
                en: 'Outside Czech regions there is no index — ARES / OpenStreetMap only.' },
@@ -196,6 +197,7 @@ export function SearchComposer({
   const legalText = active.has('sole_trader') && !active.has('company_form') ? t(T.legalSole)
     : active.has('company_form') && !active.has('sole_trader') ? t(T.legalCo) : '';
   const since = windowDays !== null ? formatDate(new Date(Date.now() - windowDays * 86_400_000).toISOString(), locale) : '';
+  const leadLine = indexMode ? t(implicitWindow ? T.noIndustryLead : T.windowLead).replace('{since}', since) : null;
   const scopeLine = !region ? null
     : !indexable ? t(T.foreign)
     : indexMode
@@ -263,7 +265,7 @@ export function SearchComposer({
 
       {scopeLine && (
         <p className="mt-3 text-xs text-ink-muted">
-          <span className="font-semibold uppercase tracking-wider text-[11px] text-ink-faint mr-2">{t(T.scopeIdx)}</span>
+          {leadLine && <span className="font-semibold text-ink mr-1.5">{leadLine}</span>}
           {scopeLine}
         </p>
       )}
@@ -276,14 +278,6 @@ export function SearchComposer({
               ...(districts.length ? [t(T.districtsSel)] : []),
             ].join(' · ') || '—')}
           </p>
-        </div>
-      )}
-      {/* Mez hledání bez oboru patří PŘED spuštění a mimo sbalený panel: kdo zvolí kraj nebo celou
-          ČR a obor nechá prázdný, musí vědět, že starší firmy nedostane a proč. */}
-      {implicitWindow && indexable && (
-        <div role="note" className="mt-3 rounded-lg border border-field bg-ink/[0.04] px-3 py-2.5">
-          <p className="text-xs font-semibold text-ink">{t(T.noIndustryTitle)}</p>
-          <p className="mt-0.5 text-xs leading-relaxed text-ink-muted">{t(T.noIndustry).replace('{since}', since)}</p>
         </div>
       )}
     </div>

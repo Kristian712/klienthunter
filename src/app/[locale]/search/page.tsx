@@ -1000,19 +1000,17 @@ export default function SearchPage() {
   /** Id ze SCENARIOS. Předvyplní se podle profese z onboardingu, uživatel ho může přepnout. */
   const [scenario, setScenario]           = useState('all');
   /**
-   * Scénář je přednastavení, ne zámek: kliknutí zapne jeho filtry, jakékoli sáhnutí na filtry ho
-   * odpojí. Který scénář „platí", se proto nečte ze stavu, ale z toho, co je opravdu zapnuté.
+   * Sekce je celý záměr: kliknutí složí podmínky JEN z ní a vypne přednastavení z profilu.
+   * Dřív se její filtry přidávaly k tomu, co už bylo zapnuté — „Bez webu" + „Mám jak oslovit"
+   * z profilu dalo 0 z 500 firem (Ústecký kraj, 20. 9. 2026), protože firma bez webu kontakt
+   * většinou nemá. Jakékoli pozdější sáhnutí na filtry sekci odpojí; která „platí", se čte
+   * z toho, co je opravdu zapnuté (`effectiveScenario`).
    */
   const applyScenario = (id: string) => {
     dirtyRef.current = true;
     setScenario(id);
-    setActive(prev => {
-      const next = new Set(prev);
-      for (const sc of SCENARIOS) for (const f of sc.filters) next.delete(f);
-      let out = next;
-      for (const f of scenarioById(id).filters) out = addFilter(out, f);
-      return out;
-    });
+    setPresetsOn(false);
+    setActive(new Set(normalizeFilters(scenarioById(id).filters)));
   };
   /** Nabídka „CRM" u exportu; zavírá se kliknutím mimo. */
   const [crmMenu, setCrmMenu]             = useState(false);
@@ -1187,11 +1185,15 @@ export default function SearchPage() {
     setProfile(p);
     // Přednastavené chipy se k aktivním přidají, nikdy nenahradí, co si uživatel zapnul sám.
     const preset = presetFiltersFor(p);
-    // U uloženého hledání se přednastavení nepřidává vůbec (viz `savedLockRef`).
-    if (preset.length > 0 && presetsOn && !savedLockRef.current) setActive(prev => new Set([...Array.from(prev), ...preset]));
+    // U uloženého hledání se přednastavení nepřidává vůbec (viz `savedLockRef`). Ani když už
+    // uživatel klikl na sekci (`dirtyRef`, třeba z odkazu `?scenario=`): sekce je celý záměr
+    // a `presetsOn` tady může být ze starého renderu, protože profil chodí ze sítě později.
+    if (preset.length > 0 && presetsOn && !savedLockRef.current && !dirtyRef.current) setActive(prev => new Set([...Array.from(prev), ...preset]));
     // Otevřené hledání má vlastní kraj a obor (applySavedMeta); profil je nepřepisuje.
     if (p.targetRegion && !savedLockRef.current)   setRegion(r => r || p.targetRegion!);
-    if (p.targetIndustry && !savedLockRef.current) setIndustries(i => (i.length ? i : [p.targetIndustry!]));
+    // Obor z profilu jen když uživatel nepřišel přes sekci: „Bez webu" z přehledu má projít
+    // celý kraj, ne jen obor z dotazníku (obor si přidá sám).
+    if (p.targetIndustry && !savedLockRef.current && !dirtyRef.current) setIndustries(i => (i.length ? i : [p.targetIndustry!]));
     // Scénář je jen výchozí hodnota přepínače; jakmile s ním uživatel hnul, profil ho nepřebíjí.
     if (p.profession && SCENARIO_BY_PROFESSION[p.profession]) {
       const def = SCENARIO_BY_PROFESSION[p.profession];
@@ -1284,6 +1286,18 @@ export default function SearchPage() {
   const allBlocked = isAllIndustries(effectiveIndustry) && Boolean(effectiveRegion) && nuts3ForRegion(effectiveRegion) === null && !isWholeCz(effectiveRegion);
   /** Celá ČR přes index je jeden dotaz; přes ARES čtrnáct krajských měst — hlášky se liší. */
   const wholeCzByCities = isWholeCz(effectiveRegion) && effectiveWindowDays(Array.from(active), effectiveIndustry) === null;
+  /**
+   * Nápis tlačítka nese záměr i území („Najít firmy bez webu · Ústecký kraj"). Území sedí
+   * s tím, co se opravdu prohledá: index = celý kraj, ARES = krajské město a okolí.
+   */
+  const searchVerb  = effectiveScenario === 'custom' ? t('search_button') : localized(scenarioById(effectiveScenario).action, locale);
+  const searchWhere = (() => {
+    if (!effectiveRegion) return '';
+    if (isWholeCz(effectiveRegion)) return localized({ cs: 'celá ČR', sk: 'celá ČR', en: 'all Czechia' }, locale);
+    const viaIndex = effectiveWindowDays(Array.from(active), effectiveIndustry) !== null && nuts3ForRegion(effectiveRegion) !== null;
+    const parts = effectiveRegion.split(',').map(x => x.trim());
+    return viaIndex ? parts[parts.length - 1] : parts[0];
+  })();
 
   const addIndustry = (value: string) => {
     setIndustries(prev => {
@@ -1748,9 +1762,9 @@ export default function SearchPage() {
           <h1 className="text-2xl font-bold text-ink mb-1">{t('title')}</h1>
           <p className="text-ink-muted text-sm">
             {localized({
-              cs: 'Vyberte kraj a obor. Data z veřejného rejstříku ARES a z OpenStreetMap.',
-              sk: 'Vyberte kraj a odbor. Dáta z verejného registra ARES a z OpenStreetMap.',
-              en: 'Pick a region and a trade. Data from the ARES public registry and OpenStreetMap.',
+              cs: 'Data z rejstříku ARES, indexu ČSÚ a OpenStreetMap.',
+              sk: 'Dáta z registra ARES, indexu ČSÚ a OpenStreetMap.',
+              en: 'Data from the ARES registry, the CZSO index and OpenStreetMap.',
             }, locale)}
           </p>
         </div>
@@ -1834,6 +1848,7 @@ export default function SearchPage() {
                     type="button"
                     onClick={() => applyScenario(sc.id)}
                     aria-pressed={on}
+                    title={localized(sc.hint, locale)}
                     className={`kh-contact text-left rounded-xl border px-3.5 py-3 min-h-[40px] ${on ? 'border-ink bg-ink text-surface' : 'border-field hover:border-ink bg-surface-muted/40'}`}
                   >
                     <span className="flex items-center gap-2.5">
@@ -1849,11 +1864,6 @@ export default function SearchPage() {
                 );
               })}
             </div>
-            <p className="text-xs text-ink-muted leading-relaxed mt-3">
-              {effectiveScenario === 'custom'
-                ? localized({ cs: 'Sekce je jen přednastavení podmínek. Co je zapnuté, vidíte níž v „Další podmínky".', sk: 'Sekcia je len prednastavenie podmienok. Čo je zapnuté, vidíte nižšie v „Ďalšie podmienky".', en: 'A section is only a preset. What is on is listed below under “More conditions”.' }, locale)
-                : localized(scenarioById(effectiveScenario).hint, locale)}
-            </p>
           </div>
 
           <div className="grid md:grid-cols-5 gap-4 items-start">
@@ -1937,7 +1947,7 @@ export default function SearchPage() {
                   value={industryQuery}
                   placeholder={industries.length
                     ? (isCs ? 'Přidat další obor…' : 'Add another trade…')
-                    : (isCs ? 'Nepovinné — prázdné = všechny obory v kraji. Nebo pište: zubaři, restaurace…' : 'Optional — empty = every trade in the region. Or type: dentists, restaurants…')}
+                    : (isCs ? 'Obor — nepovinné, prázdné = všechny obory' : 'Trade — optional, empty = every trade')}
                   disabled={allPicked}
                   onChange={e => { setIndustryQuery(e.target.value); setIndustryOpen(true); setIndustryActive(-1); }}
                   // Text se označí, aby první stisknutá klávesa přepsala vybraný obor a nepsala se
@@ -2034,7 +2044,7 @@ export default function SearchPage() {
                     className="input py-1.5 text-xs"
                     value={naceQuery}
                     onChange={e => setNaceQuery(e.target.value)}
-                    placeholder={isCs ? 'Nebo kód či název CZ-NACE, např. 73110 nebo „reklamní"' : 'Or a CZ-NACE code or name, e.g. 73110'}
+                    placeholder={isCs ? 'Kód nebo název CZ-NACE' : 'CZ-NACE code or name'}
                     aria-label="CZ-NACE"
                   />
                   {naceItems.length > 0 && (
@@ -2062,7 +2072,7 @@ export default function SearchPage() {
                 obrazovce už neví. */}
             <button type="submit"
               disabled={loading || jobRunning || !effectiveRegion || !effectiveIndustry || allBlocked || indexTotal === 0}
-              className="btn-primary h-[42px] md:mt-[23px]">
+              className="btn-primary min-h-[42px] h-auto py-2 leading-tight md:mt-[23px]">
               {loading || jobRunning ? (
                 <span className="flex items-center gap-2">
                   <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
@@ -2071,7 +2081,12 @@ export default function SearchPage() {
                   </svg>
                   {t('searching')}
                 </span>
-              ) : t('search_button')}
+              ) : (
+                <span className="block">
+                  <span className="block">{searchVerb}</span>
+                  {searchWhere && <span className="block text-xs font-normal opacity-80 mt-0.5">{searchWhere}</span>}
+                </span>
+              )}
             </button>
           </div>
 

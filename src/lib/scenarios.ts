@@ -25,6 +25,8 @@ export interface Scenario {
   icon?: ScenarioIcon;
   /** Co uživateli slíbí. Musí sedět s `filters` — jinak je to popisek, ne pravda. */
   hint: { cs: string; sk?: string; en: string };
+  /** Nápis na tlačítku Vyhledat („Najít firmy bez webu") — záměr má být čitelný z jednoho tlačítka. */
+  action: { cs: string; sk?: string; en: string };
   /** Id z LEAD_FILTERS, která se zapnou. Prázdné pole = neomezovat. */
   filters: string[];
 }
@@ -35,6 +37,7 @@ export const SCENARIOS: Scenario[] = [
     icon: 'search',
     forWhom: { cs: 'kdokoli', sk: 'ktokoľvek', en: 'anyone' },
     label: { cs: 'Všechny firmy v oboru', sk: 'Všetky firmy v odbore', en: 'Every firm in the trade' },
+    action: { cs: 'Najít firmy', sk: 'Nájsť firmy', en: 'Find firms' },
     hint: {
       cs: 'Nic neodfiltruje. Pořadí určuje skóre podle kritérií z vašeho účtu.',
       sk: 'Nič neodfiltruje. Poradie určuje skóre podľa kritérií z vášho účtu.',
@@ -49,12 +52,13 @@ export const SCENARIOS: Scenario[] = [
     /**
      * Jméno scénáře je schválně totožné s filtrem, který zapíná.
      *
-     * Předtím se jmenoval „Firmy bez webu" — což je tvrzení o firmách, a to my doložit neumíme:
-     * ARES weby needviduje. Filtr pod ním se přitom vždycky jmenoval „Web jsme nenašli", tedy
-     * tvrzení o našem hledání. Uživatel klikl na jedno a dostal druhé, a rozdíl mezi tím vypadal
-     * jako chyba filtru. Teď říkají obě nálepky totéž a v seznamu chipů se rozsvítí ta stejná.
+     * Nálepka je krátká („Bez webu") na přání majitele 20. 9. 2026 — tvrzení o firmách, které
+     * doložit neumíme, proto `hint` (tooltip sekce) i chip filtru dál říkají pravdu: web jsme
+     * nenašli. Od 20. 9. 2026 kliknutí na sekci podmínky NAHRADÍ (viz `applyScenario`), takže se
+     * k ní už nepřilepí „Mám jak oslovit" z profilu, které dřív dalo 0 z 500 firem.
      */
-    label: { cs: 'Web jsme nenašli', sk: 'Web sme nenašli', en: 'We found no website' },
+    label: { cs: 'Bez webu', sk: 'Bez webu', en: 'No website' },
+    action: { cs: 'Najít firmy bez webu', sk: 'Nájsť firmy bez webu', en: 'Find firms without a website' },
     /**
      * Scénář pouští oba stavy, ve kterých web neznáme.
      *
@@ -81,6 +85,7 @@ export const SCENARIOS: Scenario[] = [
     icon: 'globe',
     forWhom: { cs: 'tvůrci webů', sk: 'tvorcovia webov', en: 'web developers' },
     label: { cs: 'Jde oslovit a web pokulhává', sk: 'Dá sa osloviť a web pokuľháva', en: 'Reachable, weak website' },
+    action: { cs: 'Najít firmy s kontaktem a slabým webem', sk: 'Nájsť firmy s kontaktom a slabým webom', en: 'Find reachable firms with a weak website' },
     hint: {
       cs: 'Firmy, na které máme telefon, e-mail nebo profil na síti, a jejichž web jsme nenašli nebo propadl v auditu. Tohle je seznam, který jde rovnou obvolat.',
       sk: 'Firmy, na ktoré máme telefón, e-mail alebo profil na sieti, a ktorých web sme nenašli alebo prepadol v audite. Toto je zoznam, ktorý sa dá rovno obvolať.',
@@ -97,6 +102,7 @@ export const SCENARIOS: Scenario[] = [
     icon: 'social',
     forWhom: { cs: 'tvůrci webů, marketéři', sk: 'tvorcovia webov, marketéri', en: 'web developers, marketers' },
     label: { cs: 'Aktivní na sítích, web slabý', sk: 'Aktívne na sieťach, web slabý', en: 'Active on social, weak website' },
+    action: { cs: 'Najít firmy ze sítí se slabým webem', sk: 'Nájsť firmy zo sietí so slabým webom', en: 'Find social-active firms with a weak website' },
     hint: {
       cs: 'Firmy s profilem na Facebooku, Instagramu nebo LinkedInu, kterým web chybí nebo propadl v auditu. O viditelnost se starají, takže vědí, proč web potřebují.',
       sk: 'Firmy s profilom na Facebooku, Instagrame alebo LinkedIne, ktorým web chýba alebo prepadol v audite. O viditeľnosť sa starajú, takže vedia, prečo web potrebujú.',
@@ -109,6 +115,7 @@ export const SCENARIOS: Scenario[] = [
     icon: 'shield',
     forWhom: { cs: 'tvůrci webů', sk: 'tvorcovia webov', en: 'web developers' },
     label: { cs: 'Firmy se zastaralým webem', sk: 'Firmy so zastaraným webom', en: 'Firms with a dated website' },
+    action: { cs: 'Najít firmy se zastaralým webem', sk: 'Nájsť firmy so zastaraným webom', en: 'Find firms with a dated website' },
     hint: {
       cs: 'Firmy s ověřeným webem, který běží bez HTTPS — prohlížeč u něj návštěvníkovi píše „Nezabezpečeno".',
       sk: 'Firmy s overeným webom, ktorý beží bez HTTPS — prehliadač pri ňom návštevníkovi píše „Nezabezpečené".',
@@ -121,6 +128,7 @@ export const SCENARIOS: Scenario[] = [
     icon: 'megaphone',
     forWhom: { cs: 'tvůrci webů, marketéři', sk: 'tvorcovia webov, marketéri', en: 'web developers, marketers' },
     label: { cs: 'Platí za reklamu, web nemá', sk: 'Platí za reklamu, web nemá', en: 'Pays for ads, has no website' },
+    action: { cs: 'Najít inzerenty bez webu', sk: 'Nájsť inzerentov bez webu', en: 'Find advertisers without a website' },
     hint: {
       cs: 'Firmy z Meta Knihovny reklam, jejichž reklamy nevedou na web a my jsme web nenašli. Vyžaduje přístup k Ad Library API; spárování s inzerentem se povede jen u části firem.',
       sk: 'Firmy z Meta Knižnice reklám, ktorých reklamy nevedú na web a my sme web nenašli. Vyžaduje prístup k Ad Library API; spárovanie s inzerentom sa podarí len pri časti firiem.',
@@ -133,6 +141,7 @@ export const SCENARIOS: Scenario[] = [
     icon: 'sparkles',
     forWhom: { cs: 'účetní, pojišťováci, právníci', sk: 'účtovníci, poisťováci, právnici', en: 'accountants, insurers, lawyers' },
     label: { cs: 'Nové firmy', sk: 'Nové firmy', en: 'New firms' },
+    action: { cs: 'Najít nové firmy', sk: 'Nájsť nové firmy', en: 'Find new firms' },
     hint: {
       cs: 'Firmy zapsané do rejstříku během posledního půlroku, v celém kraji. Vybírají se z indexu RES ČSÚ, jméno a sídlo doplní ARES — datum vzniku je přesné.',
       sk: 'Firmy zapísané do registra počas posledného polroka, v celom kraji. Vyberajú sa z indexu RES ČSÚ, meno a sídlo doplní ARES — dátum vzniku je presný.',
@@ -145,6 +154,7 @@ export const SCENARIOS: Scenario[] = [
     icon: 'phone',
     forWhom: { cs: 'kdokoli, kdo volá a píše', sk: 'ktokoľvek, kto volá a píše', en: 'anyone who calls and writes' },
     label: { cs: 'Jde oslovit', sk: 'Dá sa osloviť', en: 'Reachable' },
+    action: { cs: 'Najít firmy s kontaktem', sk: 'Nájsť firmy s kontaktom', en: 'Find reachable firms' },
     hint: {
       cs: 'Jen firmy, na které máme telefon, e-mail, profil na síti nebo kontaktní stránku. Ostatní se v seznamu neukážou.',
       sk: 'Len firmy, na ktoré máme telefón, e-mail, profil na sieti alebo kontaktnú stránku. Ostatné sa v zozname neukážu.',
