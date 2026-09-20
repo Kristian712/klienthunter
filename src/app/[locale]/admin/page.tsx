@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useLocale } from 'next-intl';
-import { Crown, Shield, Users, RefreshCw, Ticket, Plus, Trash2, Copy, Check, Clock, Link2, CreditCard } from 'lucide-react';
+import { Crown, Shield, Users, RefreshCw, Ticket, Plus, Trash2, Copy, Check, Clock, Link2, CreditCard, KeyRound } from 'lucide-react';
 import { formatDate } from '@/lib/format-date';
 
 interface RegistryStatus {
@@ -260,6 +260,32 @@ export default function AdminPage() {
 
     } catch (err) {
       console.error('admin/setOptoutStatus:', err);
+      failToast();
+    } finally {
+      setUpdating(null);
+    }
+  };
+
+  /**
+   * Odkaz na nové heslo pro uživatele, dokud není zapnutá pošta (RESEND_API_KEY). Admin ho
+   * pošle sám; platí 24 h, jedno použití. Schránka nemusí být dostupná — pak se odkaz ukáže.
+   */
+  const resetLink = async (user: AdminUser) => {
+    setUpdating(user.id + '-reset');
+    try {
+      const res = await fetch(`/api/admin/users/${user.id}/reset-link`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ locale }),
+      });
+      if (!res.ok) { failToast(); return; }
+      const { url } = await res.json();
+      try {
+        await navigator.clipboard.writeText(url);
+        showToast(isCs ? `Odkaz na nové heslo zkopírován (platí 24 h): ${user.email}` : `Password link copied (valid 24 h): ${user.email}`);
+      } catch {
+        window.prompt(isCs ? 'Zkopírujte odkaz ručně (platí 24 h):' : 'Copy the link manually (valid 24 h):', url);
+      }
+    } catch (err) {
+      console.error('admin/resetLink:', err);
       failToast();
     } finally {
       setUpdating(null);
@@ -655,6 +681,7 @@ export default function AdminPage() {
                     <th>{isCs ? 'Registrace' : 'Joined'}</th>
                     <th>VIP</th><th>Admin</th>
                     <th>{isCs ? 'Přístup' : 'Access'}</th>
+                    <th>{isCs ? 'Heslo' : 'Password'}</th>
                   </tr></thead>
                   <tbody>
                     {users.map(user => {
@@ -692,6 +719,13 @@ export default function AdminPage() {
                               {isBlocked ? (isCs ? '✓ Odblokovat' : '✓ Unblock') : (isCs ? '✕ Zablokovat' : '✕ Block')}
                             </button>
                           )}
+                        </td>
+                        <td>
+                          <button onClick={() => resetLink(user)} disabled={updating === user.id + '-reset'} className={ROW_BTN_OFF}
+                            title={isCs ? 'Vygeneruje odkaz na nastavení nového hesla (24 h) a zkopíruje ho' : 'Generates a link to set a new password (24 h) and copies it'}>
+                            <KeyRound size={13} />
+                            {isCs ? 'Odkaz na nové heslo' : 'Password link'}
+                          </button>
                         </td>
                       </tr>
                       );

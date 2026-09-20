@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { randomBytes, createHash } from 'node:crypto';
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
-import { sendMail } from '@/lib/mail';
+import { mailEnabled, sendMail } from '@/lib/mail';
 import { countHits, hashIp, recordHit } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
@@ -32,6 +32,9 @@ const T = {
 export async function POST(req: NextRequest) {
   try {
     const { email, locale } = Body.parse(await req.json());
+    // Bez pošty se nic neodešle — formulář to má říct rovnou, ne slíbit „odkaz je na cestě".
+    // Odpověď nezávisí na tom, jestli účet existuje, takže nic neprozrazuje.
+    if (!mailEnabled()) return NextResponse.json({ ok: true, mail: 'disabled' });
     const ipHash = hashIp(req);
     if (await countHits(ipHash, 'forgot') >= FORGOT_PER_IP) {
       return NextResponse.json({ error: 'Too many requests', code: 'RATE_LIMITED' }, { status: 429 });

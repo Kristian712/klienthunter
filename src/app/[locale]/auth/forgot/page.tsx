@@ -5,6 +5,7 @@ import { useLocale } from 'next-intl';
 import Link from 'next/link';
 import { Mail, ArrowRight } from 'lucide-react';
 import { localized } from '@/lib/lead-filters';
+import { OPERATOR } from '@/lib/legal';
 
 /**
  * Zapomenuté heslo. Odpověď je vždy stejná, ať účet existuje nebo ne — formulář nesmí
@@ -21,6 +22,11 @@ const T = {
   done:    { cs: 'Pokud k tomuto e-mailu existuje účet, odkaz je na cestě. Platí hodinu. Nepřišel? Zkontrolujte spam a překlepy v adrese.',
              sk: 'Ak k tomuto e-mailu existuje účet, odkaz je na ceste. Platí hodinu. Neprišiel? Skontrolujte spam a preklepy v adrese.',
              en: 'If an account exists for this e-mail, the link is on its way. It is valid for an hour. Nothing arrived? Check spam and typos in the address.' },
+  // Pošta se zapíná proměnnou RESEND_API_KEY; dokud není, heslo obnoví ručně provozovatel
+  // (admin má v přehledu uživatelů tlačítko „Odkaz na nové heslo").
+  noMail:  { cs: 'Automatické e-maily zatím nejsou zapnuté. Napište z registrované adresy na {email} — heslo vám nastavíme ručně, obvykle do 24 hodin.',
+             sk: 'Automatické e-maily zatiaľ nie sú zapnuté. Napíšte z registrovanej adresy na {email} — heslo vám nastavíme ručne, zvyčajne do 24 hodín.',
+             en: 'Automatic e-mails are not enabled yet. Write from your registered address to {email} — we will reset the password by hand, usually within 24 hours.' },
   rate:    { cs: 'Příliš mnoho žádostí z této adresy. Zkuste to za den, nebo nám napište.',
              sk: 'Príliš veľa žiadostí z tejto adresy. Skúste to o deň, alebo nám napíšte.',
              en: 'Too many requests from this address. Try again tomorrow or write to us.' },
@@ -39,7 +45,7 @@ export default function ForgotPage() {
   const locale = useLocale();
   const t = (x: { cs: string; sk?: string; en: string }) => localized(x, locale);
   const [email, setEmail] = useState('');
-  const [state, setState] = useState<'idle' | 'sending' | 'done'>('idle');
+  const [state, setState] = useState<'idle' | 'sending' | 'done' | 'noMail'>('idle');
   const [error, setError] = useState('');
 
   const submit = async (e: React.FormEvent) => {
@@ -52,7 +58,8 @@ export default function ForgotPage() {
       });
       if (res.status === 429) { setError(t(T.rate)); setState('idle'); return; }
       if (!res.ok) { setError(t(T.server)); setState('idle'); return; }
-      setState('done');
+      const data = await res.json().catch(() => ({}));
+      setState(data?.mail === 'disabled' ? 'noMail' : 'done');
     } catch {
       setError(t(T.network)); setState('idle');
     }
@@ -67,6 +74,12 @@ export default function ForgotPage() {
 
         {state === 'done' ? (
           <div role="status" className="rounded-lg border border-line-strong bg-surface-subtle px-4 py-3 text-sm text-ink">{t(T.done)}</div>
+        ) : state === 'noMail' ? (
+          <div role="status" className="rounded-lg border border-line-strong bg-surface-subtle px-4 py-3 text-sm text-ink">
+            {t(T.noMail).split('{email}').map((part, i) => (
+              <span key={i}>{i > 0 && <a className={LINK} href={`mailto:${OPERATOR.email}?subject=${encodeURIComponent('KlientHunter – obnova hesla')}`}>{OPERATOR.email}</a>}{part}</span>
+            ))}
+          </div>
         ) : (
           <form onSubmit={submit} className="space-y-4">
             <div>
