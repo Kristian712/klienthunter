@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
     const session = sessionFrom(req);
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { plan, locale } = CheckoutSchema.parse(await req.json());
+    const { plan, locale } = CheckoutSchema.parse(await req.json().catch(() => ({})));
 
     const user = await prisma.user.findUnique({
       where: { id: session.userId },

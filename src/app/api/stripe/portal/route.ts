@@ -22,7 +22,8 @@ export async function POST(req: NextRequest) {
     const session = sessionFrom(req);
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { locale } = PortalSchema.parse(await req.json());
+    // Prázdné nebo nevalidní tělo je chyba volajícího (400), ne pád serveru (500).
+    const { locale } = PortalSchema.parse(await req.json().catch(() => ({})));
 
     const user = await prisma.user.findUnique({
       where: { id: session.userId },

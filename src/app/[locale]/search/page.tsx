@@ -19,7 +19,7 @@ import { opportunityReason, opportunityScore, reachHint, reachScore } from '@/li
 import { scoreBreakdown } from '@/lib/lead-score';
 import { websiteAudit } from '@/lib/website-audit';
 import { YIELD_NOTE, yieldFor } from '@/lib/nace-map';
-import { SCENARIOS, SCENARIO_BY_PROFESSION, scenarioById } from '@/lib/scenarios';
+import { SCENARIOS, SCENARIO_BY_PROFESSION, scenarioById, type ScenarioIcon } from '@/lib/scenarios';
 import { EMPTY_PROFILE, industriesFor, presetFiltersFor, type UserProfile } from '@/lib/profile';
 import { ALL_INDUSTRIES, ALL_INDUSTRIES_LABEL, MAX_INDUSTRIES, isAllIndustries, joinIndustries, splitIndustries } from '@/lib/industries';
 import { isWholeCz, nuts3ForRegion } from '@/lib/regions-nuts';
@@ -345,6 +345,18 @@ function LockedContacts({ locale }: { locale: string }) {
     </div>
   );
 }
+
+/** Ikony sekcí (scénářů). Jména drží lib/scenarios, kreslí se tady, kde je lucide. */
+const SCENARIO_ICONS: Record<ScenarioIcon, React.ReactNode> = {
+  globe: <Globe size={14} />,
+  social: <Users size={14} />,
+  shield: <ShieldCheck size={14} />,
+  megaphone: <Megaphone size={14} />,
+  sparkles: <Sparkles size={14} />,
+  phone: <PhoneCall size={14} />,
+  search: <Search size={14} />,
+  list: <FileText size={14} />,
+};
 
 /** Doména z adresy webu pro odkaz do Ads Transparency Center; bez protokolu a `www`. */
 function hostOfUrl(url: string): string {
@@ -1413,6 +1425,9 @@ export default function SearchPage() {
     const params = new URLSearchParams(window.location.search);
     const jobId = params.get('job');
     const savedId = params.get('search');
+    // Sekce z odkazu (přehled, úvod): zapne scénář dřív, než profil stihne dosadit svůj.
+    const fromLink = params.get('scenario');
+    if (fromLink && SCENARIOS.some(sc => sc.id === fromLink)) applyScenario(fromLink);
     if (!jobId && !savedId) return;
     setHasSearched(true);
     setLoading(true);
@@ -1792,30 +1807,49 @@ export default function SearchPage() {
             ))}
           </div>
 
-          {/* Scénář. Jen vybírá a řadí to, co se stáhne — do vyhledávání nezasahuje. */}
-          <div className="flex flex-wrap items-center gap-2 mb-4 pb-4 border-b border-line">
-            <span className="w-full md:w-auto md:mr-1 text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
-              {localized({ cs: 'Scénář', sk: 'Scenár', en: 'Scenario' }, locale)}
-            </span>
-            {SCENARIOS.filter(sc => metaAds || !(sc.filters.length > 0 && sc.filters.every(id => LEAD_FILTERS.find(f => f.id === id)?.source === 'Meta'))).map(sc => (
-              <button
-                key={sc.id}
-                type="button"
-                onClick={() => applyScenario(sc.id)}
-                aria-pressed={effectiveScenario === sc.id}
-                className={effectiveScenario === sc.id ? 'chip-active' : 'chip'}
-              >
-                {localized(sc.label, locale)}
-              </button>
-            ))}
-            {effectiveScenario === 'custom' && (
-              <span className="chip-active cursor-default" title={localized({ cs: 'Kombinace, kterou jste si poskládali sami. Scénář je jen přednastavení.', sk: 'Kombinácia, ktorú ste si poskladali sami. Scenár je len prednastavenie.', en: 'A combination you built yourself. A scenario is only a preset.' }, locale)}>
-                {localized({ cs: 'Vlastní kombinace', sk: 'Vlastná kombinácia', en: 'Custom combination' }, locale)}
+          {/*
+            Sekce podle záměru: koho hledáte a proč. Dřív řada chipů se jmény scénářů, ze kterých
+            nováček nepoznal, který je pro něj. Karta má ikonu, název, pro koho je a jednu větu
+            o tom, co v seznamu zbyde. Je to pořád jen přednastavení filtrů — nic víc pod tím není.
+          */}
+          <div className="mb-5 pb-5 border-b border-line">
+            <div className="flex items-baseline justify-between gap-3 mb-3">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
+                {localized({ cs: 'Koho hledáte', sk: 'Koho hľadáte', en: 'Who you are looking for' }, locale)}
               </span>
-            )}
-            <p className="w-full text-[11px] text-ink-faint leading-snug mt-0.5">
+              {effectiveScenario === 'custom' && (
+                <span className="text-xs text-ink-muted">
+                  {localized({ cs: 'Vlastní kombinace podmínek — kliknutím na sekci se zase složí podle ní.', sk: 'Vlastná kombinácia podmienok — kliknutím na sekciu sa zase zloží podľa nej.', en: 'A custom set of conditions — click a section to reset to it.' }, locale)}
+                </span>
+              )}
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              {SCENARIOS.filter(sc => metaAds || !(sc.filters.length > 0 && sc.filters.every(id => LEAD_FILTERS.find(f => f.id === id)?.source === 'Meta'))).map(sc => {
+                const on = effectiveScenario === sc.id;
+                return (
+                  <button
+                    key={sc.id}
+                    type="button"
+                    onClick={() => applyScenario(sc.id)}
+                    aria-pressed={on}
+                    className={`kh-contact text-left rounded-xl border px-3.5 py-3 min-h-[40px] ${on ? 'border-ink bg-ink text-surface' : 'border-field hover:border-ink bg-surface-muted/40'}`}
+                  >
+                    <span className="flex items-center gap-2.5">
+                      <span className={`icon-tile h-7 w-7 shrink-0 ${on ? 'bg-surface/15 text-surface' : 'icon-tile--who'}`}>{SCENARIO_ICONS[sc.icon ?? 'search']}</span>
+                      <span className="text-sm font-semibold leading-tight">{localized(sc.label, locale)}</span>
+                    </span>
+                    {sc.forWhom && (
+                      <span className={`mt-1.5 block text-[11px] uppercase tracking-wider ${on ? 'text-surface/70' : 'text-ink-faint'}`}>
+                        {localized({ cs: 'pro', sk: 'pre', en: 'for' }, locale)} {localized(sc.forWhom, locale)}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-xs text-ink-muted leading-relaxed mt-3">
               {effectiveScenario === 'custom'
-                ? localized({ cs: 'Scénář je jen přednastavení — kliknutím na něj se filtry zase složí podle něj.', sk: 'Scenár je len prednastavenie — kliknutím naň sa filtre zase zložia podľa neho.', en: 'A scenario is only a preset — click one to set the filters back to it.' }, locale)
+                ? localized({ cs: 'Sekce je jen přednastavení podmínek. Co je zapnuté, vidíte níž v „Další podmínky".', sk: 'Sekcia je len prednastavenie podmienok. Čo je zapnuté, vidíte nižšie v „Ďalšie podmienky".', en: 'A section is only a preset. What is on is listed below under “More conditions”.' }, locale)
                 : localized(scenarioById(effectiveScenario).hint, locale)}
             </p>
           </div>

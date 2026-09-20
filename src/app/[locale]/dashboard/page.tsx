@@ -3,7 +3,15 @@
 import { useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
 import Link from 'next/link';
-import { Search, ArrowRight, Crown, Clock, BarChart3, Upload, Trash2, Bookmark, RefreshCw, Sparkles, Phone } from 'lucide-react';
+import { Search, ArrowRight, Crown, Clock, BarChart3, Upload, Trash2, Bookmark, RefreshCw, Sparkles, Phone, Globe, Users, ShieldCheck, Megaphone, PhoneCall, FileText } from 'lucide-react';
+import { FEATURED_SCENARIOS, scenarioById, type ScenarioIcon } from '@/lib/scenarios';
+
+/** Ikony sekcí; jména drží lib/scenarios. */
+const SECTION_ICON: Record<ScenarioIcon, React.ReactNode> = {
+  globe: <Globe size={16} />, social: <Users size={16} />, shield: <ShieldCheck size={16} />,
+  megaphone: <Megaphone size={16} />, sparkles: <Sparkles size={16} />, phone: <PhoneCall size={16} />,
+  search: <Search size={16} />, list: <FileText size={16} />,
+};
 import { clearUser } from '@/lib/client-auth';
 import { industryLabel } from '@/lib/search-options';
 import { formatDate } from '@/lib/format-date';
@@ -161,6 +169,35 @@ export default function DashboardPage() {
             {user?.isVip && ' · VIP'}
           </span>
         </Link>
+      </div>
+
+      {/*
+        Sekce podle záměru: čtyři vstupy do hledání, které pokryjí většinu profesí (tvůrce webů,
+        marketér, účetní, kdokoli, kdo volá). Každý odkaz předá scénář do hledání přes `?scenario=`,
+        takže uživatel začne s poskládanými podmínkami, ne s prázdným formulářem.
+      */}
+      <h2 className="text-lg font-semibold mb-3">{isCs ? 'Koho hledáte' : 'Who are you looking for'}</h2>
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        {FEATURED_SCENARIOS.map(id => {
+          const sc = scenarioById(id);
+          return (
+            <Link key={id} href={`/${locale}/search?scenario=${id}`} className="card-hover group flex flex-col gap-3">
+              <span className="flex items-center gap-3">
+                <span className="icon-tile icon-tile--who">{SECTION_ICON[sc.icon ?? 'search']}</span>
+                <span className="font-semibold leading-tight">{localized(sc.label, locale)}</span>
+              </span>
+              {sc.forWhom && (
+                <span className="text-[11px] uppercase tracking-wider text-ink-faint">
+                  {isCs ? 'pro' : 'for'} {localized(sc.forWhom, locale)}
+                </span>
+              )}
+              <span className="text-sm text-ink-muted leading-relaxed">{localized(sc.hint, locale)}</span>
+              <span className="mt-auto flex items-center gap-1 text-sm text-ink-faint group-hover:text-accent transition-colors">
+                {isCs ? 'Hledat' : 'Search'} <ArrowRight size={14} />
+              </span>
+            </Link>
+          );
+        })}
       </div>
 
       {/* Quick actions */}

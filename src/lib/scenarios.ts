@@ -14,9 +14,15 @@ import { localized } from './lead-filters';
  * musí zvlášť testovat — a jednu z nich by nikdo nikdy nespustil.
  */
 
+export type ScenarioIcon = 'globe' | 'social' | 'shield' | 'megaphone' | 'sparkles' | 'phone' | 'search' | 'list';
+
 export interface Scenario {
   id: string;
   label: { cs: string; sk?: string; en: string };
+  /** Komu ten seznam pomůže — jedna profese nebo dvě, ať se v sekcích každý najde. */
+  forWhom?: { cs: string; sk?: string; en: string };
+  /** Ikona sekce ve výběru; kreslí ji stránka (lucide), tady je jen jméno. */
+  icon?: ScenarioIcon;
   /** Co uživateli slíbí. Musí sedět s `filters` — jinak je to popisek, ne pravda. */
   hint: { cs: string; sk?: string; en: string };
   /** Id z LEAD_FILTERS, která se zapnou. Prázdné pole = neomezovat. */
@@ -26,6 +32,8 @@ export interface Scenario {
 export const SCENARIOS: Scenario[] = [
   {
     id: 'all',
+    icon: 'search',
+    forWhom: { cs: 'kdokoli', sk: 'ktokoľvek', en: 'anyone' },
     label: { cs: 'Všechny firmy v oboru', sk: 'Všetky firmy v odbore', en: 'Every firm in the trade' },
     hint: {
       cs: 'Nic neodfiltruje. Pořadí určuje skóre podle kritérií z vašeho účtu.',
@@ -36,6 +44,8 @@ export const SCENARIOS: Scenario[] = [
   },
   {
     id: 'no_web',
+    icon: 'globe',
+    forWhom: { cs: 'tvůrci webů', sk: 'tvorcovia webov', en: 'web developers' },
     /**
      * Jméno scénáře je schválně totožné s filtrem, který zapíná.
      *
@@ -68,6 +78,8 @@ export const SCENARIOS: Scenario[] = [
      * a zároveň jim web chybí nebo pokulhává.
      */
     id: 'reach_weak_web',
+    icon: 'globe',
+    forWhom: { cs: 'tvůrci webů', sk: 'tvorcovia webov', en: 'web developers' },
     label: { cs: 'Jde oslovit a web pokulhává', sk: 'Dá sa osloviť a web pokuľháva', en: 'Reachable, weak website' },
     hint: {
       cs: 'Firmy, na které máme telefon, e-mail nebo profil na síti, a jejichž web jsme nenašli nebo propadl v auditu. Tohle je seznam, který jde rovnou obvolat.',
@@ -77,7 +89,25 @@ export const SCENARIOS: Scenario[] = [
     filters: ['can_reach', 'weak_web'],
   },
   {
+    /**
+     * Firma, která si udržuje sítě, ale web nemá nebo ho zanedbala: ví, že viditelnost má cenu,
+     * a je co jí nabídnout. Nejsilnější signál „chce růst", který máme bez placených zdrojů.
+     */
+    id: 'social_weak_web',
+    icon: 'social',
+    forWhom: { cs: 'tvůrci webů, marketéři', sk: 'tvorcovia webov, marketéri', en: 'web developers, marketers' },
+    label: { cs: 'Aktivní na sítích, web slabý', sk: 'Aktívne na sieťach, web slabý', en: 'Active on social, weak website' },
+    hint: {
+      cs: 'Firmy s profilem na Facebooku, Instagramu nebo LinkedInu, kterým web chybí nebo propadl v auditu. O viditelnost se starají, takže vědí, proč web potřebují.',
+      sk: 'Firmy s profilom na Facebooku, Instagrame alebo LinkedIne, ktorým web chýba alebo prepadol v audite. O viditeľnosť sa starajú, takže vedia, prečo web potrebujú.',
+      en: 'Firms with a Facebook, Instagram or LinkedIn profile whose website is missing or failed the audit. They already invest in visibility, so they know why they need a site.',
+    },
+    filters: ['has_social', 'weak_web'],
+  },
+  {
     id: 'old_web',
+    icon: 'shield',
+    forWhom: { cs: 'tvůrci webů', sk: 'tvorcovia webov', en: 'web developers' },
     label: { cs: 'Firmy se zastaralým webem', sk: 'Firmy so zastaraným webom', en: 'Firms with a dated website' },
     hint: {
       cs: 'Firmy s ověřeným webem, který běží bez HTTPS — prohlížeč u něj návštěvníkovi píše „Nezabezpečeno".',
@@ -88,6 +118,8 @@ export const SCENARIOS: Scenario[] = [
   },
   {
     id: 'ads_no_web',
+    icon: 'megaphone',
+    forWhom: { cs: 'tvůrci webů, marketéři', sk: 'tvorcovia webov, marketéri', en: 'web developers, marketers' },
     label: { cs: 'Platí za reklamu, web nemá', sk: 'Platí za reklamu, web nemá', en: 'Pays for ads, has no website' },
     hint: {
       cs: 'Firmy z Meta Knihovny reklam, jejichž reklamy nevedou na web a my jsme web nenašli. Vyžaduje přístup k Ad Library API; spárování s inzerentem se povede jen u části firem.',
@@ -98,6 +130,8 @@ export const SCENARIOS: Scenario[] = [
   },
   {
     id: 'new',
+    icon: 'sparkles',
+    forWhom: { cs: 'účetní, pojišťováci, právníci', sk: 'účtovníci, poisťováci, právnici', en: 'accountants, insurers, lawyers' },
     label: { cs: 'Nové firmy', sk: 'Nové firmy', en: 'New firms' },
     hint: {
       cs: 'Firmy zapsané do rejstříku během posledního půlroku, v celém kraji. Vybírají se z indexu RES ČSÚ, jméno a sídlo doplní ARES — datum vzniku je přesné.',
@@ -106,7 +140,22 @@ export const SCENARIOS: Scenario[] = [
     },
     filters: ['new_firm_6m'],
   },
+  {
+    id: 'reach',
+    icon: 'phone',
+    forWhom: { cs: 'kdokoli, kdo volá a píše', sk: 'ktokoľvek, kto volá a píše', en: 'anyone who calls and writes' },
+    label: { cs: 'Jde oslovit', sk: 'Dá sa osloviť', en: 'Reachable' },
+    hint: {
+      cs: 'Jen firmy, na které máme telefon, e-mail, profil na síti nebo kontaktní stránku. Ostatní se v seznamu neukážou.',
+      sk: 'Len firmy, na ktoré máme telefón, e-mail, profil na sieti alebo kontaktnú stránku. Ostatné sa v zozname neukážu.',
+      en: 'Only firms we have a phone, e-mail, social profile or contact page for. The rest do not appear.',
+    },
+    filters: ['can_reach'],
+  },
 ];
+
+/** Sekce na přehledu a v hlavičce hledání — čtyři vstupy, které pokryjí většinu profesí. */
+export const FEATURED_SCENARIOS = ['reach_weak_web', 'social_weak_web', 'new', 'reach'] as const;
 
 const BY_ID = new Map(SCENARIOS.map(s => [s.id, s]));
 
