@@ -311,6 +311,23 @@ export default function AdminPage() {
     }
   };
 
+  /** Smazání účtu — jen po potvrzení, admina ani sebe server odmítne. */
+  const deleteUser = async (user: AdminUser) => {
+    if (!window.confirm(isCs ? `Smazat účet ${user.email} včetně všech hledání a značek? Nejde vrátit.` : `Delete ${user.email} with all searches and tags? This cannot be undone.`)) return;
+    setUpdating(user.id + '-delete');
+    try {
+      const res = await fetch(`/api/admin/users/${user.id}/delete`, { method: 'DELETE' });
+      if (!res.ok) { failToast(); return; }
+      setUsers(prev => prev.filter(u => u.id !== user.id));
+      showToast(isCs ? `Účet smazán: ${user.email}` : `Account deleted: ${user.email}`);
+    } catch (err) {
+      console.error('admin/deleteUser:', err);
+      failToast();
+    } finally {
+      setUpdating(null);
+    }
+  };
+
   const toggleVip = async (user: AdminUser) => {
     setUpdating(user.id + '-vip');
     try {
@@ -704,6 +721,7 @@ export default function AdminPage() {
                     <th>VIP</th><th>Admin</th>
                     <th>{isCs ? 'Přístup' : 'Access'}</th>
                     <th>{isCs ? 'Heslo' : 'Password'}</th>
+                    <th></th>
                   </tr></thead>
                   <tbody>
                     {users.map(user => {
@@ -748,6 +766,14 @@ export default function AdminPage() {
                             <KeyRound size={13} />
                             {isCs ? 'Odkaz na nové heslo' : 'Password link'}
                           </button>
+                        </td>
+                        <td>
+                          {!user.isAdmin && (
+                            <button onClick={() => deleteUser(user)} disabled={updating === user.id + '-delete'} className={ROW_BTN_BLOCK}
+                              title={isCs ? 'Smazat účet včetně dat' : 'Delete the account with its data'} aria-label={isCs ? 'Smazat účet' : 'Delete account'}>
+                              <Trash2 size={13} />
+                            </button>
+                          )}
                         </td>
                       </tr>
                       );
