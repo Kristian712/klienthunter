@@ -1,9 +1,10 @@
 import Link from 'next/link';
 import { useLocale } from 'next-intl';
-import { ArrowRight, Building2, Calculator, Camera, Code2, Database, ListOrdered, MapPinned, Megaphone, MessageSquareText, Plus, Search as SearchIcon, ShieldCheck, Sparkles, type LucideIcon } from 'lucide-react';
+import { ArrowRight, Building2, Calculator, Camera, Code2, Database, FileText, Globe, ListOrdered, MapPinned, Megaphone, MessageSquareText, PhoneCall, Plus, Search as SearchIcon, ShieldCheck, Sparkles, Users, type LucideIcon } from 'lucide-react';
 import { LeadScore, GOOD_LEAD } from '@/components/LeadScore';
 import { Reveal } from '@/components/Reveal';
 import { LEAD_FILTERS, localized } from '@/lib/lead-filters';
+import { FEATURED_SCENARIOS, scenarioById, type ScenarioIcon } from '@/lib/scenarios';
 
 /**
  * Kolik kritérií skládačka opravdu nabízí — z katalogu, aby číslo na úvodu nezastaralo.
@@ -195,6 +196,11 @@ const UI = {
                 sk: 'Ukážkové dáta pre predstavu, ako výsledok vyzerá. Skóre je podiel splnených kritérií — iný odbor si zapne iné a dostane iné poradie.',
                 en: 'Sample rows showing what a result looks like. The score is the share of criteria met — another trade ticks different ones and gets a different order.' },
   since:      { cs: 'od',                       sk: 'od',                       en: 'since' },
+  secTitle:   { cs: 'Koho hledáte?',            sk: 'Koho hľadáte?',            en: 'Who are you looking for?' },
+  secLead:    { cs: 'Jedno kliknutí poskládá podmínky. Kraj si vyberete, obor je nepovinný.',
+                sk: 'Jedno kliknutie poskladá podmienky. Kraj si vyberiete, odbor je nepovinný.',
+                en: 'One click sets the conditions. Pick a region; the trade is optional.' },
+  secFor:     { cs: 'pro', sk: 'pre', en: 'for' },
   audTitle:   { cs: 'Pět lidí, pět hledání.',   sk: 'Päť ľudí, päť hľadaní.',   en: 'Five people, five searches.' },
   audNote:    { cs: `Když se ve výčtu nevidíš, poskládáš si kritéria sám — je jich ${CRITERIA} a kombinují se libovolně, i napříč obory.`,
                 sk: `Keď sa vo výpočte nevidíš, poskladáš si kritériá sám — je ich ${CRITERIA} a kombinujú sa ľubovoľne, aj naprieč odbormi.`,
@@ -227,6 +233,11 @@ const STEP_ICONS: Array<{ icon: LucideIcon; tile: string }> = [
 ];
 
 /** Ikonka a barva ke každému z pěti lidí — v pořadí `AUDIENCE`. */
+/** Ikony sekcí „Koho hledáte" — stejné jako v přehledu, jména drží lib/scenarios. */
+const SECTION_ICON: Record<ScenarioIcon, LucideIcon> = {
+  globe: Globe, social: Users, shield: ShieldCheck, megaphone: Megaphone, sparkles: Sparkles, phone: PhoneCall, search: SearchIcon, list: FileText,
+};
+
 const AUDIENCE_ICONS: Array<{ icon: LucideIcon; tile: string }> = [
   { icon: Calculator, tile: 'event' },
   { icon: Building2,  tile: 'standing' },
@@ -333,6 +344,32 @@ export default function HomePage() {
           </div>
 
           <p className="mt-6 text-sm text-ink-faint max-w-2xl">{t(UI.demoNote)}</p>
+        </div>
+      </section>
+
+      {/* ── Koho hledáte: stejné čtyři vstupy jako v přehledu a hledání, ať úvod slibuje totéž, co appka umí ── */}
+      <section className="px-5 py-24 border-t border-line">
+        <div className="max-w-6xl mx-auto">
+          <h2 className="display-sm max-w-2xl">{t(UI.secTitle)}</h2>
+          <p className="mt-3 text-ink-muted max-w-2xl">{t(UI.secLead)}</p>
+          <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {FEATURED_SCENARIOS.map((id, i) => {
+              const sc = scenarioById(id);
+              const Icon = SECTION_ICON[sc.icon ?? 'search'];
+              return (
+                <Reveal key={id} delay={i * 60}>
+                  <Link href={`/${locale}/search?scenario=${id}`} className="card-hover group flex h-full flex-col gap-3">
+                    <span className="icon-tile icon-tile--who"><Icon size={16} /></span>
+                    <span className="font-semibold leading-tight">{t(sc.label)}</span>
+                    {sc.forWhom && <span className="text-[11px] uppercase tracking-wider text-ink-faint">{t(UI.secFor)} {t(sc.forWhom)}</span>}
+                    <span className="mt-auto inline-flex items-center gap-1 text-sm text-ink-muted group-hover:text-ink transition-colors">
+                      {t(sc.action)} <ArrowRight size={14} />
+                    </span>
+                  </Link>
+                </Reveal>
+              );
+            })}
+          </div>
         </div>
       </section>
 
