@@ -5,6 +5,15 @@ import { useLocale } from 'next-intl';
 import { Crown, Shield, Users, RefreshCw, Ticket, Plus, Trash2, Copy, Check, Clock, Link2, CreditCard, KeyRound } from 'lucide-react';
 import { formatDate } from '@/lib/format-date';
 
+interface StripeStatus {
+  mode: 'live' | 'test' | null;
+  url: string;
+  webhookSecretSet: boolean;
+  prices: Array<{ plan: string; ok: boolean; amount?: number; currency?: string; interval?: string; note?: string }>;
+  webhook: { id: string; status: string; events: string[]; missing: string[] } | null;
+  others?: Array<{ url: string; status: string }>;
+}
+
 interface RegistryStatus {
   months: number;
   stats: { rows: number; bytes: number; oldest: string | null; newest: string | null };
@@ -67,6 +76,9 @@ export default function AdminPage() {
   const [dbSize, setDbSize]           = useState<{ bytes: number; tables: Array<{ name: string; bytes: number; rows: number }> } | null>(null);
   /** Index firem z ČSÚ (etapa 3): kolik má řádků, kolik zabírá a jak dopadl poslední import. */
   const [registry, setRegistry]       = useState<RegistryStatus | null>(null);
+  const [stripeInfo, setStripeInfo]   = useState<StripeStatus | null>(null);
+  const [stripeBusy, setStripeBusy]   = useState(false);
+  const [webhookSecret, setWebhookSecret] = useState<string | null>(null);
   const [importing, setImporting]     = useState(false);
   const [importNote, setImportNote]   = useState<string | null>(null);
   const [syncing, setSyncing]         = useState(false);
@@ -182,6 +194,27 @@ export default function AdminPage() {
       .then(d => { if (d?.bytes != null) setDbSize(d); })
       .catch(err => console.error('admin/db-size:', err));
   }, []);
+  const fetchStripe = useCallback(() => {
+    fetch('/api/admin/stripe').then(r => (r.ok ? r.json() : null)).then(d => d && setStripeInfo(d)).catch(err => console.error('admin/stripe:', err));
+  }, []);
+  /** Založí (nebo doplní) webhook ve Stripe; secret se ukáže jednou, do Vercelu ho vkládá člověk. */
+  const setupWebhook = async () => {
+    setStripeBusy(true);
+    try {
+      const res = await fetch('/api/admin/stripe', { method: 'POST' });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) { window.alert((isCs ? 'Stripe odmítl: ' : 'Stripe refused: ') + (d.error || res.status)); return; }
+      if (d.secret) setWebhookSecret(d.secret);
+      showToast(d.created ? (isCs ? 'Webhook založen.' : 'Webhook created.') : (isCs ? 'Webhook už existoval, události doplněny.' : 'Webhook existed, events completed.'));
+      fetchStripe();
+    } catch (err) {
+      console.error('admin/setupWebhook:', err);
+      failToast();
+    } finally {
+      setStripeBusy(false);
+    }
+  };
+
   const fetchRegistry = useCallback(() => {
     fetch('/api/admin/import-res')
       .then(r => (r.ok ? r.json() : null))
@@ -194,7 +227,7 @@ export default function AdminPage() {
       .then(d => { if (d && typeof d.enabled === 'boolean') setMetaAds(d); })
       .catch(err => console.error('admin/meta-ads:', err));
   }, []);
-  useEffect(() => { fetchDbSize(); fetchRegistry(); fetchMetaAds(); }, [fetchDbSize, fetchRegistry, fetchMetaAds]);
+  useEffect(() => { fetchDbSize(); fetchRegistry(); fetchStripe(); fetchMetaAds(); }, [fetchDbSize, fetchRegistry, fetchStripe, fetchMetaAds]);
 
   /**
    * Import běží uvnitř jednoho HTTP dotazu až 5 minut. Když skončí `done: false`, funkce
@@ -473,7 +506,7 @@ export default function AdminPage() {
             </div>
           </div>
           {/* Obnovit = všechno, co panel ukazuje: i žádosti, velikost databáze a stav indexu. */}
-          <button onClick={() => { fetchUsers(); fetchCodes(); fetchOptouts(); fetchPayments(); fetchDbSize(); fetchRegistry(); fetchMetaAds(); }}
+          <button onClick={() => { fetchUsers(); fetchCodes(); fetchOptouts(); fetchPayments(); fetchDbSize(); fetchRegistry(); fetchStripe(); fetchMetaAds(); }}
             className="btn-ghost">
             <RefreshCw size={14} />{isCs ? 'Obnovit' : 'Refresh'}
           </button>
@@ -584,6 +617,39 @@ export default function AdminPage() {
         )}
 
         {/* Index firem z ČSÚ: jediné místo, odkud jde produkční import spustit (DATABASE_URL je jen ve Vercelu). */}
+        {stripeInfo && (
+          <div className="card mb-6 text-sm">
+            <div className="flex items-baseline gap-3 flex-wrap">
+              <span className="text-xs font-medium text-ink-faint">Stripe</span>
+              <span className={`badge ${stripeInfo.mode === 'live' ? BADGE_STRONG : ''}`}>{stripeInfo.mode ? stripeInfo.mode.toUpperCase() : (isCs ? 'bez klíče' : 'no key')}</span>
+              {stripeInfo.prices.map(p => (
+                <span key={p.plan} className="text-xs text-ink-muted">
+                  {p.plan}: {p.ok ? `${p.amount} ${p.currency?.toUpperCase()} / ${p.interval}` : `✕ ${p.note ?? ''}`}
+                </span>
+              ))}
+              <button type="button" onClick={setupWebhook} disabled={stripeBusy || !stripeInfo.mode}
+                className="btn-outline text-xs py-1.5 px-3 ml-auto disabled:opacity-60">
+                {stripeBusy ? '…' : stripeInfo.webhook ? (isCs ? 'Doplnit události' : 'Complete events') : (isCs ? 'Založit webhook' : 'Create webhook')}
+              </button>
+            </div>
+            <p className="mt-2 text-xs text-ink-muted">
+              Webhook <span className="font-mono">{stripeInfo.url}</span>:{' '}
+              {stripeInfo.webhook
+                ? `${stripeInfo.webhook.status}${stripeInfo.webhook.missing.length ? (isCs ? ` · chybí události: ${stripeInfo.webhook.missing.join(', ')}` : ` · missing events: ${stripeInfo.webhook.missing.join(', ')}`) : (isCs ? ' · všechny události' : ' · all events')}`
+                : (isCs ? 've Stripe není — bez něj se po platbě tarif nepřepne.' : 'not in Stripe — plans will not switch after payment.')}
+              {' · '}STRIPE_WEBHOOK_SECRET {stripeInfo.webhookSecretSet ? (isCs ? 'nastaven' : 'set') : (isCs ? 'CHYBÍ ve Vercelu' : 'MISSING in Vercel')}
+            </p>
+            {webhookSecret && (
+              <div role="alert" className="mt-3 rounded-lg border border-ink px-3 py-2.5">
+                <p className="text-xs font-semibold text-ink">{isCs ? 'Podepisovací secret — ukáže se jen teď. Vložte do Vercelu jako STRIPE_WEBHOOK_SECRET a udělejte Redeploy.' : 'Signing secret — shown only now. Put it in Vercel as STRIPE_WEBHOOK_SECRET and redeploy.'}</p>
+                <div className="mt-1.5 flex items-center gap-2">
+                  <code className="text-xs break-all">{webhookSecret}</code>
+                  <button type="button" className="btn-outline btn-sm" onClick={() => { navigator.clipboard.writeText(webhookSecret).then(() => showToast(isCs ? 'Zkopírováno' : 'Copied')); }}>{isCs ? 'Kopírovat' : 'Copy'}</button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
         {registry && (
           <div className="card mb-6 text-sm">
             <div className="flex items-baseline gap-3 flex-wrap">
