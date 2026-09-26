@@ -211,7 +211,4 @@ export function matchAdvertiser(c: { name: string; website?: string }, index: Ad
   return key ? index.byName.get(key) ?? null : null;
 }
 
-/** Odkaz do Google Ads Transparency Center — jen podle domény, API nemá. Viz průzkum 15. 9. 2026. */
-export function googleAdsTransparencyUrl(domain: string): string {
-  return `https://adstransparency.google.com/?region=CZ&domain=${encodeURIComponent(domain)}`;
-}
+export { googleAdsTransparencyUrl } from '../ads-links';

@@ -8,7 +8,7 @@ import {
   Mail, MapPin, X, Clock, ChevronDown,
   FileText, Table2, PhoneCall, ShieldCheck, Share2, Phone, Megaphone, BedDouble, MessageSquareText, Copy,
 } from 'lucide-react';
-import { googleAdsTransparencyUrl } from '@/lib/sources/meta-ads';
+import { googleAdsTransparencyUrl } from '@/lib/ads-links';
 import { CRM_FORMATS } from '@/lib/crm-export';
 import { formatDate } from '@/lib/format-date';
 import { SearchComposer } from '@/components/SearchComposer';
