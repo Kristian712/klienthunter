@@ -92,22 +92,73 @@ export function reachHint(b: FilterableLead): { cs: string; sk: string; en: stri
 const GAP_NO_WEB = 18;
 const GAP_OLD_WEB = 12;
 const SOCIAL_NO_WEB = 8;
-const ACTIVE_BONUS = 6;
 const UNREACHABLE_FACTOR = 0.15;
 const UNRELIABLE_MALUS = 15;
 
+/**
+ * Známky, že firma má obrat a klientelu — má z čeho zaplatit a je o co přicházet.
+ *
+ * Rozšířeno 26. 9. 2026 (majitel, režim „Ubytování a wellness"): místo recenzí z Google Map,
+ * které legálně nemáme, se bere to, co je v rejstřících. Plátce DPH váží nejvíc — registrace
+ * je povinná od obratu 2 mil. Kč za rok, je to jediný veřejný signál obratu. Víc provozoven
+ * znamená větší provoz, stáří firmy stálou klientelu. Dřív to byl jediný bonus +6 za „provozovna
+ * nebo DPH".
+ */
+const VAT_BONUS = 8;
+const PREMISES_ONE = 3;
+const PREMISES_MORE = 6;
+const AGE_3Y = 3;
+const AGE_10Y = 5;
+const YEAR_MS = 365.25 * 86_400_000;
+
+/** Kolik let je firma na trhu; null, když datum vzniku neznáme. */
+export function firmAgeYears(b: FilterableLead): number | null {
+  if (!b.foundedAt) return null;
+  const t = new Date(b.foundedAt).getTime();
+  return Number.isFinite(t) ? (Date.now() - t) / YEAR_MS : null;
+}
+
+function substanceBonus(b: FilterableLead): number {
+  let bonus = 0;
+  if (b.vatPayer === true) bonus += VAT_BONUS;
+  const premises = b.activePremises ?? 0;
+  if (premises >= 2) bonus += PREMISES_MORE;
+  else if (premises === 1) bonus += PREMISES_ONE;
+  const age = firmAgeYears(b);
+  if (age !== null && age >= 10) bonus += AGE_10Y;
+  else if (age !== null && age >= 3) bonus += AGE_3Y;
+  return bonus;
+}
+
+/** Totéž slovy pro řádek: „plátce DPH · 2 provozovny · na trhu 12 let". Prázdné, když nic. */
+export function substanceFacts(b: FilterableLead, locale: string, withPremises = true): string[] {
+  const facts: string[] = [];
+  const pick = (cs: string, sk: string, en: string) => (locale === 'en' ? en : locale === 'sk' ? sk : cs);
+  if (b.vatPayer === true) facts.push(pick('plátce DPH', 'platiteľ DPH', 'VAT registered'));
+  const premises = b.activePremises ?? 0;
+  if (withPremises && premises >= 2) facts.push(pick(`${premises} provozovn${premises < 5 ? 'y' : 'en'}`, `${premises} prevádz${premises < 5 ? 'ky' : 'ok'}`, `${premises} premises`));
+  const age = firmAgeYears(b);
+  if (age !== null && age >= 3) {
+    const y = Math.floor(age);
+    facts.push(pick(`na trhu ${y} ${y < 5 ? 'roky' : 'let'}`, `na trhu ${y} ${y < 5 ? 'roky' : 'rokov'}`, `${y} years in business`));
+  }
+  return facts;
+}
+
 export function opportunityScore(b: FilterableLead): number {
   const reach = reachScore(b);
-  // Bez kanálu není co dělat: taková firma nesmí předběhnout tu, které jde napsat.
-  if (!hasReachChannel(b)) return Math.round(reach * UNREACHABLE_FACTOR);
+  // Bez kanálu není co dělat: taková firma nesmí předběhnout tu, které jde napsat. Mezi sebou
+  // se ale řadí podle obratu a stálosti (max ~10 bodů, pod nejslabší dosažitelnou firmou) —
+  // v režimu ubytování je takových většina a kontakt si uživatel dohledá v mapách.
+  if (!hasReachChannel(b)) return Math.round(reach * UNREACHABLE_FACTOR + substanceBonus(b) * 0.5);
 
   let score = reach * 0.7;
   const web = webStatusOf(b);
   if (web !== 'HAS') score += GAP_NO_WEB;
   else if (b.websiteIsOld) score += GAP_OLD_WEB;
   if (web !== 'HAS' && (b.hasFacebook || b.hasInstagram || b.hasLinkedIn)) score += SOCIAL_NO_WEB;
-  // Známky toho, že firma opravdu běží — jinak by nahoru šly prázdné schránky bez činnosti.
-  if ((b.activePremises ?? 0) > 0 || b.vatPayer === true) score += ACTIVE_BONUS;
+  // Známky toho, že firma opravdu běží a má obrat — jinak by nahoru šly prázdné schránky.
+  score += substanceBonus(b);
   if (b.vatUnreliable === true) score -= UNRELIABLE_MALUS;
   return Math.max(0, Math.min(100, Math.round(score)));
 }
