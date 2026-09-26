@@ -6,7 +6,7 @@ import { useTranslations, useLocale } from 'next-intl';
 import {
   Search, Globe, Users, ExternalLink, Check, Bookmark, RefreshCw, Sparkles,
   Mail, MapPin, X, Clock, ChevronDown,
-  FileText, Table2, PhoneCall, ShieldCheck, Share2, Phone, Megaphone,
+  FileText, Table2, PhoneCall, ShieldCheck, Share2, Phone, Megaphone, BedDouble, MessageSquareText, Copy,
 } from 'lucide-react';
 import { googleAdsTransparencyUrl } from '@/lib/sources/meta-ads';
 import { CRM_FORMATS } from '@/lib/crm-export';
@@ -15,7 +15,8 @@ import { SearchComposer } from '@/components/SearchComposer';
 import { PLAN_LIMITS } from '@/lib/plans';
 import { LEAD_FILTERS, GROUP_LABELS, GROUP_ORDER, addFilter, effectiveWindowDays, employeeLabel, hasReachChannel, matchesAll, localized, normalizeFilters, type FilterGroup } from '@/lib/lead-filters';
 import { leadReason } from '@/lib/lead-reason';
-import { opportunityReason, opportunityScore, reachHint, reachScore } from '@/lib/reach-score';
+import { opportunityScore, reachHint, reachScore, substanceFacts } from '@/lib/reach-score';
+import { STAY_INDUSTRIES, googleSearchHref, mapyCzHref, outreachMessage, stayKind, stayKindLabel, stayRankBonus } from '@/lib/stay';
 import { scoreBreakdown } from '@/lib/lead-score';
 import { websiteAudit } from '@/lib/website-audit';
 import { YIELD_NOTE, yieldFor } from '@/lib/nace-map';
@@ -288,6 +289,24 @@ const CONTACT = {
   liTip:   { cs: 'Profil firmy, na který odkazuje její web. Zpráva jde správci stránky.',
              sk: 'Profil firmy, na ktorý odkazuje jej web. Správa ide správcovi stránky.',
              en: 'The company profile its own website links to. Messages reach the page admin.' },
+  google:  { cs: 'Najít na Google', sk: 'Nájsť na Google', en: 'Find on Google' },
+  googleTip: { cs: 'Vyhledávání podle názvu a obce — recenze a hodnocení si ověříte sami. Appka odtud nic nestahuje.',
+               sk: 'Vyhľadávanie podľa názvu a obce — recenzie a hodnotenie si overíte sami. Appka odtiaľ nič nesťahuje.',
+               en: 'A search by name and town — check reviews and ratings yourself. The app downloads nothing from it.' },
+  mapyczTip: { cs: 'Firma na Mapy.cz podle názvu a obce — recenze a fotky si prohlédnete sami. Nic se neukládá.',
+               sk: 'Firma na Mapy.cz podľa názvu a obce — recenzie a fotky si prezriete sami. Nič sa neukladá.',
+               en: 'The firm on Mapy.cz by name and town — see reviews and photos yourself. Nothing is stored.' },
+  outreach:  { cs: 'Vygenerovat oslovení', sk: 'Vygenerovať oslovenie', en: 'Draft a message' },
+  outreachHead: { cs: 'Návrh zprávy — upravte, než ji pošlete', sk: 'Návrh správy — upravte, než ju pošlete', en: 'Draft — edit it before you send it' },
+  outreachNote: { cs: 'Nic se neodesílá. Zkopírujte text, nebo ho otevřete jako koncept ve svém e-mailu. U nevyžádané nabídky platí § 7 zák. 480/2004 Sb.',
+                  sk: 'Nič sa neodosiela. Skopírujte text, alebo ho otvorte ako koncept vo svojom e-maile. Pri nevyžiadanej ponuke platí § 7 zák. 480/2004 Zb.',
+                  en: 'Nothing is sent. Copy the text or open it as a draft in your own e-mail. Unsolicited offers fall under § 7 of Act 480/2004.' },
+  copy:      { cs: 'Kopírovat', sk: 'Kopírovať', en: 'Copy' },
+  copied:    { cs: 'Zkopírováno', sk: 'Skopírované', en: 'Copied' },
+  mailDraft: { cs: 'Otevřít v e-mailu', sk: 'Otvoriť v e-maile', en: 'Open in e-mail' },
+  mailDraftTip: { cs: 'Otevře koncept ve vašem poštovním programu. Odeslat musíte sami.', sk: 'Otvorí koncept vo vašom poštovom programe. Odoslať musíte sami.', en: 'Opens a draft in your mail app. You send it yourself.' },
+  reset:     { cs: 'Vrátit návrh', sk: 'Vrátiť návrh', en: 'Reset' },
+  close:     { cs: 'Zavřít', sk: 'Zavrieť', en: 'Close' },
   maps:    { cs: 'Mapy', sk: 'Mapy', en: 'Maps' },
   mapsTip: { cs: 'Otevře firmu v Google Mapách. Telefon, který nemáme, tam firmy obvykle uvádějí — appka odtud nic nestahuje, jen vás tam pošle.',
              sk: 'Otvorí firmu v Google Mapách. Telefón, ktorý nemáme, tam firmy zvyčajne uvádzajú — appka odtiaľ nič nesťahuje, len vás tam pošle.',
@@ -356,7 +375,13 @@ const SCENARIO_ICONS: Record<ScenarioIcon, React.ReactNode> = {
   phone: <PhoneCall size={14} />,
   search: <Search size={14} />,
   list: <FileText size={14} />,
+  bed: <BedDouble size={14} />,
 };
+
+/** Stejné prvky bez ohledu na pořadí — pro obory sekce. */
+function sameMembers(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every(x => b.includes(x));
+}
 
 /** Doména z adresy webu pro odkaz do Ads Transparency Center; bez protokolu a `www`. */
 function hostOfUrl(url: string): string {
@@ -460,10 +485,23 @@ function ContactStrategy({ b, locale }: { b: BusinessResult; locale: string }) {
   methods.push({ key: 'maps', icon: <MapPin size={12} />, label: L(CONTACT.maps),
                  href: mapsHref(b), tip: L(CONTACT.mapsTip) });
 
+  /**
+   * Ubytování a wellness: recenze si uživatel ověří sám — Google a Mapy.cz jako obyčejné
+   * vyhledávací odkazy podle názvu a obce. Nic se odtud nestahuje ani neukládá (Places v EHP
+   * pro tohle použít nesmíme, viz lib/stay.ts).
+   */
+  const stay = stayKind(b);
+  if (stay) {
+    methods.push({ key: 'google', icon: <Search size={12} />, label: L(CONTACT.google),
+                   href: googleSearchHref(b), tip: L(CONTACT.googleTip) });
+    methods.push({ key: 'mapycz', icon: <MapPin size={12} />, label: 'Mapy.cz',
+                   href: mapyCzHref(b), tip: L(CONTACT.mapyczTip) });
+  }
+
   // Only when nothing else worked. A row from ARES has a name, an address and an IČO and
   // nothing you can call — leaving it with no action at all is what made the whole list feel
   // broken, even though every fact on it was true.
-  if (methods.filter(m => m.key !== 'maps').length === 0) {
+  if (!stay && methods.filter(m => m.key !== 'maps').length === 0) {
     methods.push({ key: 'lookup', icon: <Search size={12} />, label: L(CONTACT.lookup),
                    href: lookupHref(b), tip: L(CONTACT.lookupTip) });
   }
@@ -508,6 +546,62 @@ function ContactStrategy({ b, locale }: { b: BusinessResult; locale: string }) {
           </a>
         ))}
       </div>
+      {stay && <OutreachDraft b={b} locale={locale} />}
+    </div>
+  );
+}
+
+/**
+ * „Vygenerovat oslovení" — návrh zprávy podle šablony majitele (lib/stay.ts), jen k úpravě.
+ *
+ * Nic se neodesílá. Text jde zkopírovat, nebo otevřít jako koncept ve vlastním e-mailu
+ * (`mailto:` — odeslat musí člověk). Firma s vlastním webem návrh nedostane: šablona mluví
+ * o chybějícím webu a u ní by lhala.
+ */
+function OutreachDraft({ b, locale }: { b: BusinessResult; locale: string }) {
+  const L = (x: { cs: string; sk?: string; en: string }) => localized(x, locale);
+  const [text, setText] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const draft = outreachMessage(b);
+  if (!draft) return null;
+
+  if (text === null) {
+    return (
+      <button type="button" onClick={() => setText(draft)}
+        className="kh-contact mt-2 inline-flex items-center gap-2 rounded-lg border border-field px-3 py-2 text-sm min-h-[40px] font-medium text-ink hover:border-ink hover:bg-ink/[0.06]">
+        <MessageSquareText size={12} />{L(CONTACT.outreach)}
+      </button>
+    );
+  }
+
+  const copy = () => {
+    navigator.clipboard.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); })
+      .catch(err => console.error('outreach/copy:', err));
+  };
+  const mailto = b.email
+    ? `mailto:${b.email}?subject=${encodeURIComponent('Přímé rezervace přes vlastní web')}&body=${encodeURIComponent(text)}`
+    : null;
+
+  return (
+    <div className="mt-3 rounded-lg border border-field p-3">
+      <label className="text-xs font-semibold uppercase tracking-wider text-ink-faint" htmlFor={`kh-outreach-${b.id}`}>
+        {L(CONTACT.outreachHead)}
+      </label>
+      <textarea id={`kh-outreach-${b.id}`} value={text} onChange={e => setText(e.target.value)} rows={9}
+        className="input mt-2 w-full text-sm leading-relaxed font-sans" />
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <button type="button" onClick={copy} className="btn-outline btn-sm inline-flex items-center gap-1.5">
+          <Copy size={12} />{copied ? L(CONTACT.copied) : L(CONTACT.copy)}
+        </button>
+        {mailto && (
+          <a href={mailto} className="btn-outline btn-sm inline-flex items-center gap-1.5" title={L(CONTACT.mailDraftTip)}>
+            <Mail size={12} />{L(CONTACT.mailDraft)}
+          </a>
+        )}
+        <button type="button" onClick={() => setText(draft)} className="btn-ghost btn-sm">{L(CONTACT.reset)}</button>
+        <button type="button" onClick={() => setText(null)} className="btn-ghost btn-sm">{L(CONTACT.close)}</button>
+      </div>
+      <p className="mt-2 text-[11px] text-ink-faint">{L(CONTACT.outreachNote)}</p>
     </div>
   );
 }
@@ -546,6 +640,10 @@ const S = {
                       sk: 'Túto adresu uviedol zdroj, ale pri našom overení neodpovedala. Web môže byť dočasne mimo prevádzky, alebo už nefunguje.',
                       en: 'A source gave this address, but it did not answer when we checked. The site may be temporarily down, or gone.' },
   webOld:      { cs: 'Zastaralý web',   sk: 'Zastaraný web',    en: 'Outdated website' },
+  stayTip:     { cs: 'Typ provozu podle názvu firmy nebo OpenStreetMap.', sk: 'Typ prevádzky podľa názvu firmy alebo OpenStreetMap.', en: 'Type of business from its name or OpenStreetMap.' },
+  stayNaceTip: { cs: 'Jen podle kódu NACE, který firma uvedla v rejstříku — že ubytování opravdu provozuje, jsme neověřili. Ověřte v mapách.',
+                 sk: 'Len podľa kódu NACE, ktorý firma uviedla v registri — že ubytovanie naozaj prevádzkuje, sme neoverili. Overte v mapách.',
+                 en: 'Only from the NACE code the firm declared in the register — we have not verified it actually runs a stay. Check the maps.' },
   webHas:      { cs: 'Mají web',        sk: 'Majú web',         en: 'Has a website' },
   scoreWord:   { cs: 'Skóre',           sk: 'Skóre',            en: 'Score' },
   // ODbL je share-alike: cokoliv odvozeného z OSM musí zdroj pojmenovat. Byla to jediná věta
@@ -1008,9 +1106,14 @@ export default function SearchPage() {
    */
   const applyScenario = (id: string) => {
     dirtyRef.current = true;
+    const sc = scenarioById(id);
     setScenario(id);
     setPresetsOn(false);
-    setActive(new Set(normalizeFilters(scenarioById(id).filters)));
+    setActive(new Set(normalizeFilters(sc.filters)));
+    // Sekce vázaná na obor („Ubytování a wellness") obory nastaví. Při odchodu z ní na sekci bez
+    // oboru se jen tyhle přednastavené obory uklidí — vlastní obor uživatele zůstává.
+    if (sc.industries) setIndustries([...sc.industries]);
+    else setIndustries(prev => (SCENARIOS.some(o => o.industries && sameMembers(o.industries, prev)) ? [] : prev));
   };
   /** Nabídka „CRM" u exportu; zavírá se kliknutím mimo. */
   const [crmMenu, setCrmMenu]             = useState(false);
@@ -1277,7 +1380,11 @@ export default function SearchPage() {
   const allPicked = industries.length === 1 && isAllIndustries(industries[0]);
   /** Scénář, jehož filtry jsou všechny zapnuté; `custom`, když uživatel kombinaci rozbil. */
   const effectiveScenario = (() => {
-    const hit = SCENARIOS.filter(sc => sc.filters.length > 0).find(sc => sc.filters.every(f => active.has(f)));
+    // Sekce s oborem platí jen s tím oborem a má přednost: „Ubytování a wellness" má stejné
+    // podmínky jako „Web jsme nenašli", liší se oborem.
+    const withIndustry = SCENARIOS.find(sc => sc.industries && sameMembers(sc.industries, industries) && sc.filters.every(f => active.has(f)));
+    if (withIndustry) return withIndustry.id;
+    const hit = SCENARIOS.filter(sc => sc.filters.length > 0 && !sc.industries).find(sc => sc.filters.every(f => active.has(f)));
     if (hit) return hit.id;
     return scenario === 'all' ? 'all' : 'custom';
   })();
@@ -1353,6 +1460,9 @@ export default function SearchPage() {
    * web, je přesně ta, které má uživatel co nabídnout (lib/reach-score `opportunityScore`).
    * Skóre podle vlastních kritérií zůstává druhou volbou, aby se nikomu neschovalo.
    */
+  /** Režim „Ubytování a wellness": skutečné penziony a wellness (z názvu, z mapy) před firmami jen s NACE. */
+  const stayMode = industries.length > 0 && industries.every(i => (STAY_INDUSTRIES as readonly string[]).includes(i));
+  const opportunityKey = (x: BusinessResult) => opportunityScore(x) + (stayMode ? stayRankBonus(x) : 0);
   const filtered = results
     .filter(b => matchesAll(b, active))
     .filter(b => !onlyNew || b.isNew)
@@ -1363,7 +1473,7 @@ export default function SearchPage() {
         : sortMode === 'score'
           ? compareRanked(salt)
           : (a, b) => {
-              const diff = rankedScore(opportunityScore(b), b.claim ?? null) - rankedScore(opportunityScore(a), a.claim ?? null);
+              const diff = rankedScore(opportunityKey(b), b.claim ?? null) - rankedScore(opportunityKey(a), a.claim ?? null);
               return diff !== 0 ? diff : b.leadScore - a.leadScore;
             },
     );
@@ -2082,7 +2192,9 @@ export default function SearchPage() {
                   {t('searching')}
                 </span>
               ) : (
-                <span className="block">
+                // `min-w-0` + `whitespace-normal`: v úzkém sloupci se delší záměr („Najít ubytování
+                // a wellness bez webu") zalomí, místo aby přetekl přes okraje tlačítka.
+                <span className="block min-w-0 whitespace-normal text-center">
                   <span className="block">{searchVerb}</span>
                   {searchWhere && <span className="block text-xs font-normal opacity-80 mt-0.5">{searchWhere}</span>}
                 </span>
@@ -2561,6 +2673,19 @@ export default function SearchPage() {
                       {/* Badges */}
                       <div className="flex flex-wrap gap-2 mt-3 items-center">
                         <WebsiteStatusBadge b={b} locale={locale} />
+                        {(() => {
+                          const kind = stayKind(b);
+                          return kind ? (
+                            <span className="badge" title={localized(kind.from === 'nace' ? S.stayNaceTip : S.stayTip, locale)}>
+                              <BedDouble size={10} />{stayKindLabel(kind)}
+                            </span>
+                          ) : null;
+                        })()}
+                        {(() => {
+                          // Obrat a stálost z rejstříků — to, co u penzionu nahrazuje recenze, které nemáme.
+                          const facts = substanceFacts(b, locale, false);
+                          return facts.length ? <span className="badge text-ink-faint" title="ARES · RES">{facts.join(' · ')}</span> : null;
+                        })()}
                         {/* Nárok: cizí sráží pořadí a říká jen „jinde" — bez toho kým, kdy a kolikrát.
                             Vlastní pořadí nemění. Stejná třída `badge`, žádná nová barva. */}
                         {/* Zaměstnanci ze statistického registru — tři stavy. `000` je „počet neuveden",

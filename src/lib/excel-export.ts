@@ -7,6 +7,7 @@ import { employeeLabel, localized } from './lead-filters';
 import type { TradeLicence } from './sources';
 import { cleanEmail } from './sources/site-contacts';
 import { reachScore } from './reach-score';
+import { stayKind, stayKindLabel } from './stay';
 import { resolveStatus, type WebsiteStatus } from './website-status';
 
 /**
@@ -62,6 +63,8 @@ export const EXPORT_COLUMNS = [
   { key: 'reason',     cs: 'Proč oslovit',         sk: 'Prečo osloviť',        en: 'Why contact' },
   { key: 'audit',      cs: 'Audit webu',           sk: 'Audit webu',           en: 'Website audit' },
   { key: 'category',   cs: 'Kategorie',            sk: 'Kategória',            en: 'Category' },
+  // Režim Ubytování a wellness: penzion / apartmány / chata… Prázdné u ostatních oborů.
+  { key: 'stayKind',   cs: 'Typ ubytování / wellness', sk: 'Typ ubytovania / wellness', en: 'Stay / wellness type' },
   // Rejstříková pole, která se do 15. 9. 2026 ukládala a v exportu chyběla.
   { key: 'founded',    cs: 'Vznik',                sk: 'Vznik',                en: 'Founded' },
   { key: 'employees',  cs: 'Zaměstnanci (RES)',    sk: 'Zamestnanci (RES)',    en: 'Employees (RES)' },
@@ -122,6 +125,7 @@ export function exportRow(b: BusinessResult, criteria: readonly string[] | null 
     websiteAudit(b, locale)?.sentence ?? '',
     // Kód i název: „73110 Činnosti reklamních agentur" — kód pro stroje, název pro lidi.
     b.category ? `${b.category} ${naceLabel(b.category) ?? ''}`.trim() : '',
+    (() => { const k = stayKind(b); return k ? stayKindLabel(k) : ''; })(),
     isoDay(b.foundedAt),
     // `000` i NULL = neuvedeno → prázdná buňka, stejná konvence jako u DPH.
     b.employeeCategory && b.employeeCategory !== '000' ? employeeLabel(b.employeeCategory, locale) : '',

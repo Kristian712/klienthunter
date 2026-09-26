@@ -812,6 +812,29 @@ export const LEAD_FILTERS: LeadFilter[] = [
     unknown: b => !b.hasFacebook && !b.socialsChecked,
   },
   {
+    id: 'social_only_web',
+    group: 'reach',
+    /**
+     * „Web" firmy je jen profil na Facebooku nebo Instagramu — vlastní stránku jsme nenašli.
+     *
+     * Typicky penziony a wellness: jako web uvádějí stránku na Facebooku a rezervace jim jdou
+     * přes Booking a zprávy. Adresa profilu přišla z OpenStreetMap (mapér ji zapsal jako
+     * `website`) nebo z jejího vlastního odkazu; `isRealWebsite` takovou adresu za web nepovažuje,
+     * takže stav webu není `HAS` a odkaz skončí ve `facebookUrl` / `instagramUrl`.
+     */
+    label: { cs: 'Web je jen Facebook nebo Instagram', sk: 'Web je len Facebook alebo Instagram', en: 'Website is only Facebook or Instagram' },
+    source: 'web',
+    hint: { cs: 'Vlastní web jsme nenašli, profil na Facebooku nebo Instagramu ano. Hosté nemají kde rezervovat napřímo.',
+            sk: 'Vlastný web sme nenašli, profil na Facebooku alebo Instagrame áno. Hostia nemajú kde rezervovať napriamo.',
+            en: 'No own website found, but a Facebook or Instagram profile. Guests have nowhere to book directly.' },
+    where: { AND: [STATUS_NOT_HAS, { OR: [{ hasFacebook: true }, { hasInstagram: true }] }] },
+    test: b => webStatusOf(b) !== 'HAS' && Boolean(b.hasFacebook || b.hasInstagram),
+    unknown: b => !b.hasFacebook && !b.hasInstagram && !b.socialsChecked,
+    evidence: (b, l) => webStatusOf(b) !== 'HAS' && (b.hasFacebook || b.hasInstagram)
+      ? localized({ cs: 'jen profil na síti, vlastní web nenalezen', sk: 'len profil na sieti, vlastný web nenájdený', en: 'social profile only, no own website found' }, l)
+      : null,
+  },
+  {
     id: 'no_category',
     scope: 'index',
     group: 'who',
@@ -1024,7 +1047,7 @@ export function indexConstraints(filterIds: readonly string[]) {
  */
 const NEW_WINDOWS = ['new_firm_30d', 'new_firm_90d', 'new_firm_6m', 'new_firm', 'new_firm_5y'];
 const WEB_REQUIRED = ['has_website', 'old_website', 'insecure_website', 'has_contact_page', 'ads_dated_web'];
-const WEB_ABSENT = ['no_web_found', 'no_website', 'web_unknown', 'no_web_has_fb', 'ads_no_web'];
+const WEB_ABSENT = ['no_web_found', 'no_website', 'web_unknown', 'no_web_has_fb', 'social_only_web', 'ads_no_web'];
 const EXCLUSIVE_SETS: string[][] = [
   ['sole_trader', 'company_form'],
   ['has_employees', 'no_employees'],
@@ -1043,6 +1066,7 @@ const EXTRA_CONFLICTS: Array<[string, string]> = [
   ['no_contact', 'has_email'],
   ['no_contact', 'can_reach'],
   ['no_social', 'no_web_has_fb'],
+  ['no_social', 'social_only_web'],
   ...WEB_REQUIRED.flatMap(a => WEB_ABSENT.map(b => [a, b] as [string, string])),
   ...['new_firm_30d', 'new_firm_90d', 'new_firm_6m', 'new_firm'].map(w => ['established_3y', w] as [string, string]),
   ...NEW_WINDOWS.map(w => ['established_10y', w] as [string, string]),

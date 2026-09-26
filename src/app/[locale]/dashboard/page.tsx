@@ -3,14 +3,14 @@
 import { useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
 import Link from 'next/link';
-import { Search, ArrowRight, Crown, Clock, BarChart3, Upload, Trash2, Bookmark, RefreshCw, Sparkles, Phone, Globe, Users, ShieldCheck, Megaphone, PhoneCall, FileText } from 'lucide-react';
+import { Search, ArrowRight, Crown, Clock, BarChart3, Upload, Trash2, Bookmark, RefreshCw, Sparkles, Phone, Globe, Users, ShieldCheck, Megaphone, PhoneCall, FileText, BedDouble } from 'lucide-react';
 import { FEATURED_SCENARIOS, scenarioById, type ScenarioIcon } from '@/lib/scenarios';
 
 /** Ikony sekcí; jména drží lib/scenarios. */
 const SECTION_ICON: Record<ScenarioIcon, React.ReactNode> = {
   globe: <Globe size={16} />, social: <Users size={16} />, shield: <ShieldCheck size={16} />,
   megaphone: <Megaphone size={16} />, sparkles: <Sparkles size={16} />, phone: <PhoneCall size={16} />,
-  search: <Search size={16} />, list: <FileText size={16} />,
+  search: <Search size={16} />, list: <FileText size={16} />, bed: <BedDouble size={16} />,
 };
 import { clearUser } from '@/lib/client-auth';
 import { industryLabel } from '@/lib/search-options';
@@ -177,7 +177,7 @@ export default function DashboardPage() {
         takže uživatel začne s poskládanými podmínkami, ne s prázdným formulářem.
       */}
       <h2 className="text-lg font-semibold mb-3">{isCs ? 'Koho hledáte' : 'Who are you looking for'}</h2>
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
         {FEATURED_SCENARIOS.map(id => {
           const sc = scenarioById(id);
           return (

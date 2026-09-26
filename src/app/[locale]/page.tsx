@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { useLocale } from 'next-intl';
-import { ArrowRight, Building2, Calculator, Camera, Code2, Database, FileText, Globe, ListOrdered, MapPinned, Megaphone, MessageSquareText, PhoneCall, Plus, Search as SearchIcon, ShieldCheck, Sparkles, Users, type LucideIcon } from 'lucide-react';
+import { ArrowRight, BedDouble, Building2, Calculator, Camera, Code2, Database, FileText, Globe, ListOrdered, MapPinned, Megaphone, MessageSquareText, PhoneCall, Plus, Search as SearchIcon, ShieldCheck, Sparkles, Users, type LucideIcon } from 'lucide-react';
 import { LeadScore, GOOD_LEAD } from '@/components/LeadScore';
 import { Reveal } from '@/components/Reveal';
 import { LEAD_FILTERS, localized } from '@/lib/lead-filters';
@@ -235,7 +235,7 @@ const STEP_ICONS: Array<{ icon: LucideIcon; tile: string }> = [
 /** Ikonka a barva ke každému z pěti lidí — v pořadí `AUDIENCE`. */
 /** Ikony sekcí „Koho hledáte" — stejné jako v přehledu, jména drží lib/scenarios. */
 const SECTION_ICON: Record<ScenarioIcon, LucideIcon> = {
-  globe: Globe, social: Users, shield: ShieldCheck, megaphone: Megaphone, sparkles: Sparkles, phone: PhoneCall, search: SearchIcon, list: FileText,
+  globe: Globe, social: Users, shield: ShieldCheck, megaphone: Megaphone, sparkles: Sparkles, phone: PhoneCall, search: SearchIcon, list: FileText, bed: BedDouble,
 };
 
 const AUDIENCE_ICONS: Array<{ icon: LucideIcon; tile: string }> = [
@@ -352,7 +352,7 @@ export default function HomePage() {
         <div className="max-w-6xl mx-auto">
           <h2 className="display-sm max-w-2xl">{t(UI.secTitle)}</h2>
           <p className="mt-3 text-ink-muted max-w-2xl">{t(UI.secLead)}</p>
-          <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
             {FEATURED_SCENARIOS.map((id, i) => {
               const sc = scenarioById(id);
               const Icon = SECTION_ICON[sc.icon ?? 'search'];

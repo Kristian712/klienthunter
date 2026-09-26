@@ -14,7 +14,7 @@ import { localized } from './lead-filters';
  * musí zvlášť testovat — a jednu z nich by nikdo nikdy nespustil.
  */
 
-export type ScenarioIcon = 'globe' | 'social' | 'shield' | 'megaphone' | 'sparkles' | 'phone' | 'search' | 'list';
+export type ScenarioIcon = 'globe' | 'social' | 'shield' | 'megaphone' | 'sparkles' | 'phone' | 'search' | 'list' | 'bed';
 
 export interface Scenario {
   id: string;
@@ -29,6 +29,11 @@ export interface Scenario {
   action: { cs: string; sk?: string; en: string };
   /** Id z LEAD_FILTERS, která se zapnou. Prázdné pole = neomezovat. */
   filters: string[];
+  /**
+   * Obory, které sekce nastaví (slugy z nace-map). Jen u režimů vázaných na obor — „Ubytování
+   * a wellness"; ostatní sekce obor nechávají na uživateli.
+   */
+  industries?: string[];
 }
 
 export const SCENARIOS: Scenario[] = [
@@ -162,10 +167,32 @@ export const SCENARIOS: Scenario[] = [
     },
     filters: ['can_reach'],
   },
+  {
+    /**
+     * Režim „Ubytování a wellness" (majitel 26. 9. 2026): penziony, apartmány, chaty, kempy,
+     * privátní sauny a wellness bez vlastního webu — přicházejí o přímé rezervace a platí
+     * Bookingu provizi. Zdroje jsou stejné jako jinde (ARES podle NACE a názvu, OpenStreetMap
+     * podle `tourism` / `leisure`); Google Places v EHP pro tohle použít nesmíme a Booking ani
+     * Airbnb se nečtou. Pořadí dává `opportunityScore` (kontakt, chybějící web, plátce DPH,
+     * provozovny, stáří firmy).
+     */
+    id: 'stay',
+    icon: 'bed',
+    forWhom: { cs: 'tvůrci webů s rezervacemi', sk: 'tvorcovia webov s rezerváciami', en: 'booking-site builders' },
+    label: { cs: 'Ubytování a wellness bez webu', sk: 'Ubytovanie a wellness bez webu', en: 'Stays and wellness without a website' },
+    hint: {
+      cs: 'Penziony, apartmány, chaty, kempy a wellness, u kterých jsme vlastní web nenašli — nebo mají jen Facebook či Instagram.',
+      sk: 'Penzióny, apartmány, chaty, kempy a wellness, pri ktorých sme vlastný web nenašli — alebo majú len Facebook či Instagram.',
+      en: 'Guest houses, apartments, chalets, camp sites and wellness where we found no own website — or only Facebook or Instagram.',
+    },
+    action: { cs: 'Najít ubytování a wellness bez webu', sk: 'Nájsť ubytovanie a wellness bez webu', en: 'Find stays and wellness without a website' },
+    filters: ['no_web_found'],
+    industries: ['hotel', 'wellness'],
+  },
 ];
 
 /** Sekce na přehledu a v hlavičce hledání — čtyři vstupy, které pokryjí většinu profesí. */
-export const FEATURED_SCENARIOS = ['reach_weak_web', 'social_weak_web', 'new', 'reach'] as const;
+export const FEATURED_SCENARIOS = ['reach_weak_web', 'social_weak_web', 'stay', 'new', 'reach'] as const;
 
 const BY_ID = new Map(SCENARIOS.map(s => [s.id, s]));
 

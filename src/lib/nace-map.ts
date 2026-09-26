@@ -113,7 +113,24 @@ export const NICHE_MAP: Record<string, NicheQuery> = {
   'chimney sweep':        { nace: ['81220', '43990'],  keywords: ['kominictví', 'kominík'], osm: ['craft=chimney_sweeper'], yield: 'mid' },
   // ── Doplněno ve vlně 5. Každý kód ověřen proti živému ARESu, že vrací řádky: obecné
   // „stavební firmy" (41, 412, 4120) vracejí nulu, proto tu nejsou.
-  'hotel':                { nace: ['55100', '55200'],  keywords: ['hotel', 'penzion', 'ubytování'], osm: ['tourism=hotel', 'tourism=guest_house'], yield: 'mid' },
+  /**
+   * Ubytování — slug zůstává `hotel` kvůli uloženým hledáním, obsahem je celé ubytování (režim
+   * „Ubytování a wellness", 26. 9. 2026). Změřeno na ARESu téhož dne (Zlín / Liberec):
+   * 55100 24/327, 55200 8/38, 55900 61/65, 55300 0/1; podtřídy 55101–55909 vracejí nulu.
+   * V názvu: penzion 4/6, apartmány 2/7, hotel 3/8, chalupa 5/5; „ubytování", „chata",
+   * „glamping", „kemp" nic nebo skoro nic — jsou v `aliases`. Do ARESu jdou jen první dvě slova.
+   */
+  'hotel':                { nace: ['55100', '55200', '55900', '55300'], keywords: ['penzion', 'apartmány', 'hotel', 'chalupa'],
+                            aliases: ['apartmán', 'apartmany', 'ubytování', 'chata', 'chaty', 'chalupy', 'glamping', 'kemp', 'autokemp', 'hostel', 'motel', 'penziony', 'hotely'],
+                            osm: ['tourism=guest_house', 'tourism=apartment', 'tourism=chalet', 'tourism=camp_site', 'tourism=hotel', 'tourism=motel', 'tourism=hostel', 'tourism=alpine_hut'], yield: 'mid' },
+  /**
+   * Wellness, privátní sauny, vířivky a masáže. 96230 (Zlín 425, Liberec 583) je kód, který
+   * firmy v ARESu u těchhle služeb opravdu nesou; 96040 z číselníku 2008 vrací nulu. 93290
+   * (546/702) je „ostatní rekreační činnosti" — deklaruje ho kdekdo, tak tu není.
+   * V názvu: wellness 2/1, relax 0/5, lázně 2/2; sauna, vířivka, masáže nic.
+   */
+  'wellness':             { nace: ['96230'],           keywords: ['wellness', 'relax', 'lázně'], aliases: ['sauna', 'privátní sauna', 'vířivka', 'vířivky', 'whirlpool', 'spa'],
+                            osm: ['leisure=sauna', 'leisure=hot_tub', 'shop=massage'], yield: 'low' },
   'freight':              { nace: ['49410'],           keywords: ['doprava', 'autodoprava', 'přeprava'], osm: [], yield: 'low' },
   'builder':              { nace: ['43990', '43120'],  keywords: ['stavební', 'zednictví', 'stavby'], osm: ['craft=builder'], yield: 'low' },
   'flooring':             { nace: ['43330'],           keywords: ['podlahy', 'podlahářství'], osm: ['shop=flooring'], yield: 'mid' },

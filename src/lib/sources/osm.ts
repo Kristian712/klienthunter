@@ -124,7 +124,9 @@ function toLead(el: OverpassElement): RawLead | null {
     address: address || undefined,
     lat: el.lat ?? el.center?.lat,
     lon: el.lon ?? el.center?.lon,
-    category: t.shop || t.craft || t.amenity || t.office || t.leisure || t.healthcare,
+    // `tourism` první: u ubytování (guest_house, chalet, camp_site…) je to jediný tag, který
+    // říká, o jaký provoz jde — a z něj se skládá typ v oslovení (lib/stay.ts).
+    category: t.tourism || t.shop || t.craft || t.amenity || t.office || t.leisure || t.healthcare,
   };
 }
 
