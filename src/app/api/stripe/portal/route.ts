@@ -43,6 +43,10 @@ export async function POST(req: NextRequest) {
     if (err instanceof z.ZodError) {
       return NextResponse.json({ error: 'Invalid input' }, { status: 400 });
     }
+    // Zákazník ze starého Stripe účtu (viz checkout) — předplatné tu není, portál nemá co ukázat.
+    if ((err as { code?: string })?.code === 'resource_missing') {
+      return NextResponse.json({ error: 'No customer', code: 'NO_CUSTOMER' }, { status: 404 });
+    }
     console.error('/api/stripe/portal:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }

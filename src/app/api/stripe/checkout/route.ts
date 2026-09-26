@@ -48,6 +48,18 @@ export async function POST(req: NextRequest) {
 
     const api = stripe();
     let customerId = user.stripeCustomerId;
+    /**
+     * Uložený zákazník musí existovat v účtu, na který míří klíč. Po přepnutí na jiný Stripe
+     * účet (26. 9. 2026: sandbox / jiný účet → ostrý účet VANEK) by jinak Checkout spadl na
+     * „No such customer" u každého, kdo už někdy kliknul na nákup. Smazaný zákazník totéž.
+     */
+    if (customerId) {
+      const existing = await api.customers.retrieve(customerId).catch((err: { code?: string }) => {
+        if (err?.code === 'resource_missing') return null;
+        throw err;
+      });
+      if (!existing || existing.deleted) customerId = null;
+    }
     if (!customerId) {
       const customer = await api.customers.create({
         email: user.email,
