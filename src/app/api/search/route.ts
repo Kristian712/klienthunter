@@ -28,7 +28,9 @@ const SearchSchema = z.object({
    * vědět dřív, než běh začne — autosave přes PATCH přijde až po něm.
    */
   filters: z.array(z.string()).max(50).optional(),
-  scenario: z.string().max(40).optional(),
+  // `null` posílá stránka u vlastní kombinace podmínek (žádná sekce). Dřív to bylo jen
+  // `.optional()` a každé takové hledání skončilo 422 dřív, než začalo (zjištěno 28. 9. 2026).
+  scenario: z.string().max(40).nullish(),
   districts: z.array(z.string().regex(/^CZ0[0-9A-C]{3}$/)).max(80).optional(),
 });
 
@@ -160,7 +162,7 @@ export async function POST(req: NextRequest) {
 
     // Limity tarifu, nárazová pojistka, založení běhu a spuštění na pozadí jsou v lib/start-search.ts —
     // totéž používá „Spustit znovu" u uloženého hledání.
-    const started = await startSearch({ userId: payload.userId, industry, region, filters, scenario, districts });
+    const started = await startSearch({ userId: payload.userId, industry, region, filters, scenario: scenario ?? undefined, districts });
     if (!started.ok) {
       const message = started.code === 'PLAN_LIMIT' ? 'Search limit reached for your plan'
         : started.code === 'RATE_LIMITED' ? 'Too many searches in a short time'
