@@ -127,9 +127,10 @@ export const NICHE_MAP: Record<string, NicheQuery> = {
    * Wellness, privátní sauny, vířivky a masáže. 96230 (Zlín 425, Liberec 583) je kód, který
    * firmy v ARESu u těchhle služeb opravdu nesou; 96040 z číselníku 2008 vrací nulu. 93290
    * (546/702) je „ostatní rekreační činnosti" — deklaruje ho kdekdo, tak tu není.
-   * V názvu: wellness 2/1, relax 0/5, lázně 2/2; sauna, vířivka, masáže nic.
+   * V názvu: wellness 2/1, relax 0/5, lázně 2/2; sauna, vířivka, masáže nic. „relax" jen jako alias —
+   * v názvu ho mají i kavárny a realitky, do ARESu nejde (28. 9. 2026, přesnost).
    */
-  'wellness':             { nace: ['96230'],           keywords: ['wellness', 'relax', 'lázně'], aliases: ['sauna', 'privátní sauna', 'vířivka', 'vířivky', 'whirlpool', 'spa'],
+  'wellness':             { nace: ['96230'],           keywords: ['wellness', 'lázně'], aliases: ['relax', 'sauna', 'privátní sauna', 'vířivka', 'vířivky', 'whirlpool', 'spa'],
                             osm: ['leisure=sauna', 'leisure=hot_tub', 'shop=massage'], yield: 'low' },
   'freight':              { nace: ['49410'],           keywords: ['doprava', 'autodoprava', 'přeprava'], osm: [], yield: 'low' },
   'builder':              { nace: ['43990', '43120'],  keywords: ['stavební', 'zednictví', 'stavby'], osm: ['craft=builder'], yield: 'low' },
