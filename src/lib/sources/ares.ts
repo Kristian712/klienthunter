@@ -3,6 +3,8 @@ import { resolveNiche, USELESS_NACE } from '../nace-map';
 import { subAreasFor } from './ares-areas';
 import type { DiscoveryOptions, DiscoverySource, MatchedBy, RawLead } from './types';
 
+import { fetchResPrimary, primaryMatches } from './res-primary';
+
 const BASE = 'https://ares.gov.cz/ekonomicke-subjekty-v-be/rest';
 const PAGE = 100;
 
@@ -242,7 +244,9 @@ export const aresSource: DiscoverySource = {
 
     // Větev NACE jde první, takže firma, kterou najdou obě, se vede jako nalezená podle oboru.
     const strands: { kind: MatchedBy; rows: Promise<AresSubject[]> }[] = [];
-    if (nace.length) strands.push({ kind: 'nace', rows: collect({ czNace: nace, sidlo, pravniForma }, limit, until, subAreas) });
+    // Větev NACE se ptá na víc firem, než se vrátí: po kontrole převažující činnosti (níž)
+    // z nich zůstane u některých oborů jen pětina. Strop 1000 = deset stránek ARESu.
+    if (nace.length) strands.push({ kind: 'nace', rows: collect({ czNace: nace, sidlo, pravniForma }, Math.min(limit * NACE_OVERFETCH, 1000), until, subAreas) });
     for (const kw of keywords.slice(0, 2)) {
       strands.push({ kind: 'name', rows: collect({ obchodniJmeno: kw, sidlo, pravniForma }, Math.ceil(limit / 2), until, subAreas) });
     }
@@ -250,17 +254,62 @@ export const aresSource: DiscoverySource = {
     const batches = await Promise.all(strands.map(s => s.rows));
 
     const seen = new Set<string>();
-    const leads: RawLead[] = [];
+    const found: RawLead[] = [];
     for (let i = 0; i < batches.length; i++) {
       for (const subject of batches[i]) {
         const lead = toLead(subject);
         if (!lead || seen.has(lead.ico!)) continue;
         seen.add(lead.ico!);
         lead.matchedBy = strands[i].kind;
-        leads.push(lead);
-        if (leads.length >= limit) return leads;
+        found.push(lead);
       }
     }
-    return leads;
+    return (await keepPrimaryTrade(found, nace, until + PRIMARY_BUDGET_MS)).slice(0, limit);
   },
 };
+
+/** Kolikrát víc firem se ve větvi NACE stáhne, než se jich vrátí. Viz `keepPrimaryTrade`. */
+const NACE_OVERFETCH = 3;
+const PRIMARY_BUDGET_MS = 8_000;
+
+/**
+ * Nechá z větve NACE jen firmy, jejichž **převažující** činnost (RES) je hledaný obor.
+ *
+ * ARES filtruje `czNace` mezi všemi deklarovanými činnostmi a firma jich mívá deset až dvacet;
+ * bez téhle kontroly byly u ubytování čtyři pětiny výsledků divadla, realitky a dopravci
+ * (měření v `res-primary.ts`, 28. 9. 2026). Firma nalezená podle **názvu** zůstává — slovo
+ * oboru v obchodním jménu je samo doklad. Když RES neodpoví vůbec (výpadek, došel čas),
+ * nechá se všechno: horší přesnost je lepší než prázdné hledání, a v logu to je vidět.
+ *
+ * Mimochodem se tu opraví `category`: dřív to byl první deklarovaný kód (u penzionu klidně
+ * „74990"), teď převažující činnost — a NACE seznam ji má na začátku.
+ */
+async function keepPrimaryTrade(leads: RawLead[], codes: string[], deadlineAt: number): Promise<RawLead[]> {
+  const byNace = leads.filter(l => l.matchedBy === 'nace' && l.ico);
+  if (!codes.length || !byNace.length) return leads;
+  const primaries = await fetchResPrimary(byNace.map(l => l.ico!), deadlineAt);
+  if (primaries.size === 0) {
+    console.warn(`ares: RES neodpověděl, ${byNace.length} firem z větve NACE bez kontroly hlavní činnosti`);
+    return leads;
+  }
+  let dropped = 0;
+  const kept = leads.filter(lead => {
+    if (!lead.ico) return true;
+    const primary = primaries.get(lead.ico);
+    if (primary) {
+      const main = primary.nace2008 ?? primary.nace2025;
+      if (main) lead.category = main;
+      lead.nace = Array.from(new Set([primary.nace2008, primary.nace2025, ...(lead.nace ?? [])].filter((c): c is string => Boolean(c))));
+      if (primary.employeeCategory) lead.employeeCategory = primary.employeeCategory;
+    }
+    if (lead.matchedBy !== 'nace') return true;
+    // RES firmu nezná (`null`) nebo nemá převažující činnost → obor nejde doložit.
+    // Chybějící záznam v mapě = dávka selhala → nevíme, firma zůstává.
+    if (primary === undefined) return true;
+    const ok = primary !== null && primaryMatches(primary, codes);
+    if (!ok) dropped++;
+    return ok;
+  });
+  if (dropped) console.info(`ares: ${dropped} z ${byNace.length} firem vyřazeno — obor není jejich hlavní činnost`);
+  return kept;
+}

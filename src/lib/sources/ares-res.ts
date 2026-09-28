@@ -1,5 +1,6 @@
 import axios from 'axios';
 import type { EnrichmentSource, RawLead } from './types';
+import { cachedResPrimary } from './res-primary';
 
 const BASE = 'https://ares.gov.cz/ekonomicke-subjekty-v-be/rest';
 
@@ -26,6 +27,9 @@ export const aresResSource: EnrichmentSource = {
 
   async enrich(lead: RawLead): Promise<Partial<RawLead>> {
     if (!lead.ico) return {};
+    // Hromadná kontrola hlavní činnosti (res-primary.ts) už záznam RES stáhla — bez dalšího dotazu.
+    const cached = cachedResPrimary(lead.ico);
+    if (cached !== undefined) return cached?.employeeCategory ? { employeeCategory: cached.employeeCategory } : {};
     try {
       const res = await axios.get(`${BASE}/ekonomicke-subjekty-res/${lead.ico}`, {
         timeout: 8_000,

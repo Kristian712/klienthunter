@@ -70,7 +70,8 @@ const BY_OSM: Record<string, string> = {
 
 /** NACE z ARESu / RES; kódy ukládají v různé hloubce, proto prefix. */
 const BY_NACE: Array<[string, string]> = [
-  ['5510', 'hotel'], ['5520', 'holiday'], ['5530', 'camp_site'], ['5590', 'lodging'], ['9623', 'wellness'],
+  // 9623 je CZ-NACE 2025, 9604 totéž podle 2008 — RES dává oba.
+  ['5510', 'hotel'], ['5520', 'holiday'], ['5530', 'camp_site'], ['5590', 'lodging'], ['9623', 'wellness'], ['9604', 'wellness'],
 ];
 
 /** Poznal se typ z názvu? Když ne, název je často jméno a příjmení živnostníka. */
@@ -90,7 +91,10 @@ export function stayKind(b: StayLead): StayKind | null {
   if (fromName) return fromName;
   const osm = b.category ? BY_OSM[b.category] : undefined;
   if (osm) return { ...KINDS[osm], from: 'osm' };
-  for (const code of b.nace ?? []) {
+  // Jen převažující činnost (`category`, u ARES z RES; první kód seznamu). Vedlejší deklarované
+  // kódy ne — autolakovna s „ubytováním" mezi dvaceti činnostmi penzion není.
+  for (const code of [b.category, b.nace?.[0]]) {
+    if (!code) continue;
     const hit = BY_NACE.find(([prefix]) => code.startsWith(prefix));
     if (hit) return { ...KINDS[hit[1]], from: 'nace' };
   }
