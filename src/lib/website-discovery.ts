@@ -452,6 +452,20 @@ function factsOnPage(text: string, firm: FirmFacts): { strong?: string; city?: b
  * dokola. Cizí web přiřazený firmě je horší než přiznané „nevíme" — po jednom takovém omylu
  * uživatel nevěří ani zbytku.
  */
+/**
+ * Stránka firmu *jmenuje*: všechna odlišující slova názvu jsou v textu a aspoň jedno v doméně.
+ * To je první půlka `pageEvidence` bez tvrdého důkazu — na tvrzení „tohle je její web" nestačí,
+ * na tvrzení „web nemá" je to ale protidůkaz.
+ */
+export function pageNamesFirm(html: string, firm: FirmFacts, url: string): boolean {
+  const text = pageText(html);
+  if (PARKED.test(text)) return false;
+  const identifying = identifyingTokens(firm.name);
+  if (identifying.length === 0 || !identifying.every(t => hasWord(text, t))) return false;
+  const label = domainLabel(url);
+  return identifying.some(t => label.includes(t));
+}
+
 export function pageEvidence(
   html: string,
   firm: FirmFacts,
@@ -594,6 +608,12 @@ export interface DiscoveryOutcome {
    * právě proto, že na ní někdo něco má. Verdikt v takovém případě zůstává „nevíme".
    */
   inconclusive: boolean;
+  /**
+   * Běžící stránka, která nese název firmy (doména i text), jen na ní chybí tvrdý důkaz —
+   * IČO, telefon nebo adresa. Hotel Rango → `rango.cz` (30. 9. 2026): web to skoro jistě je,
+   * a firma proto nesmí skončit v seznamu „bez webu". Verdikt zůstane „nevíme", s odkazem.
+   */
+  possible?: { url: string };
 }
 
 export async function discoverWebsite(
@@ -640,6 +660,7 @@ export async function discoverWebsite(
   let checked = 0;
   let probes = 0;
   let inconclusive = false;
+  let possible: { url: string } | undefined;
   /** Slova, kterými se firma odlišuje — podle nich se pozná silná hypotéza od střelby naslepo. */
   const jadro = identifyingTokens(firm.name);
   for (const domain of domains) {
@@ -657,7 +678,7 @@ export async function discoverWebsite(
     // Checked before every probe, not once: four dead hosts at five seconds each would otherwise
     // eat the budget the rest of the search needs.
     if (Date.now() >= opts.deadlineAt) {
-      return { site: null, checked: checked - 1, ranOut: true, noCandidates, searched: false, searchAnswered: false, inconclusive };
+      return { site: null, checked: checked - 1, ranOut: true, noCandidates, searched: false, searchAnswered: false, inconclusive, possible };
     }
 
     // Zkouší se `https://`, `https://www.` i `http://`: profservis.cz servíruje web výhradně
@@ -717,6 +738,8 @@ export async function discoverWebsite(
       why = null;
     }
 
+    if (!why && !possible && pageNamesFirm(result.html, firm, url)) possible = { url };
+
     if (why) {
       return {
         site: { url, html: result.html, evidence: `web dohledán podle názvu, ${why}` },
@@ -752,7 +775,7 @@ export async function discoverWebsite(
     searchAnswered = odpoved.ok;
     for (const host of odpoved.hosts) {
       if (Date.now() >= opts.deadlineAt) {
-        return { site: null, checked, ranOut: true, noCandidates, searched, searchAnswered: false, inconclusive };
+        return { site: null, checked, ranOut: true, noCandidates, searched, searchAnswered: false, inconclusive, possible };
       }
       checked++;
       const res = await opts.probe(`https://${host}`, 'all');
@@ -762,6 +785,7 @@ export async function discoverWebsite(
       // Nejdřív přísné pravidlo; značkový web (doména bez názvu firmy) projde až tím pro vyhledávač.
       const proc = pageEvidence(res.html, firm, adresa, index, opts.tradeWords ?? [])
         ?? searchPageEvidence(res.html, firm, opts.city, opts.tradeWords ?? []);
+      if (!proc && !possible && pageNamesFirm(res.html, firm, adresa)) possible = { url: adresa };
       if (proc) {
         return {
           site: { url: adresa, html: res.html, evidence: `web z vyhledávače, ${proc}` },
@@ -776,7 +800,7 @@ export async function discoverWebsite(
     }
   }
 
-  return { site: null, checked, ranOut: false, noCandidates, searched, searchAnswered, inconclusive };
+  return { site: null, checked, ranOut: false, noCandidates, searched, searchAnswered, inconclusive, possible };
 }
 
 /** Exported for the pipeline, which needs a probe that is not memoised per host. */

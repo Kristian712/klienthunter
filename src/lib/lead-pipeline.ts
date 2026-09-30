@@ -404,6 +404,18 @@ export async function verifyWebsite(
    * z jeho výsledků nebyl web té firmy. Bez vyhledávače (chybí klíč nebo vypínač, došel strop
    * dotazů, vyhledávač neodpověděl) je to **UNKNOWN** a evidence říká proč.
    */
+  // Běžící stránka s názvem firmy, jen bez tvrdého důkazu: skoro jistě její web. Nikdy tedy
+  // „web nemá" — a uživatel dostane odkaz, ať si to ověří (Hotel Rango → rango.cz, 30. 9. 2026).
+  if (found.possible) {
+    return {
+      verdict: {
+        status: 'UNKNOWN',
+        url: found.possible.url,
+        evidence: `pravděpodobně web firmy: ${found.possible.url.replace(/^https?:\/\//, '')} — běží a nese její název, jen na něm chybí IČO, telefon nebo adresa k doložení`,
+      },
+      searched,
+    };
+  }
   if (signals.claimedUrl) return { verdict, searched };
   if (found.ranOut) {
     return { verdict: { status: 'UNKNOWN', evidence: 'nestihli jsme web ověřit — hledání došel čas' }, searched };

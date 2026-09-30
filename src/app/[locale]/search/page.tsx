@@ -613,6 +613,9 @@ function OutreachDraft({ b, locale }: { b: BusinessResult; locale: string }) {
  * English builds. The wording is also deliberately factual: "Zastaralý web" is something we
  * measured, whereas the old "Potřebuje nový web" was a sales opinion the data cannot support.
  */
+/** Sekce, které stojí na ověřeném „web nemá" — bez vyhledávače nevrátí nic. */
+const VERIFIED_NO_WEB_SCENARIOS = ['no_web', 'stay', 'reach_weak_web', 'social_weak_web'];
+
 /** Podmínky, které nechají jen firmy bez nalezeného webu — a tím skoro jistě i bez kontaktu. */
 const WEB_ABSENT_FILTERS = ['no_web_found', 'no_website', 'web_unknown', 'no_web_has_fb'];
 
@@ -640,6 +643,10 @@ const S = {
                       sk: 'Túto adresu uviedol zdroj, ale pri našom overení neodpovedala. Web môže byť dočasne mimo prevádzky, alebo už nefunguje.',
                       en: 'A source gave this address, but it did not answer when we checked. The site may be temporarily down, or gone.' },
   webOld:      { cs: 'Zastaralý web',   sk: 'Zastaraný web',    en: 'Outdated website' },
+  noWebSearch: { cs: 'Ověření „web nemá" je teď vypnuté — chybí vyhledávač. Tahle sekce proto nic nevrátí: KlientHunter neukáže firmu, u které web nemá jistě vyloučený.',
+                 sk: 'Overenie „web nemá" je teraz vypnuté — chýba vyhľadávač. Táto sekcia preto nič nevráti: KlientHunter neukáže firmu, pri ktorej web nemá isto vylúčený.',
+                 en: 'The “no website” check is off right now — the search engine is missing. This section will return nothing: KlientHunter never shows a firm whose website it has not ruled out.' },
+  webProbable: { cs: 'Pravděpodobně má web', sk: 'Pravdepodobne má web', en: 'Probably has a website' },
   stayTip:     { cs: 'Typ provozu podle názvu firmy nebo OpenStreetMap.', sk: 'Typ prevádzky podľa názvu firmy alebo OpenStreetMap.', en: 'Type of business from its name or OpenStreetMap.' },
   stayNaceTip: { cs: 'Jen podle kódu NACE, který firma uvedla v rejstříku — že ubytování opravdu provozuje, jsme neověřili. Ověřte v mapách.',
                  sk: 'Len podľa kódu NACE, ktorý firma uviedla v registri — že ubytovanie naozaj prevádzkuje, sme neoverili. Overte v mapách.',
@@ -965,10 +972,13 @@ function WebsiteStatusBadge({ b, locale }: { b: BusinessResult; locale: string }
    * splynout s ním. Důvod je v obou případech v bublině (`websiteEvidence`).
    */
   if (status === 'UNKNOWN') {
+    // Běžící doména s názvem firmy bez tvrdého důkazu (rango.cz u Hotelu Rango): říct nahlas,
+    // že web nejspíš má — ne jen „neověřeno", které čtenář snadno přečte jako „nemá".
+    const probable = Boolean(b.website) && (b.websiteEvidence ?? '').startsWith('pravděpodobně web');
     return (
       <span className="badge text-ink-faint"
             title={b.websiteEvidence || localized(S.webUnknownTip, locale)}>
-        <Globe size={10} />{localized(S.webUnknown, locale)}
+        <Globe size={10} />{localized(probable ? S.webProbable : S.webUnknown, locale)}
       </span>
     );
   }
@@ -1139,10 +1149,12 @@ export default function SearchPage() {
   const [profile, setProfile] = useState<UserProfile>(EMPTY_PROFILE);
   /** Co je v nasazení zapnuté (`/api/features`): bez tokenu Meta jsou filtry `ads_*` zamčené. */
   const [metaAds, setMetaAds] = useState(false);
+  /** Běží vyhledávač? Bez něj nevznikne ověřené „web nemá" a sekce bez webu jsou prázdné. */
+  const [webSearch, setWebSearch] = useState(true);
   /** Kolik firem index pro podmínky ve skládačce najde; 0 = hledání by skončilo prázdné, proto se zamkne. */
   const [indexTotal, setIndexTotal] = useState<number | null>(null);
   useEffect(() => {
-    fetch('/api/features').then(r => (r.ok ? r.json() : null)).then(d => { if (d) setMetaAds(Boolean(d.metaAds)); }).catch(err => console.error('features:', err));
+    fetch('/api/features').then(r => (r.ok ? r.json() : null)).then(d => { if (d) { setMetaAds(Boolean(d.metaAds)); setWebSearch(d.webSearch !== false); } }).catch(err => console.error('features:', err));
   }, []);
   const [showOnboarding, setShowOnboarding] = useState(false);
   /**
@@ -1974,6 +1986,11 @@ export default function SearchPage() {
                 );
               })}
             </div>
+            {!webSearch && VERIFIED_NO_WEB_SCENARIOS.includes(effectiveScenario) && (
+              <p role="note" className="mt-2 rounded-lg border border-ink px-3 py-2 text-xs leading-relaxed text-ink">
+                {localized(S.noWebSearch, locale)}
+              </p>
+            )}
           </div>
 
           <div className="grid md:grid-cols-5 gap-4 items-start">

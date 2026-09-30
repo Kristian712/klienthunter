@@ -65,18 +65,18 @@ export const SCENARIOS: Scenario[] = [
     label: { cs: 'Bez webu', sk: 'Bez webu', en: 'No website' },
     action: { cs: 'Najít firmy bez webu', sk: 'Nájsť firmy bez webu', en: 'Find firms without a website' },
     /**
-     * Scénář pouští oba stavy, ve kterých web neznáme.
-     *
-     * Do teď zapínal jen `no_website`, tedy doložené „web nemá" — a to aplikace bez vyhledávače
-     * neřekne u nikoho, takže nejpoužívanější scénář vracel prázdno. Filtry se kombinují přes AND,
-     * takže dvojice „nevíme + nemá" by taky nevrátila nic; obojí naráz umí filtr `no_web_found`.
+     * Od 30. 9. 2026 jen jistota: ověřené „web nemá" (domény z názvu i vyhledávač) a kontakt.
+     * Majitel: „chci, aby si uživatel byl 100% jistý, že web mít nebudou a bude je moc
+     * kontaktovat". Dřív sekce pouštěla i „neověřeno" (`no_web_found`) a Hotel Rango, který má
+     * rango.cz, dostal nabídku oslovení „nemáte web". Bez vyhledávače je sekce prázdná — a UI
+     * to řekne (`/api/features` → `webSearch`).
      */
     hint: {
-      cs: 'Zůstanou firmy, u kterých web neznáme — buď jsme ho nenašli, nebo ho nešlo ověřit. Že ho nemají, tím neříkáme.',
-      sk: 'Zostanú firmy, pri ktorých web nepoznáme — buď sme ho nenašli, alebo sa nedal overiť. Že ho nemajú, tým nehovoríme.',
-      en: 'Keeps the firms whose website we do not know — either we found none, or it could not be verified. That is not a claim they have none.',
+      cs: 'Jen firmy, u kterých jsme ověřili, že web nemají — prošli jsme domény z názvu i vyhledávač — a máme na ně kontakt.',
+      sk: 'Len firmy, pri ktorých sme overili, že web nemajú — prešli sme domény z názvu aj vyhľadávač — a máme na ne kontakt.',
+      en: 'Only firms verified to have no website — name domains and a search engine — that we have a contact for.',
     },
-    filters: ['no_web_found'],
+    filters: ['no_website', 'can_reach'],
   },
   {
     /**
@@ -181,12 +181,12 @@ export const SCENARIOS: Scenario[] = [
     forWhom: { cs: 'tvůrci webů s rezervacemi', sk: 'tvorcovia webov s rezerváciami', en: 'booking-site builders' },
     label: { cs: 'Ubytování a wellness bez webu', sk: 'Ubytovanie a wellness bez webu', en: 'Stays and wellness without a website' },
     hint: {
-      cs: 'Penziony, apartmány, chaty, kempy a wellness, u kterých jsme vlastní web nenašli — nebo mají jen Facebook či Instagram.',
-      sk: 'Penzióny, apartmány, chaty, kempy a wellness, pri ktorých sme vlastný web nenašli — alebo majú len Facebook či Instagram.',
-      en: 'Guest houses, apartments, chalets, camp sites and wellness where we found no own website — or only Facebook or Instagram.',
+      cs: 'Penziony, apartmány, chaty, kempy a wellness s ověřeným „web nemá" (domény z názvu i vyhledávač) a s kontaktem.',
+      sk: 'Penzióny, apartmány, chaty, kempy a wellness s overeným „web nemá" (domény z názvu aj vyhľadávač) a s kontaktom.',
+      en: 'Guest houses, apartments, chalets, camp sites and wellness verified to have no website (name domains and search engine), with a contact.',
     },
     action: { cs: 'Najít ubytování a wellness bez webu', sk: 'Nájsť ubytovanie a wellness bez webu', en: 'Find stays and wellness without a website' },
-    filters: ['no_web_found'],
+    filters: ['no_website', 'can_reach'],
     industries: ['hotel', 'wellness'],
   },
 ];

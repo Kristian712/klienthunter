@@ -598,13 +598,15 @@ export const LEAD_FILTERS: LeadFilter[] = [
     id: 'weak_web',
     group: 'reach',
     label: { cs: 'Web chybí nebo pokulhává', sk: 'Web chýba alebo pokuľháva', en: 'Website missing or weak' },
-    hint: { cs: 'Web jsme nenašli, nebo ho firma má a propadl v auditu — bez HTTPS, bez mobilní verze, starý kód. Přesně firmy, kterým má tvůrce webů co nabídnout.',
-            sk: 'Web sme nenašli, alebo ho firma má a prepadol v audite — bez HTTPS, bez mobilnej verzie, starý kód. Presne firmy, ktorým má tvorca webov čo ponúknuť.',
-            en: 'We found no website, or the firm has one and it failed the audit — no HTTPS, no mobile version, old code. Exactly the firms a web developer can help.' },
-    where: { OR: [{ NOT: STATUS_HAS }, { websiteIsOld: true }] },
-    test: b => webStatusOf(b) !== 'HAS' || Boolean(b.websiteIsOld),
-    evidence: (b, l) => webStatusOf(b) !== 'HAS'
-      ? localized({ cs: 'web jsme nenašli', sk: 'web sme nenašli', en: 'we found no website' }, l)
+    // Od 30. 9. 2026 jen ověřené „web nemá" (NONE), ne „neověřeno": majitel chce, aby každé
+    // oslovení mířilo na firmu, která web opravdu nemá (Hotel Rango měl rango.cz).
+    hint: { cs: 'Ověřeno, že web nemá (domény z názvu i vyhledávač), nebo ho má a propadl v auditu — bez HTTPS, bez mobilní verze, starý kód.',
+            sk: 'Overené, že web nemá (domény z názvu aj vyhľadávač), alebo ho má a prepadol v audite — bez HTTPS, bez mobilnej verzie, starý kód.',
+            en: 'Verified to have no website (name domains and search engine), or it has one that failed the audit — no HTTPS, no mobile version, old code.' },
+    where: { OR: [{ websiteStatus: 'NONE' }, { websiteIsOld: true }] },
+    test: b => webStatusOf(b) === 'NONE' || Boolean(b.websiteIsOld),
+    evidence: (b, l) => webStatusOf(b) === 'NONE'
+      ? localized({ cs: 'ověřeno, že web nemá', sk: 'overené, že web nemá', en: 'verified: no website' }, l)
       : b.websiteIsOld ? localized({ cs: 'web propadl v auditu', sk: 'web prepadol v audite', en: 'the website failed the audit' }, l) : null,
   },
   {
@@ -824,14 +826,15 @@ export const LEAD_FILTERS: LeadFilter[] = [
      */
     label: { cs: 'Web je jen Facebook nebo Instagram', sk: 'Web je len Facebook alebo Instagram', en: 'Website is only Facebook or Instagram' },
     source: 'web',
-    hint: { cs: 'Vlastní web jsme nenašli, profil na Facebooku nebo Instagramu ano. Hosté nemají kde rezervovat napřímo.',
-            sk: 'Vlastný web sme nenašli, profil na Facebooku alebo Instagrame áno. Hostia nemajú kde rezervovať napriamo.',
-            en: 'No own website found, but a Facebook or Instagram profile. Guests have nowhere to book directly.' },
-    where: { AND: [STATUS_NOT_HAS, { OR: [{ hasFacebook: true }, { hasInstagram: true }] }] },
-    test: b => webStatusOf(b) !== 'HAS' && Boolean(b.hasFacebook || b.hasInstagram),
+    hint: { cs: 'Ověřeno, že vlastní web nemá (domény z názvu i vyhledávač), a má profil na Facebooku nebo Instagramu.',
+            sk: 'Overené, že vlastný web nemá (domény z názvu aj vyhľadávač), a má profil na Facebooku alebo Instagrame.',
+            en: 'Verified to have no own website (name domains and search engine), with a Facebook or Instagram profile.' },
+    // Jen s ověřeným „web nemá" (NONE) — jinak by to bylo „profil má, web jsme nenašli".
+    where: { AND: [{ websiteStatus: 'NONE' }, { OR: [{ hasFacebook: true }, { hasInstagram: true }] }] },
+    test: b => webStatusOf(b) === 'NONE' && Boolean(b.hasFacebook || b.hasInstagram),
     unknown: b => !b.hasFacebook && !b.hasInstagram && !b.socialsChecked,
-    evidence: (b, l) => webStatusOf(b) !== 'HAS' && (b.hasFacebook || b.hasInstagram)
-      ? localized({ cs: 'jen profil na síti, vlastní web nenalezen', sk: 'len profil na sieti, vlastný web nenájdený', en: 'social profile only, no own website found' }, l)
+    evidence: (b, l) => webStatusOf(b) === 'NONE' && (b.hasFacebook || b.hasInstagram)
+      ? localized({ cs: 'jen profil na síti, ověřeno, že vlastní web nemá', sk: 'len profil na sieti, overené, že vlastný web nemá', en: 'social profile only, verified: no own website' }, l)
       : null,
   },
   {

@@ -197,7 +197,9 @@ export function inObec(obec: string): string {
 
 /** Věta podle toho, co o webu víme. Null, když web mají — šablona je pro ty, kdo ho nemají. */
 export function detailSentence(b: StayLead): string | null {
-  if (webStatusOf(b) === 'HAS') return null;
+  // Jen ověřené „web nemá" (NONE). U „neověřeno" by zpráva tvrdila něco, co nevíme — a Hotel
+  // Rango, kterému by přišlo „nemáte web", má rango.cz (30. 9. 2026).
+  if (webStatusOf(b) !== 'NONE') return null;
   const fb = Boolean(b.hasFacebook);
   const ig = Boolean(b.hasInstagram);
   if (fb || ig) {

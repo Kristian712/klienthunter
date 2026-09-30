@@ -263,6 +263,13 @@ export async function runSearchJob(jobId: string): Promise<void> {
         await prisma.searchJob.update({ where: { id: jobId }, data: { processedCount: processed } });
       }
 
+      /**
+       * Vyhledávač má strop dotazů (na hledání i na měsíc) — dostanou ho nejdřív firmy, na které
+       * máme kontakt. Jen ty se můžou ukázat v sekcích „bez webu" (ověřené „web nemá" + kontakt),
+       * takže každý placený dotaz míří tam, kde rozhoduje o oslovení (30. 9. 2026).
+       */
+      candidates.sort((a, b) => Number(hasSourceContact(b)) - Number(hasSourceContact(a)));
+
       await enrichAndVerify(candidates, {
         // Dřív tu u „celé ČR" stálo `false`, protože se do jednoho průchodu měly vejít tisíce
         // sond. Po rozpadu na fáze je jedna fáze objemem běžné hledání, takže se ověřuje
@@ -351,6 +358,11 @@ function errorCode(err: unknown): string {
  * frekvence omezená a tahle úklidová práce se stejně hodí přesně ve chvíli, kdy se uživatel
  * dívá na seznam. Jeden UPDATE, žádná další infrastruktura.
  */
+/** Kontakt, který přišel už ze zdroje (OSM, rejstřík) — dřív, než se čte web firmy. */
+function hasSourceContact(c: { phone?: string; email?: string; facebookUrl?: string; instagramUrl?: string }): boolean {
+  return Boolean(c.phone || c.email || c.facebookUrl || c.instagramUrl);
+}
+
 export async function sweepStaleJobs(userId: string): Promise<void> {
   await prisma.searchJob
     .updateMany({

@@ -103,15 +103,15 @@ export const PROFESSIONS: Profession[] = [
       en: 'The “We found no website” filter includes firms whose site could not be verified.',
     },
     industries: ['hair salon', 'restaurant', 'car repair', 'plumber'],
-    presetFilters: ['no_web_found', 'working'],
-    suggests: ['no_web_found', 'has_contact'],
+    presetFilters: ['no_website', 'working'],
+    suggests: ['no_website', 'has_contact'],
     followUp: {
       question: { cs: 'Co nabízíte?', sk: 'Čo ponúkate?', en: 'What do you offer?' },
       options: [
         {
           id: 'new_sites',
           label: { cs: 'Nové weby', sk: 'Nové weby', en: 'New websites' },
-          presetFilters: ['no_web_found', 'working'],
+          presetFilters: ['no_website', 'working'],
         },
         {
           id: 'redesign',
