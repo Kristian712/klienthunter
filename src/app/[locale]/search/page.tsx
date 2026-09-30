@@ -1211,7 +1211,14 @@ export default function SearchPage() {
     savedLockRef.current = true;
     dirtyRef.current = false;
     setPresetsOn(false);
-    setActive(new Set(normalizeFilters(meta.filters)));
+    /**
+     * Hledání spuštěné sekcí „bez webu" před 30. 9. 2026 si uložilo tehdejší podmínku
+     * „Web jsme nenašli" (včetně neověřených firem). Sekce dnes slibuje ověřené „web nemá"
+     * a kontakt — staré hledání se proto otevře s jejími dnešními podmínkami, jinak by pod
+     * stejným jménem dál nabízelo firmy, které web mají (Hotel Rango → rango.cz).
+     */
+    const legacy = meta.scenario && VERIFIED_NO_WEB_SCENARIOS.includes(meta.scenario) && meta.filters.includes('no_web_found');
+    setActive(new Set(normalizeFilters(legacy ? scenarioById(meta.scenario).filters : meta.filters)));
     if (meta.scenario) setScenario(meta.scenario);
     // Kraj a obor z hledání, ne z profilu: dřív formulář po otevření hledání bez oboru ukázal obor
     // z profilu („Zubař") a další klik na Vyhledat by hledal něco jiného, než je na obrazovce.
