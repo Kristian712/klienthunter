@@ -6,6 +6,10 @@
  * "correct" codes return zero rows. Codes for the trades that had no working guess were
  * derived by sampling real companies found by name and counting their actual `czNace` values.
  *
+ * **ARES `czNace` hledá podle CZ-NACE 2025** (ověřeno 30. 9. 2026): restaurace 56100 (2008) = 0
+ * firem, 56110 (2025) = 588. Kódy tady jsou proto v číslování 2025; kontrola hlavní činnosti
+ * (`res-primary.ts`) porovnává s kódem 2025 i 2008.
+ *
  * Two consequences worth remembering:
  *  - NACE is *declared*, not audited. A firm may carry a dozen unrelated codes.
  *  - Many firms carry no NACE at all, which is why every trade also has name keywords.
@@ -41,6 +45,24 @@ export interface NicheQuery {
   pageWords?: string[];
   /** OpenStreetMap tag filters, as `key=value`. */
   osm: string[];
+  /**
+   * Živnost, kterou firma oboru musí mít (předmět podnikání v RŽP). Jen u oborů, které NACE
+   * nerozliší: kadeřnictví, kosmetika, nehty i masáže mají v CZ-NACE 2025 jeden kód 96210,
+   * kavárna má kód restaurace. Firma s IČO bez odpovídající živnosti se z výsledků vyřadí;
+   * když RŽP neodpoví, nefiltruje se. Audit 30. 9. 2026 (sources/rzp-bulk.ts).
+   */
+  licence?: RegExp;
+  /**
+   * Obor pozná jen živnost, ne hlavní činnost — kominík mívá v RES „74990 Ostatní profesní
+   * činnosti". Pak se kontrola převažující činnosti přeskočí.
+   */
+  licenceOnly?: boolean;
+  /**
+   * Kódy pro kontrolu hlavní činnosti, když se liší od dotazu. ARES hledá jen v některé hloubce
+   * (`8559` najde, `85591` ne), ale obor pozná až podtřída: 85591 = jazykové školy, zbytek 8559
+   * jsou kurzy čehokoli. Výchozí = `nace`.
+   */
+  primaryNace?: string[];
   /** Jak často u tohohle oboru najdeme web. Viz `YIELD` níž. */
   yield?: YieldBand;
 }
@@ -69,48 +91,77 @@ export type YieldBand = 'measured-high' | 'measured-low' | 'high' | 'mid' | 'low
  * `46900` (unspecialised wholesale) is the catch-all code half of all Czech firms declare.
  * It matches everything and therefore identifies nothing — never put it in a query.
  */
+/*
+ * OSM štítky pročištěné 30. 9. 2026: prádelna není úklidová firma, zahradní centrum není
+ * zahradník, posilovna není osobní trenér, `amenity=doctors` jsou i specialisté, „zámečnictví"
+ * je v češtině kovovýroba (`craft=metal_construction`).
+ */
 export const USELESS_NACE = new Set(['46900', '4690', '00', '74', '741', '68200', 'G']);
 
 export const NICHE_MAP: Record<string, NicheQuery> = {
-  'plumber':              { nace: ['4322'],            keywords: ['instalatérství', 'instalatér', 'topenář'], aliases: ['vodoinstalatér', 'vodoinstalace'], osm: ['craft=plumber'], yield: 'low' },
-  'electrician':          { nace: ['43210'],           keywords: ['elektro', 'elektroinstalace', 'elektrikář'], osm: ['craft=electrician'], yield: 'unknown' },
-  'carpenter':            { nace: ['43320', '16230'],  keywords: ['truhlářství', 'tesařství'], osm: ['craft=carpenter', 'craft=joiner'], yield: 'low' },
-  'painter':              { nace: ['43340'],           keywords: ['malířství', 'malby', 'nátěry'], osm: ['craft=painter'], yield: 'low' },
+  'plumber':              { nace: ['4322'],            keywords: ['instalatérství', 'instalatér', 'topenář'], aliases: ['vodoinstalatér', 'vodoinstalace'], osm: ['craft=plumber'], licence: /vodoinstalatérství|topenářství|plynových zařízení/i, yield: 'low' },
+  // „elektro" v názvu mají hlavně velkoobchody a montáže strojů (Olomouc 2 z 25) — jen alias.
+  'electrician':          { nace: ['43210'],           keywords: ['elektroinstalace', 'elektrikář'], aliases: ['elektro'], osm: ['craft=electrician'], licence: /elektrických zařízení|elektrotechnick/i, yield: 'unknown' },
+  'carpenter':            { nace: ['43320', '16230'],  keywords: ['truhlářství', 'tesařství'], osm: ['craft=carpenter', 'craft=joiner'], licence: /truhlářství|tesařství/i, yield: 'low' },
+  // 43340 (2025) je malíři i skláři dohromady — rozliší je živnost.
+  'painter':              { nace: ['43340'],           keywords: ['malířství', 'malby', 'nátěry'], osm: ['craft=painter'], licence: /malířství|lakýrnictví|natěračství/i, yield: 'low' },
   // 43910 samo vrací tři firmy v celé ČR — kód se prakticky nedeklaruje. Doplněné 43990
   // (ostatní specializované stavební práce) rozšíří záběr; obor stejně stojí hlavně na názvu.
-  'roofer':               { nace: ['43910', '43990'],  keywords: ['pokrývačství', 'střechy'], aliases: ['pokrývač'], osm: ['craft=roofer'], yield: 'unknown' },
-  'landscaper':           { nace: ['81300'],           keywords: ['zahradnictví', 'zahradní'], osm: ['craft=gardener', 'shop=garden_centre'], yield: 'high' },
-  'restaurant':           { nace: ['56300'],           keywords: ['restaurace', 'hostinec'], pageWords: ['hospoda', 'šenk', 'bistro', 'pivnice', 'jídelna', 'pizzerie', 'kuchyně'], osm: ['amenity=restaurant'], yield: 'high' },
-  'cafe':                 { nace: ['56300'],           keywords: ['kavárna', 'café'], osm: ['amenity=cafe'], yield: 'high' },
-  'bakery':               { nace: ['10710', '47240'],  keywords: ['pekárna', 'pekařství'], osm: ['shop=bakery'], yield: 'mid' },
-  'butcher shop':         { nace: ['47220', '10110'],  keywords: ['řeznictví', 'masna'], osm: ['shop=butcher'], yield: 'mid' },
-  'hair salon':           { nace: ['96210'],           keywords: ['kadeřnictví', 'kadeřník'], aliases: ['kadeřnic'], pageWords: ['kadeřnice', 'barbershop', 'barber', 'holičství', 'střih'], osm: ['shop=hairdresser'], yield: 'measured-low' },
-  'beauty salon':         { nace: ['96210', '96230'],  keywords: ['kosmetika', 'kosmetický'], osm: ['shop=beauty'], yield: 'low' },
-  'nail studio':          { nace: ['96210'],           keywords: ['nehty', 'nehtová', 'manikúra'], aliases: ['nehtové studio'], osm: ['shop=beauty'], yield: 'low' },
-  'massage':              { nace: ['96230'],           keywords: ['masáže', 'masér'], aliases: ['masážní'], osm: ['shop=massage'], yield: 'low' },
-  'car repair':           { nace: ['95310'],           keywords: ['autoservis', 'autodílna'], aliases: ['automobilový servis'], pageWords: ['pneuservis', 'opravy vozidel', 'oprava vozidel', 'servis vozidel', 'diagnostika vozidel'], osm: ['shop=car_repair'], yield: 'mid' },
-  'tire shop':            { nace: ['95310'],           keywords: ['pneuservis', 'pneu'], osm: ['shop=tyres'], yield: 'mid' },
+  // Pokrývači jsou v CZ-NACE 2025 43410 (Přerov 76, Brno 637); 43910/43990 vracely hlavně
+  // „ostatní specializované stavební práce".
+  'roofer':               { nace: ['43410'],           keywords: ['pokrývačství', 'střechy'], aliases: ['pokrývač'], osm: ['craft=roofer'], licence: /pokrývačství/i, yield: 'unknown' },
+  'landscaper':           { nace: ['81300'],           keywords: ['zahradnictví', 'zahradní'], osm: ['craft=gardener'], yield: 'high' },
+  // 56300 je v číslování 2025 „podávání nápojů" (Přerov 4 firmy); restaurace jsou 56110 (588).
+  'restaurant':           { nace: ['56110'],           keywords: ['restaurace', 'hostinec'], pageWords: ['hospoda', 'šenk', 'bistro', 'pivnice', 'jídelna', 'pizzerie', 'kuchyně'], osm: ['amenity=restaurant'], licence: /hostinská činnost/i, yield: 'high' },
+  // Kavárny nesou v registru kód restaurací (Brno: 11 z 13 „kaváren" = 56110). NACE je tedy
+  // od restaurací neoddělí — hledá se podle názvu, mapy a úzkého 56300 (nápoje).
+  'cafe':                 { nace: ['56300'],           keywords: ['kavárna', 'café'], osm: ['amenity=cafe'], licence: /hostinská činnost/i, yield: 'high' },
+  'bakery':               { nace: ['10710', '47240'],  keywords: ['pekárna', 'pekařství'], osm: ['shop=bakery'], licence: /pekařství|cukrářství/i, yield: 'mid' },
+  // „masna" našla hlavně příjmení Masná — pryč.
+  'butcher shop':         { nace: ['47220', '10110'],  keywords: ['řeznictví', 'uzenářství'], aliases: ['masna'], osm: ['shop=butcher'], licence: /řeznictví|uzenářství/i, yield: 'mid' },
+  'hair salon':           { nace: ['96210'],           keywords: ['kadeřnictví', 'kadeřník'], aliases: ['kadeřnic'], pageWords: ['kadeřnice', 'barbershop', 'barber', 'holičství', 'střih'], osm: ['shop=hairdresser'], licence: /holičství|kadeřnictví/i, yield: 'measured-low' },
+  // Kosmetika, nehty a masáže sdílejí s kadeřnictvím kód 96210 — rozhoduje živnost.
+  'beauty salon':         { nace: ['96210', '96220', '96230'], keywords: ['kosmetika', 'kosmetický'], osm: ['shop=beauty'], licence: /kosmetické služby/i, yield: 'low' },
+  'nail studio':          { nace: ['96210', '96220', '96230'], keywords: ['nehty', 'nehtová', 'manikúra'], aliases: ['nehtové studio'], osm: ['beauty=nails'], licence: /pedikúra|manikúra/i, yield: 'low' },
+  'massage':              { nace: ['96230', '96210', '96220'], keywords: ['masáže', 'masér'], aliases: ['masážní'], osm: ['shop=massage'], licence: /masérské|rekondiční|regenerační/i, yield: 'low' },
+  'car repair':           { nace: ['95310'],           keywords: ['autoservis', 'autodílna'], aliases: ['automobilový servis'], pageWords: ['pneuservis', 'opravy vozidel', 'oprava vozidel', 'servis vozidel', 'diagnostika vozidel'], osm: ['shop=car_repair'], licence: /opravy silničních vozidel|karoserií/i, yield: 'mid' },
+  // Pneuservis je v registru stejný obor jako autoservis (kód i živnost) — odliší ho název a mapa.
+  'tire shop':            { nace: ['95310'],           keywords: ['pneuservis', 'pneu'], osm: ['shop=tyres'], licence: /opravy silničních vozidel/i, yield: 'mid' },
   'accountant':           { nace: ['69200'],           keywords: ['účetnictví', 'účetní'], osm: ['office=accountant'], yield: 'low' },
   'photographer':         { nace: ['74200'],           keywords: ['fotograf', 'fotoateliér'], osm: ['craft=photographer'], yield: 'low' },
-  'cleaning service':     { nace: ['81210', '81220'],  keywords: ['úklid', 'úklidové'], osm: ['shop=laundry'], yield: 'mid' },
+  // 81230 = „ostatní úklidové činnosti" (2025); tam je většina firem s „úklid" v názvu.
+  'cleaning service':     { nace: ['81210', '81220', '81230'], keywords: ['úklid', 'úklidové'], osm: [], yield: 'mid' },
   'veterinarian':         { nace: ['75000'],           keywords: ['veterinární', 'veterina'], osm: ['amenity=veterinary'], yield: 'high' },
-  'general practitioner': { nace: ['86210'],           keywords: ['praktický lékař', 'ordinace'], osm: ['amenity=doctors'], yield: 'high' },
+  // „ordinace" v názvu mají i zubaři a oční (Olomouc 8 z 24 praktiků) — jen alias.
+  'general practitioner': { nace: ['86210'],           keywords: ['praktický lékař', 'praktická lékařka'], aliases: ['ordinace'], osm: ['healthcare:speciality=general'], yield: 'high' },
   'dentist':              { nace: ['86230'],           keywords: ['zubní', 'stomatolog', 'dentál'], pageWords: ['stomatologie', 'zubař', 'ortodoncie', 'dentální hygiena'], osm: ['amenity=dentist'], yield: 'measured-high' },
-  'physiotherapist':      { nace: ['96230'],           keywords: ['fyzioterapie', 'rehabilitace'], osm: ['healthcare=physiotherapist'], yield: 'low' },
+  // Fyzioterapeuti jsou v registru ve skupině 869 spolu s laboratořemi a sanitkami a v 96230
+  // s masážemi — kód je neoddělí. Hledá se podle názvu a mapy.
+  'physiotherapist':      { nace: [],                  keywords: ['fyzioterapie', 'rehabilitace'], osm: ['healthcare=physiotherapist'], yield: 'low' },
   'pharmacy':             { nace: ['47730'],           keywords: ['lékárna'], osm: ['amenity=pharmacy'], yield: 'high' },
-  'optician':             { nace: ['47780'],           keywords: ['optika', 'oční optika'], pageWords: ['brýle', 'oční', 'kontaktní čočky', 'optometrist'], osm: ['shop=optician'], yield: 'high' },
+  // Oční optiky jsou v CZ-NACE 2025 47740 (Brno: 12 z 12 „optik"); 47780 byl „ostatní maloobchod".
+  'optician':             { nace: ['47740'],           keywords: ['optika', 'oční optika'], pageWords: ['brýle', 'oční', 'kontaktní čočky', 'optometrist'], osm: ['shop=optician'], licence: /oční optika/i, yield: 'high' },
   'lawyer':               { nace: ['69100'],           keywords: ['advokát', 'advokátní'], osm: ['office=lawyer'], yield: 'high' },
-  'real estate agency':   { nace: ['68310'],           keywords: ['reality', 'realitní'], osm: ['office=estate_agent'], yield: 'mid' },
+  'real estate agency':   { nace: ['68310'],           keywords: ['reality', 'realitní'], osm: ['office=estate_agent'], licence: /realitní zprostředkování/i, yield: 'mid' },
   'driving school':       { nace: ['85530'],           keywords: ['autoškola'], osm: ['amenity=driving_school'], yield: 'mid' },
-  'language school':      { nace: ['8559'],            keywords: ['jazyková škola', 'jazykov'], osm: ['amenity=language_school'], yield: 'mid' },
-  'gym':                  { nace: ['93130'],           keywords: ['fitness', 'posilovna'], osm: ['leisure=fitness_centre'], yield: 'high' },
-  'personal trainer':     { nace: ['85510'],           keywords: ['trenér'], aliases: ['osobní trenér'], osm: ['leisure=fitness_centre'], yield: 'mid' },
-  'yoga studio':          { nace: ['93130'],           keywords: ['jóga', 'yoga'], osm: ['leisure=fitness_centre'], yield: 'high' },
+  // 85591 = jazykové školy; 8559 samo je „ostatní vzdělávání" (kurzy čehokoli). „jazykov" byl
+  // mrtvý kmen (ARES hledá celá slova).
+  'language school':      { nace: ['8559'], primaryNace: ['85591'], keywords: ['jazyková škola', 'jazykové'], osm: ['amenity=language_school'], yield: 'mid' },
+  'gym':                  { nace: ['93130'],           keywords: ['fitness', 'posilovna'], osm: ['leisure=fitness_centre'], licence: /tělovýchovných a sportovních/i, yield: 'high' },
+  'personal trainer':     { nace: ['85510'],           keywords: ['trenér'], aliases: ['osobní trenér'], osm: [], licence: /tělovýchovných a sportovních/i, yield: 'mid' },
+  // Jóga nemá vlastní kód (93130 = fitka) — hledá se podle názvu a mapy (sport=yoga).
+  'yoga studio':          { nace: [],                  keywords: ['jóga', 'yoga'], osm: ['sport=yoga'], yield: 'high' },
   'florist':              { nace: ['47760'],           keywords: ['květinářství', 'květiny'], osm: ['shop=florist'], yield: 'mid' },
-  'tailor':               { nace: ['95230'],           keywords: ['krejčovství', 'krejčí', 'šití'], osm: ['craft=tailor', 'shop=tailor'], yield: 'low' },
-  'locksmith':            { nace: ['25620', '25110'],  keywords: ['zámečnictví', 'zámečník'], aliases: ['zámečnic'], osm: ['craft=locksmith'], yield: 'mid' },
-  'glazier':              { nace: ['23120', '43340'],  keywords: ['sklenářství', 'sklenář'], osm: ['craft=glaziery'], yield: 'low' },
-  'chimney sweep':        { nace: ['81220', '43990'],  keywords: ['kominictví', 'kominík'], osm: ['craft=chimney_sweeper'], yield: 'mid' },
+  // 95230 byla oprava obuvi. Krejčí: šití oděvů 14210/14290 (2025) a úpravy oděvů 95290.
+  // „krejčí" v názvu je hlavně příjmení (Olomouc 0 z 39) — pryč.
+  'tailor':               { nace: ['14210', '14290', '95290'], keywords: ['krejčovství', 'šití'], aliases: ['krejčí'], osm: ['craft=tailor', 'shop=tailor'], yield: 'low' },
+  'locksmith':            { nace: ['25620', '25110'],  keywords: ['zámečnictví', 'zámečník'], aliases: ['zámečnic'], osm: ['craft=metal_construction', 'craft=locksmith'], licence: /zámečnictví/i, yield: 'mid' },
+  // „sklenář" je hlavně příjmení — pryč. 43340 sdílí s malíři; sklenáři podnikají na volnou
+  // živnost (žádný z 43341 v Brně nemá „Sklenářství"), takže je pozná jen podtřída 43341.
+  'glazier':              { nace: ['43340', '23120'], primaryNace: ['43341', '2312'], keywords: ['sklenářství'], aliases: ['sklenář'], osm: ['craft=glaziery'], yield: 'low' },
+  // Kominík mívá hlavní činnost „74990 ostatní profesní" — pozná ho jen živnost Kominictví.
+  // 74990 do dotazu nejde (tisíce poradců), takové kominíky najde název „kominictví".
+  'chimney sweep':        { nace: ['81220', '43990'], keywords: ['kominictví', 'kominík'], osm: ['craft=chimney_sweeper'], licence: /kominictví/i, licenceOnly: true, yield: 'mid' },
   // ── Doplněno ve vlně 5. Každý kód ověřen proti živému ARESu, že vrací řádky: obecné
   // „stavební firmy" (41, 412, 4120) vracejí nulu, proto tu nejsou.
   /**
@@ -133,8 +184,9 @@ export const NICHE_MAP: Record<string, NicheQuery> = {
   'wellness':             { nace: ['96230'],           keywords: ['wellness', 'lázně'], aliases: ['relax', 'sauna', 'privátní sauna', 'vířivka', 'vířivky', 'whirlpool', 'spa'],
                             osm: ['leisure=sauna', 'leisure=hot_tub', 'shop=massage'], yield: 'low' },
   'freight':              { nace: ['49410'],           keywords: ['doprava', 'autodoprava', 'přeprava'], osm: [], yield: 'low' },
-  'builder':              { nace: ['43990', '43120'],  keywords: ['stavební', 'zednictví', 'stavby'], osm: ['craft=builder'], yield: 'low' },
-  'flooring':             { nace: ['43330'],           keywords: ['podlahy', 'podlahářství'], osm: ['shop=flooring'], yield: 'mid' },
+  // Výstavba budov je v CZ-NACE 2025 41000 (Přerov 371) — nejčastější hlavní činnost stavebních firem.
+  'builder':              { nace: ['41000', '43990', '43120'], keywords: ['stavební', 'zednictví', 'stavby'], osm: ['craft=builder'], licence: /provádění staveb|zednictví/i, yield: 'low' },
+  'flooring':             { nace: ['43330'],           keywords: ['podlahy', 'podlahářství'], osm: ['shop=flooring'], licence: /podlahářství/i, yield: 'mid' },
 };
 
 /** Malá písmena bez diakritiky — „Kadeřnictví" i „kadernictvi" má vést na totéž. */

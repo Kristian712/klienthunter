@@ -96,8 +96,10 @@ export async function fetchResPrimary(icos: string[], deadlineAt: number): Promi
  * proto prefix oběma směry — kratší kód z RES ale aspoň tříznakový, jinak by `55` pustilo
  * i hotely do „kempů" a `4` celé stavebnictví.
  */
-export function primaryMatches(primary: ResPrimary, codes: readonly string[]): boolean {
+export function primaryMatches(primary: ResPrimary, codes: readonly string[], strict = false): boolean {
+  // `strict`: jen přesná podtřída (`85591` jazykové školy). Kratší kód z RES („8559 ostatní
+  // vzdělávání") by pustil kurzy čehokoli.
   return [primary.nace2025, primary.nace2008].some(p =>
-    Boolean(p) && codes.some(c => p!.startsWith(c) || (p!.length >= 3 && c.startsWith(p!))),
+    Boolean(p) && codes.some(c => p!.startsWith(c) || (!strict && p!.length >= 3 && c.startsWith(p!))),
   );
 }

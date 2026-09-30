@@ -1,4 +1,5 @@
-import { aresSource } from './ares';
+import { IN_LIQUIDATION, aresSource, keepLicensed } from './ares';
+import { resolveNiche } from '../nace-map';
 import { osmSource } from './osm';
 import { aresRzpSource } from './ares-rzp';
 import { aresResSource } from './ares-res';
@@ -41,7 +42,11 @@ export async function discoverAll(
       // Filtr podle vzniku: místo dotazu do ARESu jde první zdroj přes index z ČSÚ, který
       // umí datum i celý kraj. OpenStreetMap běží dál stejně — kontakty index nemá.
       if (s.id === 'ares' && opts.registry && registryCanServe(opts.registry)) {
-        return registryDiscover(opts.registry).catch(() => [] as RawLead[]);
+        // Index má převažující činnost, ale kosmetiku od kadeřnictví neodliší (stejný kód) —
+        // i tady rozhodne živnost oboru.
+        return registryDiscover(opts.registry)
+          .then(leads => keepLicensed(leads.filter(l => !IN_LIQUIDATION.test(l.name)), resolveNiche(niche), Date.now() + 10_000))
+          .catch(() => [] as RawLead[]);
       }
       return s.search(niche, city, limit, { legalForms: opts.legalForms }).catch(() => [] as RawLead[]);
     }),

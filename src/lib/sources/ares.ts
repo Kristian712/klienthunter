@@ -4,6 +4,8 @@ import { subAreasFor } from './ares-areas';
 import type { DiscoveryOptions, DiscoverySource, MatchedBy, RawLead } from './types';
 
 import { fetchResPrimary, primaryMatches } from './res-primary';
+import { activeLicences, fetchRzp } from './rzp-bulk';
+import type { NicheQuery } from '../nace-map';
 
 const BASE = 'https://ares.gov.cz/ekonomicke-subjekty-v-be/rest';
 const PAGE = 100;
@@ -114,8 +116,12 @@ function parseAresDate(value?: string): Date | undefined {
   return Number.isNaN(d.getTime()) ? undefined : d;
 }
 
+/** Firma v likvidaci není lead pro nikoho — nic nekupuje a za chvíli nebude. */
+export const IN_LIQUIDATION = /v\s+likvidaci/i;
+
 function toLead(s: AresSubject): RawLead | null {
   if (!s.ico || !s.obchodniJmeno) return null;
+  if (IN_LIQUIDATION.test(s.obchodniJmeno)) return null;
   const nace = (s.czNace ?? []).filter(c => c.length >= 4 && !USELESS_NACE.has(c));
   return {
     sourceId: 'ares',
@@ -233,7 +239,8 @@ export const aresSource: DiscoverySource = {
   label: 'ARES (veřejný registr)',
 
   async search(niche: string, city: string, limit: number, opts?: DiscoveryOptions): Promise<RawLead[]> {
-    const { nace, keywords } = resolveNiche(niche);
+    const niche_ = resolveNiche(niche);
+    const { nace, keywords } = niche_;
     const sidlo = city ? { textovaAdresa: city } : undefined;
     // Právní forma ze skládačky jde rovnou do dotazu — ARES ji umí a výsledek je pak o to užší.
     const pravniForma = opts?.legalForms?.length ? [...opts.legalForms] : undefined;
@@ -264,7 +271,8 @@ export const aresSource: DiscoverySource = {
         found.push(lead);
       }
     }
-    return (await keepPrimaryTrade(found, nace, until + PRIMARY_BUDGET_MS)).slice(0, limit);
+    const precise = await keepPrimaryTrade(found, niche_, until + PRIMARY_BUDGET_MS);
+    return (await keepLicensed(precise, niche_, until + PRIMARY_BUDGET_MS)).slice(0, limit);
   },
 };
 
@@ -284,9 +292,10 @@ const PRIMARY_BUDGET_MS = 8_000;
  * Mimochodem se tu opraví `category`: dřív to byl první deklarovaný kód (u penzionu klidně
  * „74990"), teď převažující činnost — a NACE seznam ji má na začátku.
  */
-async function keepPrimaryTrade(leads: RawLead[], codes: string[], deadlineAt: number): Promise<RawLead[]> {
+async function keepPrimaryTrade(leads: RawLead[], niche: NicheQuery, deadlineAt: number): Promise<RawLead[]> {
+  const codes = niche.primaryNace ?? niche.nace;
   const byNace = leads.filter(l => l.matchedBy === 'nace' && l.ico);
-  if (!codes.length || !byNace.length) return leads;
+  if (!codes.length || !byNace.length || niche.licenceOnly) return leads;
   const primaries = await fetchResPrimary(byNace.map(l => l.ico!), deadlineAt);
   if (primaries.size === 0) {
     console.warn(`ares: RES neodpověděl, ${byNace.length} firem z větve NACE bez kontroly hlavní činnosti`);
@@ -306,10 +315,40 @@ async function keepPrimaryTrade(leads: RawLead[], codes: string[], deadlineAt: n
     // RES firmu nezná (`null`) nebo nemá převažující činnost → obor nejde doložit.
     // Chybějící záznam v mapě = dávka selhala → nevíme, firma zůstává.
     if (primary === undefined) return true;
-    const ok = primary !== null && primaryMatches(primary, codes);
+    const ok = primary !== null && primaryMatches(primary, codes, Boolean(niche.primaryNace));
     if (!ok) dropped++;
     return ok;
   });
   if (dropped) console.info(`ares: ${dropped} z ${byNace.length} firem vyřazeno — obor není jejich hlavní činnost`);
+  return kept;
+}
+
+/**
+ * Nechá jen firmy s živností oboru (`NicheQuery.licence`) — u oborů, které NACE nerozliší.
+ *
+ * Kadeřnictví, kosmetika, nehty i masáže mají v CZ-NACE 2025 jeden kód; bez tohohle vracelo
+ * hledání kosmetiky kadeřnice. Platí pro větev NACE i název: „Kavárna U Mostu" bez hostinské
+ * činnosti kavárnu neprovozuje. Firma, kterou RŽP nezná (`null`), vypadne — obor nejde doložit.
+ * Když RŽP neodpoví vůbec, nechá se všechno a zaloguje se to.
+ */
+export async function keepLicensed(leads: RawLead[], niche: NicheQuery, deadlineAt: number): Promise<RawLead[]> {
+  if (!niche.licence) return leads;
+  const withIco = leads.filter(l => l.ico);
+  if (!withIco.length) return leads;
+  const rzp = await fetchRzp(withIco.map(l => l.ico!), deadlineAt);
+  if (rzp.size === 0) {
+    console.warn(`ares: RŽP neodpověděl, ${withIco.length} firem bez kontroly živnosti`);
+    return leads;
+  }
+  let dropped = 0;
+  const kept = leads.filter(lead => {
+    if (!lead.ico) return true;
+    const z = rzp.get(lead.ico);
+    if (z === undefined) return true;
+    const ok = activeLicences(z).some(subject => niche.licence!.test(subject));
+    if (!ok) dropped++;
+    return ok;
+  });
+  if (dropped) console.info(`ares: ${dropped} z ${withIco.length} firem vyřazeno — nemají živnost oboru`);
   return kept;
 }
