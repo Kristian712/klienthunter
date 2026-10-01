@@ -1,5 +1,5 @@
 import dns from 'node:dns/promises';
-import { searchDomains, webSearchEnabled } from './sources/web-search';
+import { NOT_A_WEBSITE, searchDomains, webSearchEnabled } from './sources/web-search';
 import { normalizeName, probeWebsite, type ProbeResult, type RobotsCheck } from './website-status';
 
 /**
@@ -143,7 +143,7 @@ const MAX_SLUG = 40;
 export const MAX_DOMAINS_PER_FIRM = 14;
 
 /** Kolik domén jedné firmy smí dojít až ke stažení stránky. DNS je levné, HTTP ne. */
-const MAX_PROBES_PER_FIRM = 5;
+const MAX_PROBES_PER_FIRM = 8;
 
 /**
  * Domains worth asking about, best first.
@@ -204,6 +204,21 @@ export function domainCandidates(
   if (/^u\s/.test(normalizeName(name)) && tokens.length > 0) {
     push(`u${tokens.join('')}`);
     push(`u-${tokens.join('-')}`);
+  }
+  /**
+   * „U" uprostřed: „Hotel u námořníka" má `hotelunamornika.eu`, „Hotel U Zeleného stromu" by
+   * mohl mít `uzelenehostromu.cz`. Dřív se „u" zahodilo a zkoušelo se `hotelnamornika` (ruční
+   * kontrola 1. 10. 2026).
+   */
+  const uMatch = /^(.+?)\s+u\s+(.+)$/.exec(normalizeName(name));
+  if (uMatch) {
+    const pred = nameTokens(uMatch[1]);
+    const po = nameTokens(uMatch[2]);
+    if (pred.length > 0 && po.length > 0) {
+      push(`${pred.join('')}u${po.join('')}`);
+      push([...pred, 'u', ...po].join('-'));
+      push(`u${po.join('')}`);
+    }
   }
   /**
    * Název bez obecných slov: „Dentdelion – zubní ordinace" má web na `dentdelion.cz`, ne na
@@ -663,27 +678,28 @@ export async function discoverWebsite(
   let possible: { url: string } | undefined;
   /** Slova, kterými se firma odlišuje — podle nich se pozná silná hypotéza od střelby naslepo. */
   const jadro = identifyingTokens(firm.name);
-  for (const domain of domains) {
-    checked++;
-    if (!registered.includes(domain)) continue;
-    /**
-     * Strop na počet stažení stránky u jedné firmy.
-     *
-     * DNS dotaz je zadarmo, stažení stránky ne — a od chvíle, kdy se zkoušejí i tvary jako
-     * `kadernictvi-prijmeni.cz`, může jedné firmě odpovědět víc domén, než na kolik má času.
-     * Pět nejpravděpodobnějších stačí: pořadí kandidátů jde od nejlepší hypotézy dolů.
-     */
-    if (probes >= MAX_PROBES_PER_FIRM) break;
+  /**
+   * Strop na počet stažení stránky u jedné firmy, a katalogy pryč.
+   *
+   * DNS dotaz je zadarmo, stažení stránky ne. Pořadí kandidátů jde od nejlepší hypotézy dolů.
+   * `hotel.cz` nebo `restaurace.cz` jsou zaregistrované katalogy, ne web firmy — dřív zabraly
+   * jedno z pěti míst a `hotelunamornika.eu` se na řadu nedostal (1. 10. 2026). Stránky se
+   * stahují souběžně, vyhodnocují v pořadí.
+   */
+  const toProbe = domains
+    .filter(d => registered.includes(d) && !isDirectoryHost(d))
+    .slice(0, MAX_PROBES_PER_FIRM);
+  if (toProbe.length && Date.now() >= opts.deadlineAt) {
+    return { site: null, checked: 0, ranOut: true, noCandidates, searched: false, searchAnswered: false, inconclusive, possible };
+  }
+  // Zkouší se `https://`, `https://www.` i `http://`: profservis.cz servíruje web výhradně
+  // na www a holá doména vrací 403, takže firma s živým webem vycházela jako „web neuveden".
+  const probedGuesses = await Promise.all(toProbe.map(d => opts.probe(`https://${d}`, 'all')));
+  checked = domains.length;
+  for (let gi = 0; gi < toProbe.length; gi++) {
+    const domain = toProbe[gi];
     probes++;
-    // Checked before every probe, not once: four dead hosts at five seconds each would otherwise
-    // eat the budget the rest of the search needs.
-    if (Date.now() >= opts.deadlineAt) {
-      return { site: null, checked: checked - 1, ranOut: true, noCandidates, searched: false, searchAnswered: false, inconclusive, possible };
-    }
-
-    // Zkouší se `https://`, `https://www.` i `http://`: profservis.cz servíruje web výhradně
-    // na www a holá doména vrací 403, takže firma s živým webem vycházela jako „web neuveden".
-    const result = await opts.probe(`https://${domain}`, 'all');
+    const result = probedGuesses[gi];
     // Blocked by robots.txt means a site exists but we may not read it — and without reading it
     // we cannot show it belongs to this firm, so it stays unsaid.
     if (!result.alive || !result.html) {
@@ -768,18 +784,33 @@ export async function discoverWebsite(
     : null;
   if (listek && opts.searchQuota) {
     searched = true;
-    const dotaz = [`"${firm.name}"`, opts.city, opts.tradeWords?.[0]].filter(Boolean).join(' ');
-    const odpoved = await searchDomains(dotaz, 3);
+    /**
+     * Dotaz: obchodní jméno bez právní formy + obec. Bez slova oboru — „penzion" u hotelu dotaz
+     * zúžil špatně — a bez „s.r.o.", které na webu hotelu nikdo nepíše. Domén se bere až osm:
+     * první tři dřív obsadily Booking, Trip.com a Kudy z nudy a vlastní web hotelu (hotelnepomuk.cz
+     * u „Hotel U Zeleného stromu s.r.o.") se na řadu nedostal (ruční kontrola 1. 10. 2026).
+     */
+    const dotaz = [`"${withoutLegalForm(firm.name)}"`, opts.city].filter(Boolean).join(' ');
+    const odpoved = await searchDomains(dotaz, 8);
     // Brave účtuje jen úspěšné dotazy, takže neúspěšný se do stropu nepočítá.
     if (!odpoved.ok) await opts.searchQuota.release(listek);
     searchAnswered = odpoved.ok;
-    for (const host of odpoved.hosts) {
-      if (Date.now() >= opts.deadlineAt) {
-        return { site: null, checked, ranOut: true, noCandidates, searched, searchAnswered: false, inconclusive, possible };
-      }
+    if (Date.now() >= opts.deadlineAt && odpoved.hosts.length) {
+      return { site: null, checked, ranOut: true, noCandidates, searched, searchAnswered: false, inconclusive, possible };
+    }
+    // Souběžně: osm domén po jedné by se do limitu na firmu nevešlo a firma by skončila „nevíme".
+    const probed = await Promise.all(odpoved.hosts.map(host => opts.probe(`https://${host}`, 'all')));
+    for (let i = 0; i < odpoved.hosts.length; i++) {
+      const host = odpoved.hosts[i];
+      const res = probed[i];
       checked++;
-      const res = await opts.probe(`https://${host}`, 'all');
-      if (!res.alive || !res.html) continue;
+      if (!res.alive || !res.html) {
+        // Vyhledávač na dotaz se jménem firmy nabídl doménu s jejím jménem a ta mlčí — mohl to
+        // být její web na chvíli mimo provoz. Pak nejde říct „web nemá".
+        const label = host.split('.')[0].replace(/-/g, '');
+        if (jadro.length > 0 && jadro.some(t => label.includes(t))) inconclusive = true;
+        continue;
+      }
 
       const adresa = res.finalUrl ?? `https://${host}`;
       // Nejdřív přísné pravidlo; značkový web (doména bez názvu firmy) projde až tím pro vyhledávač.
@@ -807,3 +838,19 @@ export async function discoverWebsite(
 export async function probeOnce(url: string, robots?: RobotsCheck): Promise<ProbeResult> {
   return probeWebsite(url, robots);
 }
+
+/** „Hotel U Zeleného stromu s.r.o." → „Hotel U Zeleného stromu". Do dotazu vyhledávače. */
+export function withoutLegalForm(name: string): string {
+  return name
+    .replace(/,?\s*(spol\.\s*s\s*r\.\s*o\.|s\.\s*r\.\s*o\.|a\.\s*s\.|v\.\s*o\.\s*s\.|k\.\s*s\.|z\.\s*s\.|z\.\s*ú\.|o\.\s*p\.\s*s\.|družstvo)\s*$/i, '')
+    .trim();
+}
+
+/** Katalog nebo síť, ne web firmy (seznam sdílí vyhledávač — `NOT_A_WEBSITE`). */
+function isDirectoryHost(domain: string): boolean {
+  const host = domain.toLowerCase().replace(/^www\./, '');
+  return NOT_A_WEBSITE.some(d => host === d || host.endsWith('.' + d)) || GENERIC_DIRECTORY_DOMAINS.has(host);
+}
+
+/** Obecná slova oboru pod .cz jsou katalogy nebo cizí firmy, nikdy web konkrétní firmy. */
+const GENERIC_DIRECTORY_DOMAINS = new Set(['hotel.cz', 'hotely.cz', 'penzion.cz', 'penziony.cz', 'restaurace.cz', 'apartmany.cz', 'ubytovani.cz', 'kadernictvi.cz', 'autoservis.cz', 'wellness.cz']);

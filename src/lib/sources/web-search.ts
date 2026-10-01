@@ -42,6 +42,14 @@ export const NOT_A_WEBSITE = [
   'facebook.com', 'instagram.com', 'linkedin.com', 'youtube.com', 'tiktok.com', 'x.com',
   'twitter.com', 'seznam.cz', 'google.com', 'bing.com', 'yelp.com', 'foursquare.com',
   'kdomestriha.cz', 'salonkee.cz', 'rezervanto.cz', 'nejlepsi-sluzby.cz', 'sluzby.cz',
+  // Ubytovací a cestovní katalogy (1. 10. 2026): u hotelu obsadí všechna první místa výsledku.
+  'booking.com', 'airbnb.com', 'airbnb.cz', 'trip.com', 'expedia.com', 'expedia.cz', 'hotels.com',
+  'trivago.cz', 'trivago.com', 'tripadvisor.com', 'tripadvisor.cz', 'kudyznudy.cz', 'hotel.cz',
+  'hportal.cz', 'ubyter.cz', 'e-chalupy.cz', 'megaubytovani.cz', 'czechhotels.info', 'hotelmix.co.uk',
+  'guestreservations.com', 'meetselect.com', 'planetofhotels.com', 'hrs.com', 'travelweekly.com',
+  'booked.cz', 'booked.net', 'reserving.com', 'cleartrip.com', 'hotel.info', 'agoda.com',
+  'kayak.com', 'ubytovanivcr.cz', 'ubytujsenaplno.cz', 'turistika.cz', 'near-place.com',
+  'restu.cz', 'menicka.cz', 'zomato.com', 'hladjakprase.cz', 'ceske-hospudky.cz',
 ];
 
 /**
@@ -132,7 +140,8 @@ async function searchLinkup(query: string, limit: number, key: string): Promise<
   try {
     await throttle();
     const res = await axios.post(LINKUP_ENDPOINT, {
-      q: query,
+      // Linkup hledá přirozeným jazykem — uvozovky z dotazu pro Brave by mu jen překážely.
+      q: query.replace(/"/g, ''),
       depth: 'standard',
       outputType: 'searchResults',
       maxResults: 10,
