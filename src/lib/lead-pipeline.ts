@@ -417,6 +417,12 @@ export async function verifyWebsite(
       searched,
     };
   }
+  if (found.unknownToEngine) {
+    return {
+      verdict: { status: 'UNKNOWN', evidence: 'vyhledávač o firmě nic nenašel (ani katalogy, ani rejstříky) — z toho nejde říct, že web nemá' },
+      searched,
+    };
+  }
   if (signals.claimedUrl) return { verdict, searched };
   if (found.ranOut) {
     return { verdict: { status: 'UNKNOWN', evidence: 'nestihli jsme web ověřit — hledání došel čas' }, searched };

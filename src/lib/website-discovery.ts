@@ -210,6 +210,7 @@ export function domainCandidates(
    * mohl mít `uzelenehostromu.cz`. Dřív se „u" zahodilo a zkoušelo se `hotelnamornika` (ruční
    * kontrola 1. 10. 2026).
    */
+  let uSlug: string | undefined;
   const uMatch = /^(.+?)\s+u\s+(.+)$/.exec(normalizeName(name));
   if (uMatch) {
     const pred = nameTokens(uMatch[1]);
@@ -218,6 +219,7 @@ export function domainCandidates(
       push(`${pred.join('')}u${po.join('')}`);
       push([...pred, 'u', ...po].join('-'));
       push(`u${po.join('')}`);
+      uSlug = `${pred.join('')}u${po.join('')}`;
     }
   }
   /**
@@ -290,6 +292,8 @@ export function domainCandidates(
   if (tld === 'cz' && cely.length >= 8 && slugs.includes(cely)) {
     domains.push(`${cely}.com`, `${cely}.eu`);
   }
+  // „Hotel u námořníka" → hotelunamornika.eu (1. 10. 2026).
+  if (tld === 'cz' && uSlug && uSlug.length >= 8) domains.push(`${uSlug}.eu`, `${uSlug}.com`);
   return domains;
 }
 
@@ -444,6 +448,14 @@ function factsOnPage(text: string, firm: FirmFacts): { strong?: string; city?: b
   if (street && number && text.includes(street) && cislice.includes(digitsOf(number))) {
     return { strong: 'na stránce je adresa firmy z registru', city: cityOnPage };
   }
+  /**
+   * Weby píšou spíš orientační číslo („Přemyslova 54") než celé popisné/orientační („286/54").
+   * Ulice s orientačním číslem hned za ní, a k tomu obec — to je adresa té firmy.
+   */
+  const orientacni = number?.includes('/') ? number.split('/').pop() : undefined;
+  if (street && orientacni && cityOnPage && new RegExp(`${escapeRe(street)}\\s*(?:\\d+\\s*/\\s*)?${escapeRe(orientacni)}\\b`).test(text)) {
+    return { strong: 'na stránce je adresa firmy z registru', city: cityOnPage };
+  }
 
   return { city: cityOnPage };
 }
@@ -536,22 +548,39 @@ export function searchPageEvidence(
   firm: FirmFacts,
   city: string | undefined,
   tradeWords: readonly string[],
+  url?: string,
 ): string | null {
   const text = pageText(html);
   if (PARKED.test(text)) return null;
 
-  const facts = factsOnPage(text, firm);
-  if (facts.strong) return facts.strong;
-
   const identifying = identifyingTokens(firm.name);
+  const facts = factsOnPage(text, firm);
+  if (facts.strong) {
+    /**
+     * Tvrdý fakt (adresa, telefon) mají i stránky, které firmu jen uvádějí — web města, katalog,
+     * hotel na téže adrese. Web firmy to je, jen když ji stránka jmenuje v titulku nebo v doméně
+     * (web města Nepomuk u Hotelu U Zeleného stromu, 1. 10. 2026). Jinak ji volající vede jako
+     * „pravděpodobně má web".
+     */
+    const titulekF = pageTitle(html);
+    const label = url ? domainLabel(url) : '';
+    const named = identifying.length > 0 && identifying.every(t => hasWord(text, t))
+      && (identifying.some(t => titulekF.includes(t)) || identifying.some(t => label.includes(t)));
+    return named ? facts.strong : null;
+  }
+
   const obec = city ? normalizeName(city).replace(/\s*\d+$/, '').trim() : '';
+  // Jméno musí být i v titulku: katalog nebo web jiného hotelu, který firmu jen uvádí v nabídce,
+  // má jméno, obec i obor na stránce taky (Enjoy Inn na hotelmelnik.cz, 1. 10. 2026).
+  const titulek = pageTitle(html);
   if (
     identifying.length > 0 &&
     identifying.every(t => hasWord(text, t)) &&
+    identifying.some(t => titulek.includes(t)) &&
     obec.length >= 2 && hasWord(text, obec) &&
     tradeWords.some(w => text.includes(w))
   ) {
-    return 'na stránce je celý název firmy, její obec i obor';
+    return 'na stránce je celý název firmy (i v titulku), její obec i obor';
   }
   return null;
 }
@@ -629,6 +658,8 @@ export interface DiscoveryOutcome {
    * a firma proto nesmí skončit v seznamu „bez webu". Verdikt zůstane „nevíme", s odkazem.
    */
   possible?: { url: string };
+  /** Vyhledávač odpověděl, ale o firmě nevěděl nic — „web nemá" z toho nevyplývá. */
+  unknownToEngine?: boolean;
 }
 
 export async function discoverWebsite(
@@ -779,6 +810,7 @@ export async function discoverWebsite(
    */
   let searched = false;
   let searchAnswered = false;
+  let unknownToEngine = false;
   const listek = opts.searchQuota && webSearchEnabled() && Date.now() < opts.deadlineAt
     ? await opts.searchQuota.reserve()
     : null;
@@ -795,6 +827,14 @@ export async function discoverWebsite(
     // Brave účtuje jen úspěšné dotazy, takže neúspěšný se do stropu nepočítá.
     if (!odpoved.ok) await opts.searchQuota.release(listek);
     searchAnswered = odpoved.ok;
+    /**
+     * „Web nemá" jen u firmy, kterou vyhledávač zná — našel o ní katalog, rejstřík, mapu. Když
+     * o ní neví nic, jeho ticho nic nedokazuje (Lombard Hotel Pilsen: výsledky jen o hotelu
+     * na téže adrese pod jinou značkou, 1. 10. 2026).
+     */
+    if (searchAnswered && !odpoved.texts.some(t => jadro.length > 0 && jadro.every(tok => hasWord(normalizeName(t), tok)))) {
+      unknownToEngine = true;
+    }
     if (Date.now() >= opts.deadlineAt && odpoved.hosts.length) {
       return { site: null, checked, ranOut: true, noCandidates, searched, searchAnswered: false, inconclusive, possible };
     }
@@ -817,8 +857,10 @@ export async function discoverWebsite(
       if (isTenantPage(host, jadro)) continue;
       // Nejdřív přísné pravidlo; značkový web (doména bez názvu firmy) projde až tím pro vyhledávač.
       const proc = pageEvidence(res.html, firm, adresa, index, opts.tradeWords ?? [])
-        ?? searchPageEvidence(res.html, firm, opts.city, opts.tradeWords ?? []);
-      if (!proc && !possible && pageNamesFirm(res.html, firm, adresa)) possible = { url: adresa };
+        ?? searchPageEvidence(res.html, firm, opts.city, opts.tradeWords ?? [], adresa);
+      if (!proc && !possible && (pageNamesFirm(res.html, firm, adresa) || factsOnPage(pageText(res.html), firm).strong)) {
+        possible = { url: adresa };
+      }
       if (proc) {
         return {
           site: { url: adresa, html: res.html, evidence: `web z vyhledávače, ${proc}` },
@@ -861,20 +903,25 @@ export async function discoverWebsite(
           const res = probed2[i];
           checked++;
           if (!res.alive || !res.html) continue;
-          const fakt = factsOnPage(pageText(res.html), firm).strong;
-          if (fakt) {
-            const adresa = res.finalUrl ?? `https://${hosts2[i]}`;
+          const text2 = pageText(res.html);
+          const fakt = factsOnPage(text2, firm).strong;
+          if (!fakt) continue;
+          const adresa = res.finalUrl ?? `https://${hosts2[i]}`;
+          // Adresa i jméno firmy → její web. Jen adresa (web města, hotel pod jinou značkou na téže
+          // adrese) → „pravděpodobně má web", nikdy „nemá" ani ověřený web s cizí adresou.
+          if (jadro.length > 0 && jadro.every(t => hasWord(text2, t))) {
             return {
-              site: { url: adresa, html: res.html, evidence: `web z vyhledávače podle adresy, ${fakt}` },
+              site: { url: adresa, html: res.html, evidence: `web z vyhledávače podle adresy, ${fakt} i název` },
               checked, ranOut: false, noCandidates, searched, searchAnswered, inconclusive,
             };
           }
+          if (!possible) possible = { url: adresa };
         }
       }
     }
   }
 
-  return { site: null, checked, ranOut: false, noCandidates, searched, searchAnswered, inconclusive, possible };
+  return { site: null, checked, ranOut: false, noCandidates, searched, searchAnswered: searchAnswered && !unknownToEngine, inconclusive, possible, unknownToEngine };
 }
 
 /** Stavebnice webů: firma tu má skutečný vlastní web na subdoméně (`penzion-x.webnode.cz`). */
@@ -914,3 +961,13 @@ function isDirectoryHost(domain: string): boolean {
 
 /** Obecná slova oboru pod .cz jsou katalogy nebo cizí firmy, nikdy web konkrétní firmy. */
 const GENERIC_DIRECTORY_DOMAINS = new Set(['hotel.cz', 'hotely.cz', 'penzion.cz', 'penziony.cz', 'restaurace.cz', 'apartmany.cz', 'ubytovani.cz', 'kadernictvi.cz', 'autoservis.cz', 'wellness.cz']);
+
+function escapeRe(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** Titulek stránky (bez diakritiky, malými) — pro měkký důkaz u výsledků vyhledávače. */
+function pageTitle(html: string): string {
+  const m = /<title[^>]*>([^<]*)<\/title>/i.exec(html);
+  return m ? normalizeName(m[1]) : '';
+}

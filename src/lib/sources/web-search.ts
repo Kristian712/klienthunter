@@ -106,6 +106,11 @@ export interface SearchAnswer {
    */
   ok: boolean;
   hosts: string[];
+  /**
+   * Titulek a úryvek každého výsledku (i katalogů, které se do `hosts` nedostaly). Podle nich
+   * se pozná, že vyhledávač firmu vůbec zná — jen pak smí jeho ticho znamenat „web nemá".
+   */
+  texts: string[];
 }
 
 /**
@@ -116,7 +121,7 @@ export interface SearchAnswer {
 export async function searchDomains(query: string, limit = 3): Promise<SearchAnswer> {
   if (process.env.LINKUP_API_KEY) return searchLinkup(query, limit, process.env.LINKUP_API_KEY);
   const key = process.env.BRAVE_SEARCH_API_KEY;
-  if (!key) return { ok: false, hosts: [] };
+  if (!key) return { ok: false, hosts: [], texts: [] };
 
   try {
     await throttle();
@@ -127,18 +132,18 @@ export async function searchDomains(query: string, limit = 3): Promise<SearchAns
       signal: AbortSignal.timeout(TIMEOUT_MS),
       validateStatus: () => true,
     });
-    if (res.status !== 200) return { ok: false, hosts: [] };
+    if (res.status !== 200) return { ok: false, hosts: [], texts: [] };
 
-    const results: Array<{ url?: string }> = res.data?.web?.results ?? [];
+    const results: Array<{ url?: string; title?: string; description?: string }> = res.data?.web?.results ?? [];
     const hosts: string[] = [];
     for (const r of results) {
       const host = r.url ? usableHost(r.url) : null;
       if (host && !hosts.includes(host)) hosts.push(host);
       if (hosts.length >= limit) break;
     }
-    return { ok: true, hosts };
+    return { ok: true, hosts, texts: results.map(r => `${r.title ?? ''} ${r.description ?? ''}`) };
   } catch {
-    return { ok: false, hosts: [] };
+    return { ok: false, hosts: [], texts: [] };
   }
 }
 
@@ -162,18 +167,18 @@ async function searchLinkup(query: string, limit: number, key: string): Promise<
     });
     if (res.status !== 200) {
       console.warn('web-search (linkup):', res.status);
-      return { ok: false, hosts: [] };
+      return { ok: false, hosts: [], texts: [] };
     }
-    const results: Array<{ url?: string }> = res.data?.results ?? [];
+    const results: Array<{ url?: string; name?: string; content?: string }> = res.data?.results ?? [];
     const hosts: string[] = [];
     for (const r of results) {
       const host = r.url ? usableHost(r.url) : null;
       if (host && !hosts.includes(host)) hosts.push(host);
       if (hosts.length >= limit) break;
     }
-    return { ok: true, hosts };
+    return { ok: true, hosts, texts: results.map(r => `${r.name ?? ''} ${(r.content ?? '').slice(0, 600)}`) };
   } catch (err) {
     console.warn('web-search (linkup):', err instanceof Error ? err.message : err);
-    return { ok: false, hosts: [] };
+    return { ok: false, hosts: [], texts: [] };
   }
 }
