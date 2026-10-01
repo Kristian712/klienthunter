@@ -50,6 +50,11 @@ export const NOT_A_WEBSITE = [
   'booked.cz', 'booked.net', 'reserving.com', 'cleartrip.com', 'hotel.info', 'agoda.com',
   'kayak.com', 'ubytovanivcr.cz', 'ubytujsenaplno.cz', 'turistika.cz', 'near-place.com',
   'restu.cz', 'menicka.cz', 'zomato.com', 'hladjakprase.cz', 'ceske-hospudky.cz',
+  'pilsenhotelspage.com', 'hotelsplzen.com', 'hotelyplzen.net', 'o-hotel.cz', 'ubytovani-plzen.info',
+  'firmyvdosahu.cz', 'firmyvkraji.cz', 'detail.cz', 'expanzo.com', 'portalridice.cz', 'ceskehory.cz',
+  'eubytko.cz', 'svetubytovani.cz', 'krusnohorci.cz', 'zenhotels.com', 'airpaz.com', 'novostavby.com',
+  'momondo.com', 'hotelscombined.com', 'hotelplanner.com', 'yelp.com', 'hotel-u.cz', 'ubytovani.cz',
+  'rejstrik-firem.kurzy.cz', 'or.justice.cz', 'imsp.cz', 'kontaktyfirem.cz', 'abc-firmy.cz',
 ];
 
 /**

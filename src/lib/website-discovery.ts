@@ -813,6 +813,8 @@ export async function discoverWebsite(
       }
 
       const adresa = res.finalUrl ?? `https://${host}`;
+      // `u-nmonka.pilsenhotelspage.com`: subdoména katalogu, ne web firmy (1. 10. 2026).
+      if (isTenantPage(host, jadro)) continue;
       // Nejdřív přísné pravidlo; značkový web (doména bez názvu firmy) projde až tím pro vyhledávač.
       const proc = pageEvidence(res.html, firm, adresa, index, opts.tradeWords ?? [])
         ?? searchPageEvidence(res.html, firm, opts.city, opts.tradeWords ?? []);
@@ -831,7 +833,65 @@ export async function discoverWebsite(
     }
   }
 
+  /**
+   * Druhý dotaz: adresa z registru.
+   *
+   * Provozovatel se často jmenuje jinak než podnik: „Hotel Jezírko s.r.o." provozuje Hotel
+   * Panorama (panorama-pm.cz), „Lombard Hotel Pilsen s.r.o." hotel Vienna House na téže adrese
+   * (ruční kontrola 1. 10. 2026). Podle jména se jejich web nenajde, podle adresy ano — a protože
+   * jméno tu nesedí, projde jen stránka s tvrdým faktem: IČO, telefon nebo adresa z registru.
+   * Když tenhle dotaz neodpoví, „web nemá" se neříká (searchAnswered = false).
+   */
+  const ulice = firm.address?.split(',')[0]?.trim();
+  const { street, number, city: obecAdresy } = addressParts(firm.address);
+  if (searchAnswered && street && number && ulice && opts.searchQuota && Date.now() < opts.deadlineAt) {
+    const listek2 = await opts.searchQuota.reserve();
+    if (!listek2) {
+      // Strop došel uprostřed — bez druhého dotazu jistota není.
+      searchAnswered = false;
+    } else {
+      const odpoved2 = await searchDomains(`"${ulice}" ${obecAdresy ?? opts.city ?? ''}`.trim(), 8);
+      if (!odpoved2.ok) {
+        await opts.searchQuota.release(listek2);
+        searchAnswered = false;
+      } else {
+        const hosts2 = odpoved2.hosts.filter(h => !isTenantPage(h, jadro));
+        const probed2 = await Promise.all(hosts2.map(h => opts.probe(`https://${h}`, 'all')));
+        for (let i = 0; i < hosts2.length; i++) {
+          const res = probed2[i];
+          checked++;
+          if (!res.alive || !res.html) continue;
+          const fakt = factsOnPage(pageText(res.html), firm).strong;
+          if (fakt) {
+            const adresa = res.finalUrl ?? `https://${hosts2[i]}`;
+            return {
+              site: { url: adresa, html: res.html, evidence: `web z vyhledávače podle adresy, ${fakt}` },
+              checked, ranOut: false, noCandidates, searched, searchAnswered, inconclusive,
+            };
+          }
+        }
+      }
+    }
+  }
+
   return { site: null, checked, ranOut: false, noCandidates, searched, searchAnswered, inconclusive, possible };
+}
+
+/** Stavebnice webů: firma tu má skutečný vlastní web na subdoméně (`penzion-x.webnode.cz`). */
+const SITE_BUILDERS = ['webnode.cz', 'webnode.com', 'webnode.page', 'wixsite.com', 'estranky.cz', 'mypage.cz',
+  'websnadno.cz', 'blogspot.com', 'wordpress.com', 'weebly.com', 'jimdosite.com', 'eshop-rychle.cz', 'webgarden.cz', 'rajce.idnes.cz'];
+
+/**
+ * Stránka na cizí subdoméně — katalog, který každé firmě dá `jmeno.katalog.com`. Web firmy to
+ * není, i když na něm je její jméno, obec, obor a klidně i adresa. Výjimka: stavebnice webů.
+ */
+function isTenantPage(host: string, identifying: string[]): boolean {
+  const h = host.toLowerCase().replace(/^www\./, '');
+  if (SITE_BUILDERS.some(b => h === b || h.endsWith('.' + b))) return false;
+  const labels = h.split('.');
+  if (labels.length < 3) return false;
+  const base = labels[labels.length - 2];
+  return !identifying.some(t => base.includes(t));
 }
 
 /** Exported for the pipeline, which needs a probe that is not memoised per host. */
