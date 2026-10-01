@@ -6,7 +6,7 @@ import { useTranslations, useLocale } from 'next-intl';
 import {
   Search, Globe, Users, ExternalLink, Check, Bookmark, RefreshCw, Sparkles,
   Mail, MapPin, X, Clock, ChevronDown,
-  FileText, Table2, PhoneCall, ShieldCheck, Share2, Phone, Megaphone, BedDouble, MessageSquareText, Copy,
+  FileText, Table2, PhoneCall, ShieldCheck, Share2, Phone, Megaphone, BedDouble,
 } from 'lucide-react';
 import { googleAdsTransparencyUrl } from '@/lib/ads-links';
 import { CRM_FORMATS } from '@/lib/crm-export';
@@ -16,7 +16,7 @@ import { PLAN_LIMITS } from '@/lib/plans';
 import { LEAD_FILTERS, GROUP_LABELS, GROUP_ORDER, addFilter, effectiveWindowDays, employeeLabel, hasReachChannel, matchesAll, localized, normalizeFilters, type FilterGroup } from '@/lib/lead-filters';
 import { leadReason } from '@/lib/lead-reason';
 import { opportunityScore, reachHint, reachScore, substanceFacts } from '@/lib/reach-score';
-import { STAY_INDUSTRIES, googleSearchHref, mapyCzHref, outreachMessage, stayKind, stayKindLabel, stayRankBonus } from '@/lib/stay';
+import { STAY_INDUSTRIES, googleSearchHref, mapyCzHref, stayKind, stayKindLabel, stayRankBonus } from '@/lib/stay';
 import { scoreBreakdown } from '@/lib/lead-score';
 import { websiteAudit } from '@/lib/website-audit';
 import { YIELD_NOTE, yieldFor } from '@/lib/nace-map';
@@ -296,17 +296,6 @@ const CONTACT = {
   mapyczTip: { cs: 'Firma na Mapy.cz podle názvu a obce — recenze a fotky si prohlédnete sami. Nic se neukládá.',
                sk: 'Firma na Mapy.cz podľa názvu a obce — recenzie a fotky si prezriete sami. Nič sa neukladá.',
                en: 'The firm on Mapy.cz by name and town — see reviews and photos yourself. Nothing is stored.' },
-  outreach:  { cs: 'Vygenerovat oslovení', sk: 'Vygenerovať oslovenie', en: 'Draft a message' },
-  outreachHead: { cs: 'Návrh zprávy — upravte, než ji pošlete', sk: 'Návrh správy — upravte, než ju pošlete', en: 'Draft — edit it before you send it' },
-  outreachNote: { cs: 'Nic se neodesílá. Zkopírujte text, nebo ho otevřete jako koncept ve svém e-mailu. U nevyžádané nabídky platí § 7 zák. 480/2004 Sb.',
-                  sk: 'Nič sa neodosiela. Skopírujte text, alebo ho otvorte ako koncept vo svojom e-maile. Pri nevyžiadanej ponuke platí § 7 zák. 480/2004 Zb.',
-                  en: 'Nothing is sent. Copy the text or open it as a draft in your own e-mail. Unsolicited offers fall under § 7 of Act 480/2004.' },
-  copy:      { cs: 'Kopírovat', sk: 'Kopírovať', en: 'Copy' },
-  copied:    { cs: 'Zkopírováno', sk: 'Skopírované', en: 'Copied' },
-  mailDraft: { cs: 'Otevřít v e-mailu', sk: 'Otvoriť v e-maile', en: 'Open in e-mail' },
-  mailDraftTip: { cs: 'Otevře koncept ve vašem poštovním programu. Odeslat musíte sami.', sk: 'Otvorí koncept vo vašom poštovom programe. Odoslať musíte sami.', en: 'Opens a draft in your mail app. You send it yourself.' },
-  reset:     { cs: 'Vrátit návrh', sk: 'Vrátiť návrh', en: 'Reset' },
-  close:     { cs: 'Zavřít', sk: 'Zavrieť', en: 'Close' },
   maps:    { cs: 'Mapy', sk: 'Mapy', en: 'Maps' },
   mapsTip: { cs: 'Otevře firmu v Google Mapách. Telefon, který nemáme, tam firmy obvykle uvádějí — appka odtud nic nestahuje, jen vás tam pošle.',
              sk: 'Otvorí firmu v Google Mapách. Telefón, ktorý nemáme, tam firmy zvyčajne uvádzajú — appka odtiaľ nič nesťahuje, len vás tam pošle.',
@@ -546,62 +535,6 @@ function ContactStrategy({ b, locale }: { b: BusinessResult; locale: string }) {
           </a>
         ))}
       </div>
-      {stay && <OutreachDraft b={b} locale={locale} />}
-    </div>
-  );
-}
-
-/**
- * „Vygenerovat oslovení" — návrh zprávy podle šablony majitele (lib/stay.ts), jen k úpravě.
- *
- * Nic se neodesílá. Text jde zkopírovat, nebo otevřít jako koncept ve vlastním e-mailu
- * (`mailto:` — odeslat musí člověk). Firma s vlastním webem návrh nedostane: šablona mluví
- * o chybějícím webu a u ní by lhala.
- */
-function OutreachDraft({ b, locale }: { b: BusinessResult; locale: string }) {
-  const L = (x: { cs: string; sk?: string; en: string }) => localized(x, locale);
-  const [text, setText] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-  const draft = outreachMessage(b);
-  if (!draft) return null;
-
-  if (text === null) {
-    return (
-      <button type="button" onClick={() => setText(draft)}
-        className="kh-contact mt-2 inline-flex items-center gap-2 rounded-lg border border-field px-3 py-2 text-sm min-h-[40px] font-medium text-ink hover:border-ink hover:bg-ink/[0.06]">
-        <MessageSquareText size={12} />{L(CONTACT.outreach)}
-      </button>
-    );
-  }
-
-  const copy = () => {
-    navigator.clipboard.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); })
-      .catch(err => console.error('outreach/copy:', err));
-  };
-  const mailto = b.email
-    ? `mailto:${b.email}?subject=${encodeURIComponent('Přímé rezervace přes vlastní web')}&body=${encodeURIComponent(text)}`
-    : null;
-
-  return (
-    <div className="mt-3 rounded-lg border border-field p-3">
-      <label className="text-xs font-semibold uppercase tracking-wider text-ink-faint" htmlFor={`kh-outreach-${b.id}`}>
-        {L(CONTACT.outreachHead)}
-      </label>
-      <textarea id={`kh-outreach-${b.id}`} value={text} onChange={e => setText(e.target.value)} rows={9}
-        className="input mt-2 w-full text-sm leading-relaxed font-sans" />
-      <div className="mt-2 flex flex-wrap items-center gap-2">
-        <button type="button" onClick={copy} className="btn-outline btn-sm inline-flex items-center gap-1.5">
-          <Copy size={12} />{copied ? L(CONTACT.copied) : L(CONTACT.copy)}
-        </button>
-        {mailto && (
-          <a href={mailto} className="btn-outline btn-sm inline-flex items-center gap-1.5" title={L(CONTACT.mailDraftTip)}>
-            <Mail size={12} />{L(CONTACT.mailDraft)}
-          </a>
-        )}
-        <button type="button" onClick={() => setText(draft)} className="btn-ghost btn-sm">{L(CONTACT.reset)}</button>
-        <button type="button" onClick={() => setText(null)} className="btn-ghost btn-sm">{L(CONTACT.close)}</button>
-      </div>
-      <p className="mt-2 text-[11px] text-ink-faint">{L(CONTACT.outreachNote)}</p>
     </div>
   );
 }

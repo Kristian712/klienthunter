@@ -53,8 +53,17 @@ export const NOT_A_WEBSITE = [
  * nastavují samy, jen pro svůj běh.
  */
 export function webSearchEnabled(): boolean {
-  return Boolean(process.env.BRAVE_SEARCH_API_KEY) && process.env.WEB_SEARCH_ENABLED === '1';
+  return Boolean(process.env.LINKUP_API_KEY || process.env.BRAVE_SEARCH_API_KEY) && process.env.WEB_SEARCH_ENABLED === '1';
 }
+
+/**
+ * Linkup (Paříž) — bezplatná cesta. Majitel 1. 10. 2026: „chci to celé zadarmo", Brave chce kartu.
+ * Linkup každý měsíc dobije účet na 20 $ (standardní vyhledávání 0,005 $ → ~4 000 dotazů), bez
+ * předplatného (docs.linkup.so/pages/documentation/platform/pricing, ověřeno 1. 10. 2026).
+ * Google Custom Search je pro nové zákazníky zavřený, Bing API zrušené (srpen 2025), Tavily
+ * podmínkami zakazuje zpřístupnit výstupy třetím stranám. Má-li nasazení oba klíče, vede Linkup.
+ */
+export const LINKUP_ENDPOINT = 'https://api.linkup.so/v1/search';
 
 let posledni = 0;
 
@@ -90,6 +99,7 @@ export interface SearchAnswer {
  * pokračuje bez něj.
  */
 export async function searchDomains(query: string, limit = 3): Promise<SearchAnswer> {
+  if (process.env.LINKUP_API_KEY) return searchLinkup(query, limit, process.env.LINKUP_API_KEY);
   const key = process.env.BRAVE_SEARCH_API_KEY;
   if (!key) return { ok: false, hosts: [] };
 
@@ -113,6 +123,40 @@ export async function searchDomains(query: string, limit = 3): Promise<SearchAns
     }
     return { ok: true, hosts };
   } catch {
+    return { ok: false, hosts: [] };
+  }
+}
+
+/** Totéž přes Linkup. Adresáře a sítě se vyřadí už v dotazu, ať nežerou místa ve výsledku. */
+async function searchLinkup(query: string, limit: number, key: string): Promise<SearchAnswer> {
+  try {
+    await throttle();
+    const res = await axios.post(LINKUP_ENDPOINT, {
+      q: query,
+      depth: 'standard',
+      outputType: 'searchResults',
+      maxResults: 10,
+      excludeDomains: NOT_A_WEBSITE.slice(0, 100),
+    }, {
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: `Bearer ${key}` },
+      timeout: TIMEOUT_MS * 2,
+      signal: AbortSignal.timeout(TIMEOUT_MS * 2),
+      validateStatus: () => true,
+    });
+    if (res.status !== 200) {
+      console.warn('web-search (linkup):', res.status);
+      return { ok: false, hosts: [] };
+    }
+    const results: Array<{ url?: string }> = res.data?.results ?? [];
+    const hosts: string[] = [];
+    for (const r of results) {
+      const host = r.url ? usableHost(r.url) : null;
+      if (host && !hosts.includes(host)) hosts.push(host);
+      if (hosts.length >= limit) break;
+    }
+    return { ok: true, hosts };
+  } catch (err) {
+    console.warn('web-search (linkup):', err instanceof Error ? err.message : err);
     return { ok: false, hosts: [] };
   }
 }
