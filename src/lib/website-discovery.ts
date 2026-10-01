@@ -839,7 +839,9 @@ export async function discoverWebsite(
       return { site: null, checked, ranOut: true, noCandidates, searched, searchAnswered: false, inconclusive, possible };
     }
     // Souběžně: osm domén po jedné by se do limitu na firmu nevešlo a firma by skončila „nevíme".
-    const probed = await Promise.all(odpoved.hosts.map(host => opts.probe(`https://${host}`, 'all')));
+    // first-only: vyhledávač vrátil přesnou adresu; tři podoby (https, www, http) po 6 s by jen
+    // pálily čas a firma by skončila jako neověřená.
+    const probed = await Promise.all(odpoved.hosts.map(host => opts.probe(`https://${host}`, 'first-only')));
     for (let i = 0; i < odpoved.hosts.length; i++) {
       const host = odpoved.hosts[i];
       const res = probed[i];
@@ -898,7 +900,7 @@ export async function discoverWebsite(
         searchAnswered = false;
       } else {
         const hosts2 = odpoved2.hosts.filter(h => !isTenantPage(h, jadro));
-        const probed2 = await Promise.all(hosts2.map(h => opts.probe(`https://${h}`, 'all')));
+        const probed2 = await Promise.all(hosts2.map(h => opts.probe(`https://${h}`, 'first-only')));
         for (let i = 0; i < hosts2.length; i++) {
           const res = probed2[i];
           checked++;

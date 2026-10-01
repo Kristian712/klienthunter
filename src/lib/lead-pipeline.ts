@@ -74,8 +74,9 @@ const DISCOVERY_HEADROOM_MS = 6_000;
  * adresy (`www.`, `http://`) se v reálném hledání nikdy nestihly, i když je kód uměl.
  * Tři varianty po 6 s se vejdou sem.
  */
-// 30 s: domény z názvu + dva dotazy do vyhledávače (jméno, adresa) se do 20 s nevešly.
-const PER_CANDIDATE_MS = 30_000;
+// 60 s: domény z názvu, dva dotazy do vyhledávače (jméno, adresa) a stažení jejich výsledků se do
+// 20 ani 30 s nevešly a firmy končily jako neověřené (1. 10. 2026).
+const PER_CANDIDATE_MS = 60_000;
 
 /**
  * Vrátí, co stihne práce, jinak náhradní výsledek. Nikdy nevyhodí výjimku.
