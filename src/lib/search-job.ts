@@ -280,6 +280,9 @@ export async function runSearchJob(jobId: string): Promise<void> {
         industry: job.industry,
         batchSize: BATCH,
         searchQuota,
+        // Hledání s podmínkou „mám jak oslovit" (všechny sekce bez webu) se ptá vyhledávače jen
+        // na firmy s kontaktem — ostatní by v nich stejně nebyly.
+        searchOnly: filterIds.includes('can_reach') ? hasSourceContact : undefined,
         onBatch: async batch => {
           const rows = await persistResults(job.searchId, batch, user?.targetFilters);
           processed += batch.length;

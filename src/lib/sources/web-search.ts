@@ -28,7 +28,9 @@ export const BRAVE_ENDPOINT = 'https://api.search.brave.com/res/v1/web/search';
  * 50 dotazů/s (ověřeno 11. 9. 2026). Hodnota se upraví podle měření, až bude jasné, kolik dotazů
  * jedno hledání spotřebuje.
  */
-const MIN_GAP_MS = Number(process.env.WEB_SEARCH_GAP_MS ?? 1_100);
+// Linkup frontu po 1,1 s nepotřebuje: sto dotazů jednoho hledání tak čekalo přes dvě minuty
+// a firmy končily „nestihli jsme ověřit" (1. 10. 2026). Brave zůstává na původním rozestupu.
+const MIN_GAP_MS = Number(process.env.WEB_SEARCH_GAP_MS ?? (process.env.LINKUP_API_KEY ? 150 : 1_100));
 const TIMEOUT_MS = 6_000;
 
 /**
@@ -147,7 +149,8 @@ async function searchLinkup(query: string, limit: number, key: string): Promise<
     const res = await axios.post(LINKUP_ENDPOINT, {
       // Linkup hledá přirozeným jazykem — uvozovky z dotazu pro Brave by mu jen překážely.
       q: query.replace(/"/g, ''),
-      depth: 'standard',
+      // `fast` stojí stejně jako `standard` (0,005 $) a odpoví rychleji — na otázku má/nemá web stačí.
+      depth: 'fast',
       outputType: 'searchResults',
       maxResults: 10,
       excludeDomains: NOT_A_WEBSITE.slice(0, 100),

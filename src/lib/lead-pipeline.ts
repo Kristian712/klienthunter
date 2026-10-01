@@ -74,7 +74,8 @@ const DISCOVERY_HEADROOM_MS = 6_000;
  * adresy (`www.`, `http://`) se v reálném hledání nikdy nestihly, i když je kód uměl.
  * Tři varianty po 6 s se vejdou sem.
  */
-const PER_CANDIDATE_MS = 20_000;
+// 30 s: domény z názvu + dva dotazy do vyhledávače (jméno, adresa) se do 20 s nevešly.
+const PER_CANDIDATE_MS = 30_000;
 
 /**
  * Vrátí, co stihne práce, jinak náhradní výsledek. Nikdy nevyhodí výjimku.
@@ -459,7 +460,7 @@ export interface VerifiedCandidate {
  */
 export async function enrichAndVerify(
   candidates: Candidate[],
-  { probeNetwork, deadlineAt, region = '', industry = '', onBatch, batchSize = 25, searchQuota }:
+  { probeNetwork, deadlineAt, region = '', industry = '', onBatch, batchSize = 25, searchQuota, searchOnly }:
     {
       probeNetwork: boolean;
       deadlineAt: number;
@@ -482,6 +483,11 @@ export async function enrichAndVerify(
        * hledání přihlášeného uživatele; ukázka a import CSV bez ní vyhledávač nepoužijí.
        */
       searchQuota?: SearchQuota;
+      /**
+       * Na které firmy se smí ptát vyhledávače. Sekce „bez webu" ukazují jen firmy s kontaktem,
+       * takže dotazy na ostatní by jen žraly čas a strop — a jejich verdikt by nikdo neviděl.
+       */
+      searchOnly?: (c: Candidate) => boolean;
     },
 ): Promise<VerifiedCandidate[]> {
   const robots = createRobotsCache();
@@ -529,7 +535,7 @@ export async function enrichAndVerify(
       probe,
       deadlineAt: discoveryDeadline,
       probeNetwork,
-      searchQuota,
+      searchQuota: !searchOnly || searchOnly(c) ? searchQuota : undefined,
     });
     return verdict;
   };
