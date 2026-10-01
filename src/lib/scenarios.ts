@@ -72,11 +72,14 @@ export const SCENARIOS: Scenario[] = [
      * to řekne (`/api/features` → `webSearch`).
      */
     hint: {
-      cs: 'Jen firmy, u kterých jsme ověřili, že web nemají — prošli jsme domény z názvu i vyhledávač — a máme na ně kontakt.',
-      sk: 'Len firmy, pri ktorých sme overili, že web nemajú — prešli sme domény z názvu aj vyhľadávač — a máme na ne kontakt.',
-      en: 'Only firms verified to have no website — name domains and a search engine — that we have a contact for.',
+      cs: 'Jen firmy, u kterých jsme ověřili, že web nemají — prošli jsme domény z názvu i vyhledávač. Kontakt mají jen některé; u ostatních ho dohledáte jedním klikem v Mapy.cz nebo na Googlu.',
+      sk: 'Len firmy, pri ktorých sme overili, že web nemajú — prešli sme domény z názvu aj vyhľadávač. Kontakt majú len niektoré; pri ostatných ho dohľadáte jedným klikom v Mapy.cz alebo na Googli.',
+      en: 'Only firms verified to have no website — name domains and a search engine. Only some have a contact; for the rest, find it in one click on Mapy.cz or Google.',
     },
-    filters: ['no_website', 'can_reach'],
+    // Bez „mám jak oslovit" (majitel 1. 10. 2026): ověřené firmy bez webu skoro nikdy nemají
+    // veřejný kontakt (v Plzni žádná), sekce by byla prázdná. Kontakt se dohledá z odkazů v řádku;
+    // firmy s kontaktem jdou v pořadí první.
+    filters: ['no_website'],
   },
   {
     /**
@@ -181,12 +184,12 @@ export const SCENARIOS: Scenario[] = [
     forWhom: { cs: 'tvůrci webů s rezervacemi', sk: 'tvorcovia webov s rezerváciami', en: 'booking-site builders' },
     label: { cs: 'Ubytování a wellness bez webu', sk: 'Ubytovanie a wellness bez webu', en: 'Stays and wellness without a website' },
     hint: {
-      cs: 'Penziony, apartmány, chaty, kempy a wellness s ověřeným „web nemá" (domény z názvu i vyhledávač) a s kontaktem.',
-      sk: 'Penzióny, apartmány, chaty, kempy a wellness s overeným „web nemá" (domény z názvu aj vyhľadávač) a s kontaktom.',
-      en: 'Guest houses, apartments, chalets, camp sites and wellness verified to have no website (name domains and search engine), with a contact.',
+      cs: 'Penziony, apartmány, chaty, kempy a wellness s ověřeným „web nemá" (domény z názvu i vyhledávač). Kontakt dohledáte jedním klikem v Mapy.cz nebo na Googlu.',
+      sk: 'Penzióny, apartmány, chaty, kempy a wellness s overeným „web nemá" (domény z názvu aj vyhľadávač). Kontakt dohľadáte jedným klikom v Mapy.cz alebo na Googli.',
+      en: 'Guest houses, apartments, chalets, camp sites and wellness verified to have no website (name domains and search engine). Find the contact in one click on Mapy.cz or Google.',
     },
     action: { cs: 'Najít ubytování a wellness bez webu', sk: 'Nájsť ubytovanie a wellness bez webu', en: 'Find stays and wellness without a website' },
-    filters: ['no_website', 'can_reach'],
+    filters: ['no_website'],
     industries: ['hotel', 'wellness'],
   },
 ];

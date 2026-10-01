@@ -68,7 +68,8 @@ const STAGE_MIN_MS = 60_000;
  * Dřív platil pro jedno volání `enrichAndVerify`, tedy pro jednu fáze, a „Celá ČR" se čtrnácti fázemi
  * smělo položit 1 400 dotazů. Nad tímhle stropem hlídá měsíční strop celé aplikace (web-search-quota.ts).
  */
-const MAX_WEB_SEARCHES = Number(process.env.MAX_WEB_SEARCHES ?? 100);
+// Linkup: dva dotazy na firmu (jméno, adresa) a 3 500 dotazů měsíčně zdarma → 200 na hledání.
+const MAX_WEB_SEARCHES = Number(process.env.MAX_WEB_SEARCHES ?? (process.env.LINKUP_API_KEY ? 200 : 100));
 
 /** Job, který se takhle dlouho neposunul, už se nevrátí — instance ho vzala s sebou. */
 export const STALE_AFTER_MS = 5 * 60 * 1000;

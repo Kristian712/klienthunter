@@ -225,20 +225,6 @@ function isCzMobile(phone: string): boolean {
  * reader nothing to do at all. It is a search, not a claim: the button says so, and where the
  * user lands is up to what the search engine finds.
  */
-/**
- * Vyhledávání firmy na Facebooku podle názvu a města.
- *
- * Není to dohledaný profil — profil dohledat neumíme a nikdy nebudeme: Facebook i Instagram
- * mají v robots.txt `User-agent: * / Disallow: /` a výslovně zakazují automatizovaný sběr dat,
- * takže stránku profilu nesmíme ani načíst, natož ověřit, že patří té firmě. Tlačítko tedy
- * nic netvrdí, jen ušetří opsání názvu do vyhledávacího pole.
- */
-function lookupHref(b: BusinessResult): string {
-  // The last part of an ARES address is "70030 Ostrava"; the postcode only narrows a web search
-  // by accident, so it goes.
-  const town = (b.address ?? '').split(',').pop()?.replace(/\d/g, '').trim() ?? '';
-  return `https://www.google.com/search?q=${encodeURIComponent([b.name, town].filter(Boolean).join(' '))}`;
-}
 
 /**
  * Odkaz do Google Map na hledání firmy podle názvu a města.
@@ -312,10 +298,6 @@ const CONTACT = {
   webTip:  { cs: 'Web firmy tak, jak jsme ho ověřili. Kontakty bývají v patičce nebo v menu.',
              sk: 'Web firmy tak, ako sme ho overili. Kontakty bývajú v pätičke alebo v menu.',
              en: 'The website as we verified it. Contacts are usually in the footer or the menu.' },
-  lookup:  { cs: 'Najít firmu na webu', sk: 'Nájsť firmu na webe', en: 'Look the firm up' },
-  lookupTip: { cs: 'Otevře vyhledávání podle názvu a města. Její web ani profil jsme nedohledali — tohle je nejrychlejší způsob, jak zkusit najít, kde se firma prezentuje.',
-             sk: 'Otvorí vyhľadávanie podľa názvu a mesta. Jej web ani profil sme nedohľadali — toto je najrýchlejší spôsob, ako skúsiť nájsť, kde sa firma prezentuje.',
-             en: 'Opens a web search by name and town. We could not find a site or profile for this firm, so this is the fastest way to try.' },
   email:   { cs: 'E-mail',           sk: 'E-mail',           en: 'E-mail' },
   emailTip:{ cs: 'Písemně a doložitelně. U nevyžádané nabídky platí § 7 zák. 480/2004 Sb. — viz podmínky.',
              sk: 'Písomne a doložiteľne. Pri nevyžiadanej ponuke platí § 7 zák. 480/2004 Zb. — viď podmienky.',
@@ -480,19 +462,14 @@ function ContactStrategy({ b, locale }: { b: BusinessResult; locale: string }) {
    * pro tohle použít nesmíme, viz lib/stay.ts).
    */
   const stay = stayKind(b);
-  if (stay) {
+  // Odkazy na vyhledání i u každé firmy bez kontaktu: v sekcích „bez webu" je to jediná cesta
+  // k telefonu (majitel 1. 10. 2026). Jen vyhledávací URL, nic se nestahuje.
+  const noContact = methods.filter(m => m.key !== 'maps').length === 0;
+  if (stay || noContact) {
     methods.push({ key: 'google', icon: <Search size={12} />, label: L(CONTACT.google),
                    href: googleSearchHref(b), tip: L(CONTACT.googleTip) });
     methods.push({ key: 'mapycz', icon: <MapPin size={12} />, label: 'Mapy.cz',
                    href: mapyCzHref(b), tip: L(CONTACT.mapyczTip) });
-  }
-
-  // Only when nothing else worked. A row from ARES has a name, an address and an IČO and
-  // nothing you can call — leaving it with no action at all is what made the whole list feel
-  // broken, even though every fact on it was true.
-  if (!stay && methods.filter(m => m.key !== 'maps').length === 0) {
-    methods.push({ key: 'lookup', icon: <Search size={12} />, label: L(CONTACT.lookup),
-                   href: lookupHref(b), tip: L(CONTACT.lookupTip) });
   }
 
   return (

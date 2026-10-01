@@ -15,17 +15,23 @@ import type { SearchQuota } from './website-discovery';
  *  • Rezervace je jedna transakce pod zámkem (`pg_advisory_xact_lock`), takže ani dvacet firem
  *    ověřovaných najednou v několika instancích Vercelu strop nepřečerpá.
  *  • Brave účtuje jen úspěšné dotazy. Když vyhledávač neodpoví, rezervace se vrací.
- *  • Výchozí strop je 900, ne 1 000: ze stejného klíče jdou i dotazy z měřicích skriptů a z vývoje,
- *    které produkční databáze nevidí. `WEB_SEARCH_MONTHLY_LIMIT` ho umí snížit; výš než 1 000
- *    (celý kredit) se nepustí, ať je v proměnné cokoli.
+ *  • Výchozí strop je pod kreditem (Brave 900 z 1 000, Linkup 3 500 z 4 000): ze stejného klíče
+ *    jdou i dotazy z vývoje, které produkční databáze nevidí. `WEB_SEARCH_MONTHLY_LIMIT` ho umí
+ *    snížit; výš než celý bezplatný kredit se nepustí, ať je v proměnné cokoli.
  *
  * Když strop dojde, rezervace vrátí `null` a hledání pokračuje bez vyhledávače — firma dostane
  * „nevíme" místo „web nemá". Uživatel žádnou chybu nevidí; do logu se to zapíše jednou za běh.
  */
 
-/** $5 kredit ÷ $5 za 1 000 dotazů. Nad tohle strop nikdy nepůjde. */
-const CREDIT_QUERIES = 1_000;
-const DEFAULT_LIMIT = 900;
+/**
+ * Strop = to, co pokryje bezplatný měsíční kredit, nikdy víc (majitel: „jestli se za zvednutí
+ * platí, tak to nedělej", 1. 10. 2026).
+ *  • Brave: $5 kredit ÷ $5 za 1 000 dotazů → 1 000, výchozí 900.
+ *  • Linkup: dobití na $20 měsíčně ÷ $0,005 za dotaz → 4 000, výchozí 3 500 (rezerva na vývoj).
+ */
+const LINKUP = Boolean(process.env.LINKUP_API_KEY);
+const CREDIT_QUERIES = LINKUP ? 4_000 : 1_000;
+const DEFAULT_LIMIT = LINKUP ? 3_500 : 900;
 export const QUOTA_WINDOW_DAYS = 31;
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** Libovolné pevné číslo zámku, sdílené všemi instancemi. */
