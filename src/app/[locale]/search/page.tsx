@@ -6,7 +6,7 @@ import { useTranslations, useLocale } from 'next-intl';
 import {
   Search, Globe, Users, ExternalLink, Check, Bookmark, RefreshCw, Sparkles,
   Mail, MapPin, X, Clock, ChevronDown,
-  FileText, Table2, PhoneCall, ShieldCheck, Share2, Phone, Megaphone, BedDouble,
+  FileText, PhoneCall, ShieldCheck, Phone, Megaphone, BedDouble, SlidersHorizontal, Download,
 } from 'lucide-react';
 import { googleAdsTransparencyUrl } from '@/lib/ads-links';
 import { CRM_FORMATS } from '@/lib/crm-export';
@@ -15,12 +15,12 @@ import { SearchComposer } from '@/components/SearchComposer';
 import { PLAN_LIMITS } from '@/lib/plans';
 import { LEAD_FILTERS, GROUP_LABELS, GROUP_ORDER, addFilter, effectiveWindowDays, employeeLabel, hasReachChannel, matchesAll, localized, normalizeFilters, type FilterGroup } from '@/lib/lead-filters';
 import { leadReason } from '@/lib/lead-reason';
-import { opportunityScore, reachHint, reachScore, substanceFacts } from '@/lib/reach-score';
-import { STAY_INDUSTRIES, googleSearchHref, mapyCzHref, stayKind, stayKindLabel, stayRankBonus } from '@/lib/stay';
+import { opportunityScore, substanceFacts } from '@/lib/reach-score';
+import { STAY_INDUSTRIES, googleSearchHref, mapyCzHref, obecFromAddress, stayKind, stayKindLabel, stayRankBonus } from '@/lib/stay';
 import { scoreBreakdown } from '@/lib/lead-score';
 import { websiteAudit } from '@/lib/website-audit';
 import { YIELD_NOTE, yieldFor } from '@/lib/nace-map';
-import { SCENARIOS, SCENARIO_BY_PROFESSION, scenarioById, type ScenarioIcon } from '@/lib/scenarios';
+import { LOCAL_TRADES, PRIMARY_SCENARIOS, SCENARIOS, SCENARIO_BY_PROFESSION, scenarioById, type ScenarioIcon } from '@/lib/scenarios';
 import { EMPTY_PROFILE, industriesFor, presetFiltersFor, type UserProfile } from '@/lib/profile';
 import { ALL_INDUSTRIES, ALL_INDUSTRIES_LABEL, MAX_INDUSTRIES, isAllIndustries, joinIndustries, splitIndustries } from '@/lib/industries';
 import { isWholeCz, nuts3ForRegion } from '@/lib/regions-nuts';
@@ -36,7 +36,6 @@ interface SavedMeta {
   origin: string | null;
 }
 import { REGIONS, INDUSTRIES, POPULAR_CHIPS } from '@/lib/search-options';
-import { LeadScore, GOOD_LEAD } from '@/components/LeadScore';
 import { ResultsMap, type MapLead } from '@/components/ResultsMap';
 import { LEAD_STATUSES, isDone, statusDef, type LeadStatus } from '@/lib/lead-tags';
 import { OnboardingModal } from '@/components/OnboardingModal';
@@ -257,8 +256,7 @@ function whatsappHref(phone: string): string {
  */
 
 const CONTACT = {
-  heading: { cs: 'Jak kontaktovat', sk: 'Ako kontaktovať', en: 'How to get in touch' },
-  reach:   { cs: 'Dosažitelnost',   sk: 'Dosiahnuteľnosť',  en: 'Reachability' },
+  lookup:  { cs: 'Kontakt nemáme — dohledejte ho:', sk: 'Kontakt nemáme — dohľadajte ho:', en: 'We have no contact — look it up:' },
   call:    { cs: 'Zavolat',          sk: 'Zavolať',          en: 'Call' },
   callTip: { cs: 'Číslo je mobilní — voláte nejspíš přímo majiteli, ne na recepci.',
              sk: 'Číslo je mobilné — voláte najskôr priamo majiteľovi, nie na recepciu.',
@@ -375,16 +373,9 @@ function premisesLabel(n: number, locale: string): string {
   return `${n} ${n === 1 ? 'provozovna' : n < 5 ? 'provozovny' : 'provozoven'}`;
 }
 
-function ContactStrategy({ b, locale }: { b: BusinessResult; locale: string }) {
+function ContactStrategy({ b, locale, part }: { b: BusinessResult; locale: string; part: 'main' | 'rest' }) {
   const mobile = b.phone ? isCzMobile(b.phone) : false;
   const L = (x: { cs: string; sk?: string; en: string }) => localized(x, locale);
-  /**
-   * Dosažitelnost patří přesně sem, nad seznam cest ke kontaktu: je to jeho shrnutí do jednoho
-   * čísla. Vedle skóre leadu stojí schválně jinde a menší — to říká „stojí za oslovení",
-   * tohle „a jde to vůbec".
-   */
-  const reach = reachScore(b);
-
   /**
    * `value` je samotný údaj — číslo, e-mail, doména. Tlačítko nese akci, `value` nese fakt:
    * bez něj by po sloučení dvou dřívějších bloků do jednoho zmizelo z řádku telefonní číslo
@@ -472,46 +463,42 @@ function ContactStrategy({ b, locale }: { b: BusinessResult; locale: string }) {
                    href: mapyCzHref(b), tip: L(CONTACT.mapyczTip) });
   }
 
+  const button = (m: Method, primary: boolean) => (
+    <a
+      key={m.key}
+      href={m.href}
+      target={m.key !== 'call' && m.key !== 'email' ? '_blank' : undefined}
+      // A search engine has no business knowing which firm our user is about to call.
+      referrerPolicy="no-referrer"
+      rel="noopener noreferrer"
+      title={m.tip}
+      className={`kh-contact inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm min-h-[40px] max-w-full ${
+        primary
+          ? 'border-ink bg-ink text-surface font-semibold hover:bg-ink/90'
+          : 'border-field text-ink hover:border-ink hover:bg-ink/[0.06]'
+      }`}
+    >
+      <span className="shrink-0 opacity-90">{m.icon}</span>
+      <span className={`truncate ${m.value ? 'font-mono tracking-tight' : 'font-medium'}`}>{m.value ?? m.label}</span>
+    </a>
+  );
+
+  /**
+   * Řádek výsledku nese jen hlavní cesty — zavolat, napsat, web. Zbytek (WhatsApp, sítě, mapy)
+   * je v detailu: osm tlačítek pod každou z pěti set firem byla houština, ve které se číslo
+   * hledalo (majitel 11. 10. 2026). Firma bez kontaktu dostane odkazy na dohledání a řádek to
+   * řekne nahlas.
+   */
+  const direct = methods.filter(m => ['call', 'email', 'web', 'contact'].includes(m.key));
+  const main = direct.length > 0 ? direct : methods.filter(m => m.key !== 'maps').slice(0, 3);
+  const shown = part === 'main' ? main : methods.filter(m => !main.includes(m));
+  if (shown.length === 0) return null;
   return (
-    <div className="mt-4 border-t border-line pt-4">
-      <div className="flex items-baseline justify-between gap-3 mb-2.5">
-        <p className="text-xs font-semibold text-ink uppercase tracking-wider">
-          {L(CONTACT.heading)}
-        </p>
-        <span className="flex items-center gap-2 shrink-0" title={L(reachHint(b))}>
-          <span className="text-[11px] uppercase tracking-wider text-ink-faint">{L(CONTACT.reach)}</span>
-          <span className="h-1.5 w-16 rounded-full bg-ink/15 overflow-hidden" aria-hidden>
-            <span className="block h-full bg-ink transition-[width] duration-500" style={{ width: `${reach}%` }} />
-          </span>
-          <span className="text-xs tnum text-ink-muted">{reach}</span>
-        </span>
-      </div>
-      {/*
-        Kontakt je to hlavní, kvůli čemu tu řádek je, takže je z něj tlačítko s hodnotou uvnitř:
-        telefonní číslo a e-mail jdou přečíst i zkopírovat rovnou, bez rozklikávání. Dřív byla
-        hodnota drobným písmem vedle a tlačítko neslo jen sloveso. Vysvětlivka zůstává v bublině.
-      */}
-      <div className="flex flex-wrap gap-2">
-        {methods.map((m, i) => (
-          <a
-            key={m.key}
-            href={m.href}
-            target={m.key !== 'call' && m.key !== 'email' ? '_blank' : undefined}
-            // A search engine has no business knowing which firm our user is about to call.
-            referrerPolicy="no-referrer"
-            rel="noopener noreferrer"
-            title={m.tip}
-            className={`kh-contact inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm min-h-[40px] ${
-              i === 0
-                ? 'border-ink bg-ink text-surface font-semibold hover:bg-ink/90'
-                : 'border-field text-ink hover:border-ink hover:bg-ink/[0.06]'
-            }`}
-          >
-            <span className="shrink-0 opacity-90">{m.icon}</span>
-            <span className={m.value ? 'font-mono tracking-tight' : 'font-medium'}>{m.value ?? m.label}</span>
-          </a>
-        ))}
-      </div>
+    <div className="flex flex-wrap items-center gap-2">
+      {part === 'main' && direct.length === 0 && (
+        <span className="w-full text-xs text-ink-faint">{L(CONTACT.lookup)}</span>
+      )}
+      {shown.map((m, i) => button(m, part === 'main' && i === 0 && direct.length > 0))}
     </div>
   );
 }
@@ -525,6 +512,30 @@ function ContactStrategy({ b, locale }: { b: BusinessResult; locale: string }) {
  */
 /** Sekce, které stojí na ověřeném „web nemá" — bez vyhledávače nevrátí nic. */
 const VERIFIED_NO_WEB_SCENARIOS = ['no_web', 'stay', 'reach_weak_web', 'social_weak_web'];
+
+/**
+ * Přepínač nad výsledky (od 12. 10. 2026): čtyři pohledy na tentýž seznam podle toho, co o webu
+ * firmy víme. Je to totéž co tři hlavní volby nad hledáním — proto přepnutí nastaví i sekci.
+ * „Neověřeno" tu stojí schválně vedle: firmy, na které nezbyl čas ani dotazy do vyhledávače,
+ * se nesmějí tvářit jako „bez webu", ale ani zmizet.
+ */
+interface WebTab { id: string; filters: string[]; scenario?: string; label: { cs: string; sk: string; en: string }; note: { cs: string; sk: string; en: string } }
+const WEB_TABS: WebTab[] = [
+  { id: 'none', filters: ['no_website'], scenario: 'no_web',
+    label: { cs: 'Bez webu', sk: 'Bez webu', en: 'No website' },
+    note: { cs: 'Vyhledávač firmu zná, ale žádný její web nenašel.', sk: 'Vyhľadávač firmu pozná, ale žiadny jej web nenašiel.', en: 'The search engine knows the firm but found no website for it.' } },
+  { id: 'old', filters: ['old_website'], scenario: 'old_web',
+    label: { cs: 'Starý web', sk: 'Starý web', en: 'Outdated website' },
+    note: { cs: 'Web jsme načetli a je zastaralý — u každé firmy stojí proč.', sk: 'Web sme načítali a je zastaraný — pri každej firme je dôvod.', en: 'We loaded the website and it is outdated — each row says why.' } },
+  { id: 'unknown', filters: ['web_unknown'],
+    label: { cs: 'Neověřeno', sk: 'Neoverené', en: 'Unverified' },
+    note: { cs: 'U těchto firem jsme web nestihli ověřit. Mít ho můžou.', sk: 'Pri týchto firmách sme web nestihli overiť. Mať ho môžu.', en: 'We could not verify these firms. They may have a website.' } },
+  { id: 'all', filters: [], scenario: 'all',
+    label: { cs: 'Vše', sk: 'Všetko', en: 'All' },
+    note: { cs: '', sk: '', en: '' } },
+];
+/** Podmínky o stavu webu — přepínač je nahrazuje, ostatní zapnuté filtry nechává. */
+const WEB_STATE_FILTERS = ['no_web_found', 'no_website', 'web_unknown', 'has_website', 'weak_web', 'old_website', 'insecure_website', 'no_web_has_fb', 'social_only_web'];
 
 /** Podmínky, které nechají jen firmy bez nalezeného webu — a tím skoro jistě i bez kontaktu. */
 const WEB_ABSENT_FILTERS = ['no_web_found', 'no_website', 'web_unknown', 'no_web_has_fb'];
@@ -594,6 +605,17 @@ const S = {
   noFilters:   { cs: 'žádné', sk: 'žiadne', en: 'none' },
   runNow:      { cs: 'Spustit hledání', sk: 'Spustiť hľadanie', en: 'Run the search' },
   save:        { cs: 'Uložit hledání', sk: 'Uložiť hľadanie', en: 'Save search' },
+  detail:      { cs: 'Detail', sk: 'Detail', en: 'Details' },
+  filters:     { cs: 'Filtry', sk: 'Filtre', en: 'Filters' },
+  more:        { cs: 'Další možnosti', sk: 'Ďalšie možnosti', en: 'More options' },
+  moreWho:     { cs: 'Jiné hledání', sk: 'Iné hľadanie', en: 'Other searches' },
+  moreTrades:  { cs: 'Rychlý výběr oboru', sk: 'Rýchly výber odboru', en: 'Quick trade pick' },
+  defaultTrades: { cs: 'Bez oboru hledáme v podnicích s provozovnou — obory si můžete změnit.', sk: 'Bez odboru hľadáme v podnikoch s prevádzkou — odbory si môžete zmeniť.', en: 'With no trade picked we search businesses with premises — change the trades as you like.' },
+  moreContacts: { cs: 'Další cesty', sk: 'Ďalšie cesty', en: 'Other channels' },
+  score:       { cs: 'Skóre', sk: 'Skóre', en: 'Score' },
+  tabEmpty:    { cs: 'V tomhle pohledu teď není žádná firma.', sk: 'V tomto pohľade teraz nie je žiadna firma.', en: 'No firm in this view right now.' },
+  tabEmptyRunning: { cs: 'Ověřování ještě běží — firmy sem přibývají průběžně.', sk: 'Overovanie ešte beží — firmy sem pribúdajú priebežne.', en: 'Verification is still running — firms keep arriving here.' },
+  tabEmptyElse: { cs: 'Zbytek hledání najdete tady:', sk: 'Zvyšok hľadania nájdete tu:', en: 'The rest of the search is here:' },
   saveTip:     { cs: 'Uloží obor, kraj, zapnuté filtry a scénář. Příště je otevřete jedním kliknutím a uvidíte, co je nové.',
                  sk: 'Uloží odbor, kraj, zapnuté filtre a scenár. Nabudúce ich otvoríte jedným kliknutím a uvidíte, čo je nové.',
                  en: 'Saves the trade, region, active filters and scenario. Next time you open it with one click and see what is new.' },
@@ -1033,8 +1055,22 @@ export default function SearchPage() {
     // Sekce vázaná na obor („Ubytování a wellness") obory nastaví. Při odchodu z ní na sekci bez
     // oboru se jen tyhle přednastavené obory uklidí — vlastní obor uživatele zůstává.
     if (sc.industries) setIndustries([...sc.industries]);
-    else setIndustries(prev => (SCENARIOS.some(o => o.industries && sameMembers(o.industries, prev)) ? [] : prev));
+    else setIndustries(prev => {
+      const own = SCENARIOS.some(o => o.industries && sameMembers(o.industries, prev)) ? [] : prev;
+      // Bez oboru nabídne sekce podniky s provozovnou (`defaultIndustries`); kdo si obor vybral,
+      // tomu zůstane. Odchod na sekci bez nich tenhle přednastavený balík zase uklidí.
+      if (sc.defaultIndustries) return own.length ? own : [...sc.defaultIndustries];
+      return sameMembers(own, LOCAL_TRADES) ? [] : own;
+    });
+    if (!(PRIMARY_SCENARIOS as readonly string[]).includes(id)) setAdvanced(true);
   };
+  /** Rozbalené „Další možnosti" pod formulářem: ostatní sekce, okresy a podmínky před hledáním. */
+  const [advanced, setAdvanced]           = useState(false);
+  /** Panel podmínek nad výsledky; výchozí zavřený — pohled přepíná přepínač. */
+  const [showFilters, setShowFilters]     = useState(false);
+  /** Řádky s rozbaleným detailem. */
+  const [openRows, setOpenRows]           = useState<Set<string>>(new Set());
+  const toggleRow = (id: string) => setOpenRows(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
   /** Nabídka „CRM" u exportu; zavírá se kliknutím mimo. */
   const [crmMenu, setCrmMenu]             = useState(false);
   const crmMenuRef = useRef<HTMLDivElement>(null);
@@ -1233,6 +1269,9 @@ export default function SearchPage() {
       // Scénář je přednastavení = jeho filtry musí být opravdu zapnuté, ne jen vybraný chip:
       // do hledání jde to, co je v `active`. U uloženého hledání se nic nepřidává.
       if (!savedLockRef.current && !dirtyRef.current) setActive(prev => new Set(normalizeFilters([...Array.from(prev), ...scenarioById(def).filters])));
+      // Sekce bez oboru hledá v podnicích s provozovnou — jen když obor nepřišel ani z profilu.
+      const pack = scenarioById(def).defaultIndustries;
+      if (pack && !savedLockRef.current && !dirtyRef.current) setIndustries(i => (i.length ? i : [...pack]));
     }
   }
 
@@ -1445,6 +1484,17 @@ export default function SearchPage() {
   const countFor = (id: string) => {
     const withIt = new Set(active).add(id);
     return results.filter(b => matchesAll(b, withIt)).length;
+  };
+
+  /** Přepínač nad výsledky: podmínky o webu nahrazuje, ostatní zapnuté filtry drží. */
+  const otherFilters = Array.from(active).filter(id => !WEB_STATE_FILTERS.includes(id));
+  const webFilters = Array.from(active).filter(id => WEB_STATE_FILTERS.includes(id));
+  const activeTab = WEB_TABS.find(tab => sameMembers(tab.filters, webFilters)) ?? null;
+  const tabCount = (tab: WebTab) => results.filter(b => matchesAll(b, [...otherFilters, ...tab.filters])).length;
+  const setTab = (tab: WebTab) => {
+    dirtyRef.current = true;
+    if (tab.scenario) setScenario(tab.scenario);
+    setActive(new Set(normalizeFilters([...otherFilters, ...tab.filters])));
   };
 
 
@@ -1839,66 +1889,28 @@ export default function SearchPage() {
         {/* ── Search form ── */}
         <form onSubmit={handleSearch} className="card mb-6">
           {/*
-            Zkratky na nejčastější obory patří nad celý řádek, ne dovnitř sloupce s oborem.
-            Dokud byly uvnitř, byl ten sloupec o dva řádky vyšší než sousední — a protože se
-            mřížka zarovnává na spodní hranu, výběr regionu klesl dolů a nad ním zela prázdná
-            plocha přes půl karty. Nahoře navíc čtou líp: je to volba, ne dekorace pole.
+            Tři hlavní volby. Dřív osm karet sekcí a nad nimi řada zkratek na obory — nováček
+            nepoznal, kterou z nich chce (majitel 11. 10. 2026: „nechci hledat nějaké složitosti").
+            Ostatní sekce, zkratky a podmínky jsou pod „Další možnosti".
           */}
-          <div className="flex flex-wrap gap-1.5 mb-4">
-            {/* „Všechny obory" první: pro účetní nebo pojišťováka je to ten hlavní případ. */}
-            <button type="button" onClick={() => toggleIndustry(ALL_INDUSTRIES)} className={allPicked ? 'chip-active' : 'chip'}>
-              {localized(ALL_INDUSTRIES_LABEL, locale)}
-            </button>
-            {quickChips.map(chip => (
-              <button
-                key={chip.value}
-                type="button"
-                onClick={() => toggleIndustry(chip.value)}
-                className={industries.includes(chip.value) ? 'chip-active' : 'chip'}
-                aria-pressed={industries.includes(chip.value)}
-              >
-                {chip.label}
-              </button>
-            ))}
-          </div>
-
-          {/*
-            Sekce podle záměru: koho hledáte a proč. Dřív řada chipů se jmény scénářů, ze kterých
-            nováček nepoznal, který je pro něj. Karta má ikonu, název, pro koho je a jednu větu
-            o tom, co v seznamu zbyde. Je to pořád jen přednastavení filtrů — nic víc pod tím není.
-          */}
-          <div className="mb-5 pb-5 border-b border-line">
-            <div className="flex items-baseline justify-between gap-3 mb-3">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
-                {localized({ cs: 'Koho hledáte', sk: 'Koho hľadáte', en: 'Who you are looking for' }, locale)}
-              </span>
-              {effectiveScenario === 'custom' && (
-                <span className="text-xs text-ink-muted">
-                  {localized({ cs: 'Vlastní kombinace podmínek — kliknutím na sekci se zase složí podle ní.', sk: 'Vlastná kombinácia podmienok — kliknutím na sekciu sa zase zloží podľa nej.', en: 'A custom set of conditions — click a section to reset to it.' }, locale)}
-                </span>
-              )}
-            </div>
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-              {SCENARIOS.filter(sc => metaAds || !(sc.filters.length > 0 && sc.filters.every(id => LEAD_FILTERS.find(f => f.id === id)?.source === 'Meta'))).map(sc => {
-                const on = effectiveScenario === sc.id;
+          <div className="mb-5">
+            <div className="grid grid-cols-3 gap-2">
+              {PRIMARY_SCENARIOS.map(id => {
+                const sc = scenarioById(id);
+                const on = effectiveScenario === id;
                 return (
                   <button
-                    key={sc.id}
+                    key={id}
                     type="button"
-                    onClick={() => applyScenario(sc.id)}
+                    onClick={() => applyScenario(id)}
                     aria-pressed={on}
                     title={localized(sc.hint, locale)}
-                    className={`kh-contact text-left rounded-xl border px-3.5 py-3 min-h-[40px] ${on ? 'border-ink bg-ink text-surface' : 'border-field hover:border-ink bg-surface-muted/40'}`}
+                    className={`kh-contact rounded-xl border px-2 py-3 sm:px-4 sm:py-4 min-h-[56px] ${on ? 'border-ink bg-ink text-surface' : 'border-field hover:border-ink bg-surface-muted/40'}`}
                   >
-                    <span className="flex items-center gap-2.5">
-                      <span className={`icon-tile h-7 w-7 shrink-0 ${on ? 'bg-surface/15 text-surface' : 'icon-tile--who'}`}>{SCENARIO_ICONS[sc.icon ?? 'search']}</span>
-                      <span className="text-sm font-semibold leading-tight">{localized(sc.label, locale)}</span>
+                    <span className="flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2.5">
+                      <span className="shrink-0">{SCENARIO_ICONS[sc.icon ?? 'search']}</span>
+                      <span className="text-sm sm:text-base font-semibold leading-tight">{localized(sc.label, locale)}</span>
                     </span>
-                    {sc.forWhom && (
-                      <span className={`mt-1.5 block text-[11px] uppercase tracking-wider ${on ? 'text-surface/70' : 'text-ink-faint'}`}>
-                        {localized({ cs: 'pro', sk: 'pre', en: 'for' }, locale)} {localized(sc.forWhom, locale)}
-                      </span>
-                    )}
                   </button>
                 );
               })}
@@ -1982,6 +1994,9 @@ export default function SearchPage() {
               )}
               {allBlocked && (
                 <p className="mb-2 text-xs text-ink-muted leading-snug">{localized(S.allNeedsEvent, locale)}</p>
+              )}
+              {sameMembers(industries, LOCAL_TRADES) && scenarioById(effectiveScenario).defaultIndustries && (
+                <p className="mb-2 text-[11px] text-ink-faint leading-snug">{localized(S.defaultTrades, locale)}</p>
               )}
 
               <div className="relative">
@@ -2082,7 +2097,7 @@ export default function SearchPage() {
               </div>
 
               {/* Obor přímo kódem CZ-NACE, pro toho, kdo ho zná. Číselník je na serveru (/api/nace). */}
-              {!allPicked && (
+              {advanced && !allPicked && (
                 <div className="relative mt-2">
                   <input
                     className="input py-1.5 text-xs"
@@ -2136,26 +2151,83 @@ export default function SearchPage() {
             </button>
           </div>
 
-          {/* Pod mřížkou, ne v ní: uvnitř sloupce tahle věta rozhodila zarovnání polí. */}
-          {/* Skládačka podmínek před spuštěním — dvě skupiny: zužuje výběr (index) a prořezává nalezené. */}
-          <SearchComposer
-            locale={locale}
-            region={effectiveRegion}
-            industry={effectiveIndustry}
-            active={active}
-            toggle={toggle}
-            districts={districts}
-            setDistricts={next => { dirtyRef.current = true; setDistricts(next); }}
-            presetIds={presetsOn ? presetIds : []}
-            // Admin a VIP mají limit VIP (500), ne podle tarifu — dřív řádek „Co se prohledá" slíbil 20 a přišlo 500.
-            limit={unlimited ? PLAN_LIMITS.VIP.resultsPerSearch : PLAN_LIMITS[(userPlan as keyof typeof PLAN_LIMITS)]?.resultsPerSearch ?? PLAN_LIMITS.FREE.resultsPerSearch}
-            metaAds={metaAds}
-            onIndexTotal={setIndexTotal}
-          />
+          <button type="button" onClick={() => setAdvanced(v => !v)} aria-expanded={advanced}
+            className="mt-4 inline-flex items-center gap-1.5 text-xs text-ink-muted hover:text-ink min-h-[36px]">
+            <SlidersHorizontal size={13} />{localized(S.more, locale)}
+            <ChevronDown size={12} className={`transition-transform ${advanced ? 'rotate-180' : ''}`} />
+            {/* Co je zapnuté mimo tři hlavní volby, se řekne i při zavřeném panelu. */}
+            {!(PRIMARY_SCENARIOS as readonly string[]).includes(effectiveScenario) && (
+              <span className="text-ink-faint">· {effectiveScenario === 'custom'
+                ? localized({ cs: 'vlastní podmínky', sk: 'vlastné podmienky', en: 'custom conditions' }, locale)
+                : localized(scenarioById(effectiveScenario).label, locale)}</span>
+            )}
+          </button>
 
-          {yieldNote && (
-            <p className="text-[11px] text-ink-faint mt-2 leading-snug max-w-2xl">{yieldNote}</p>
-          )}
+          {/* Schované, ne odmontované: skládačka počítá, kolik firem index najde (`onIndexTotal`),
+              a ten údaj zamyká tlačítko hledání i při zavřeném panelu. */}
+          <div className={advanced ? 'mt-3 pt-4 border-t border-line' : 'hidden'}>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint mb-2">{localized(S.moreWho, locale)}</p>
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 mb-5">
+              {SCENARIOS.filter(sc => !(PRIMARY_SCENARIOS as readonly string[]).includes(sc.id))
+                .filter(sc => metaAds || !(sc.filters.length > 0 && sc.filters.every(id => LEAD_FILTERS.find(f => f.id === id)?.source === 'Meta'))).map(sc => {
+                const on = effectiveScenario === sc.id;
+                return (
+                  <button
+                    key={sc.id}
+                    type="button"
+                    onClick={() => applyScenario(sc.id)}
+                    aria-pressed={on}
+                    title={localized(sc.hint, locale)}
+                    className={`kh-contact text-left rounded-xl border px-3.5 py-2.5 min-h-[40px] ${on ? 'border-ink bg-ink text-surface' : 'border-field hover:border-ink bg-surface-muted/40'}`}
+                  >
+                    <span className="flex items-center gap-2.5">
+                      <span className="shrink-0">{SCENARIO_ICONS[sc.icon ?? 'search']}</span>
+                      <span className="text-sm font-semibold leading-tight">{localized(sc.label, locale)}</span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint mb-2">{localized(S.moreTrades, locale)}</p>
+            <div className="flex flex-wrap gap-1.5 mb-5">
+              {/* „Všechny obory" první: pro účetní nebo pojišťováka je to ten hlavní případ. */}
+              <button type="button" onClick={() => toggleIndustry(ALL_INDUSTRIES)} className={allPicked ? 'chip-active' : 'chip'}>
+                {localized(ALL_INDUSTRIES_LABEL, locale)}
+              </button>
+              {quickChips.map(chip => (
+                <button
+                  key={chip.value}
+                  type="button"
+                  onClick={() => toggleIndustry(chip.value)}
+                  className={industries.includes(chip.value) ? 'chip-active' : 'chip'}
+                  aria-pressed={industries.includes(chip.value)}
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Skládačka podmínek před spuštěním — dvě skupiny: zužuje výběr (index) a prořezává nalezené. */}
+            <SearchComposer
+              locale={locale}
+              region={effectiveRegion}
+              industry={effectiveIndustry}
+              active={active}
+              toggle={toggle}
+              districts={districts}
+              setDistricts={next => { dirtyRef.current = true; setDistricts(next); }}
+              presetIds={presetsOn ? presetIds : []}
+              // Admin a VIP mají limit VIP (500), ne podle tarifu — dřív řádek „Co se prohledá" slíbil 20 a přišlo 500.
+              limit={unlimited ? PLAN_LIMITS.VIP.resultsPerSearch : PLAN_LIMITS[(userPlan as keyof typeof PLAN_LIMITS)]?.resultsPerSearch ?? PLAN_LIMITS.FREE.resultsPerSearch}
+              metaAds={metaAds}
+              onIndexTotal={setIndexTotal}
+            />
+
+            {yieldNote && (
+              <p className="text-[11px] text-ink-faint mt-2 leading-snug max-w-2xl">{yieldNote}</p>
+            )}
+          </div>
 
           {/* Kolečko se točí jen v tlačítku. Dvě identická pár centimetrů od sebe byla jen hluk. */}
           {loading && loadingMsg && (
@@ -2305,222 +2377,208 @@ export default function SearchPage() {
               </div>
             )}
 
-            <div className="mb-8">
-              <div className="flex items-baseline justify-between flex-wrap gap-3 pb-3 mb-4 border-b border-line">
-                <div className="flex items-baseline gap-3">
-                  <h2 className="text-lg font-extrabold tracking-tight">{isCs ? 'Výsledky' : 'Results'}</h2>
-                  <span className="tnum text-sm text-ink-muted">
-                    {isCs ? `${filtered.length} z ${results.length} firem` : `${filtered.length} of ${results.length}`}
-                  </span>
-                  {/* Kolik z nich jde vůbec oslovit. Kvůli tomuhle číslu se seznam prochází —
-                      a je lepší ho vidět hned než po projetí čtyř set řádků. */}
-                  <span className="tnum text-sm text-ink-faint" title={localized(S.reachableTip, locale)}>
-                    {localized(S.reachable, locale).replace('{n}', String(filtered.filter(b => hasReachChannel(b)).length))}
-                  </span>
-                </div>
+            <div className="mb-6">
+              {/*
+                Přepínač: čtyři pohledy na tentýž seznam podle toho, co o webu firmy víme. Dřív tu
+                stál panel čtyř skupin podmínek s vysvětlivkou pod každou — majitel 11. 10. 2026:
+                „pořád se tam prolíná, kdo to je, co se stalo, jak na tom je, jak oslovit".
+                Podmínky zůstaly, jen jsou pod jedním tlačítkem „Filtry". Na telefonu 2 × 2,
+                žádné vodorovné posouvání.
+              */}
+              <div className="grid grid-cols-2 sm:flex gap-2" role="tablist" aria-label={isCs ? 'Výsledky podle webu' : 'Results by website'}>
+                {WEB_TABS.map(tab => {
+                  const on = activeTab?.id === tab.id;
+                  return (
+                    <button key={tab.id} type="button" role="tab" aria-selected={on} onClick={() => setTab(tab)}
+                      title={localized(tab.note, locale) || undefined}
+                      className={`rounded-xl border px-4 py-2.5 min-h-[44px] text-sm font-semibold whitespace-nowrap transition-colors ${on ? 'border-ink bg-ink text-surface' : 'border-field text-ink hover:border-ink'}`}>
+                      {localized(tab.label, locale)}
+                      <span className={`ml-2 tnum font-normal ${on ? 'text-surface/70' : 'text-ink-faint'}`}>{tabCount(tab)}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              {activeTab && activeTab.id !== 'all' && (
+                <p className="mt-2 text-xs text-ink-faint">{localized(activeTab.note, locale)}</p>
+              )}
 
-                <div className="flex items-center gap-4 flex-wrap">
-                  {/* Řazení. Výchozí je dosažitelnost, protože k čemu je firma, kterou nejde oslovit. */}
-                  <label className="flex items-center gap-2 text-xs text-ink-muted">
-                    <span className="uppercase tracking-wider text-[11px] text-ink-faint">{localized(S.sortLabel, locale)}</span>
-                    <select value={sortMode} onChange={e => setSortMode(e.target.value as typeof sortMode)}
-                      className="input h-9 w-auto py-0 pr-8 text-xs cursor-pointer">
-                      <option value="reach">{localized(S.sortReach, locale)}</option>
-                      <option value="score">{localized(S.sortScore, locale)}</option>
-                      <option value="name">{localized(S.sortName, locale)}</option>
-                    </select>
-                  </label>
-                  {/* Seznam / mapa. Mapa umí zobrazit jen firmy se souřadnicemi, takže je to
-                      druhý pohled na tatáž data, ne náhrada seznamu. */}
-                  <div className="flex gap-1">
-                    {(['list', 'map'] as const).map(v => (
-                      <button
-                        key={v}
-                        onClick={() => setView(v)}
-                        aria-pressed={view === v}
-                        className={view === v ? 'chip-active' : 'chip'}
-                      >
-                        {v === 'list'
-                          ? localized({ cs: 'Seznam', sk: 'Zoznam', en: 'List' }, locale)
-                          : localized({ cs: 'Mapa', sk: 'Mapa', en: 'Map' }, locale)}
-                      </button>
-                    ))}
+              <div className="mt-4 flex items-center gap-2 flex-wrap">
+                {/* Kolik firem v pohledu je a na kolik z nich máme kontakt — kvůli tomu se seznam prochází. */}
+                <span className="tnum text-sm text-ink-muted w-full sm:w-auto sm:mr-auto" title={localized(S.reachableTip, locale)}>
+                  {firmsCount(filtered.length, locale)}{' '}
+                  <span className="text-ink-faint">{localized(S.reachable, locale).replace('{n}', String(filtered.filter(b => hasReachChannel(b)).length))}</span>
+                </span>
+                {/* Seznam / mapa. Mapa umí zobrazit jen firmy se souřadnicemi, takže je to
+                    druhý pohled na tatáž data, ne náhrada seznamu. */}
+                {(['list', 'map'] as const).map(v => (
+                  <button
+                    key={v}
+                    onClick={() => setView(v)}
+                    aria-pressed={view === v}
+                    className={view === v ? 'chip-active' : 'chip'}
+                  >
+                    {v === 'list'
+                      ? localized({ cs: 'Seznam', sk: 'Zoznam', en: 'List' }, locale)
+                      : localized({ cs: 'Mapa', sk: 'Mapa', en: 'Map' }, locale)}
+                  </button>
+                ))}
+                {/* Řazení. Výchozí je dosažitelnost, protože k čemu je firma, kterou nejde oslovit. */}
+                <select value={sortMode} onChange={e => setSortMode(e.target.value as typeof sortMode)}
+                  aria-label={localized(S.sortLabel, locale)}
+                  className="input h-9 w-auto py-0 pr-8 text-xs cursor-pointer">
+                  <option value="reach">{localized(S.sortReach, locale)}</option>
+                  <option value="score">{localized(S.sortScore, locale)}</option>
+                  <option value="name">{localized(S.sortName, locale)}</option>
+                </select>
+                <button type="button" onClick={() => setShowFilters(v => !v)} aria-expanded={showFilters}
+                  className={otherFilters.length > 0 ? 'chip-active' : 'chip'}>
+                  <SlidersHorizontal size={12} />{localized(S.filters, locale)}
+                  {otherFilters.length > 0 && <span className="tnum text-accent-ink/70">{otherFilters.length}</span>}
+                </button>
+                {/* Jeden export místo tří tlačítek: CSV, Excel a soubory pro CRM v jedné nabídce. */}
+                {searchId && (
+                  <div className="relative" ref={crmMenuRef}>
+                    <button type="button" onClick={() => setCrmMenu(v => !v)} aria-haspopup="menu" aria-expanded={crmMenu}
+                      disabled={exportBusy} className="chip" title={jobRunning ? localized(S.exportRunning, locale) : undefined}>
+                      <Download size={12} />{exportBusy ? localized(S.exportBusy, locale) : 'Export'}<ChevronDown size={12} />
+                    </button>
+                    {crmMenu && (
+                      <div role="menu" className="absolute left-0 sm:left-auto sm:right-0 top-full mt-1 z-20 w-60 rounded-lg border border-line-strong bg-surface-muted py-1 shadow-pop animate-fade-in">
+                        {jobRunning && (
+                          <p className="px-3 py-2 text-[11px] text-ink-faint border-b border-line">{localized(S.exportRunning, locale)}</p>
+                        )}
+                        <button role="menuitem" type="button" onClick={() => { setCrmMenu(false); openExport('format=csv&'); }}
+                          className="block w-full text-left px-3 py-2 text-sm hover:bg-ink/[0.06]">CSV</button>
+                        {isPro && (
+                          <button role="menuitem" type="button" onClick={() => { setCrmMenu(false); openExport(''); }}
+                            className="block w-full text-left px-3 py-2 text-sm hover:bg-ink/[0.06]">{t('export_excel')}</button>
+                        )}
+                        {/* Soubor přímo pro CRM: jen sloupce, které importér zná, věta „proč" v poznámce. */}
+                        {CRM_FORMATS.map(f => (
+                          <button key={f.id} role="menuitem" type="button"
+                            onClick={() => { setCrmMenu(false); openExport(`format=${f.id}&`); }}
+                            className="block w-full text-left px-3 py-2 text-sm hover:bg-ink/[0.06]">
+                            {f.label}
+                            <span className="block text-[11px] text-ink-faint">{isCs ? 'CSV k importu bez mapování sloupců' : 'CSV ready to import without mapping'}</span>
+                          </button>
+                        ))}
+                        <Link href={`/${locale}/profile#integrace`} className="block px-3 py-2 text-[11px] text-ink-faint hover:text-ink border-t border-line mt-1">
+                          {isCs ? 'Make / Zapier webhook nastavíte v profilu' : 'Set up the Make / Zapier webhook in your profile'}
+                        </Link>
+                      </div>
+                    )}
                   </div>
+                )}
+                {searchId && !isDemo && !savedMeta?.rootName && !showSave && (
+                  <button onClick={() => setShowSave(true)} className="chip" title={localized(S.saveTip, locale)}>
+                    <Bookmark size={12} />{localized(S.save, locale)}
+                  </button>
+                )}
+              </div>
+
+              {/* Uložené hledání: jméno, „co je nové od minule" a nový běh. Neuložené: pole pro jméno. */}
+              {searchId && !isDemo && savedMeta?.rootName && (
+                <div className="mt-3 flex items-center gap-2 flex-wrap">
+                  <span className="badge text-ink" title={localized(S.savedAs, locale)}>
+                    <Bookmark size={10} />{savedMeta.rootName}
+                  </span>
+                  {savedMeta.origin === 'profile' && (
+                    <span className="text-xs text-ink-faint" title={localized(S.fromProfileTip, locale)}>
+                      {localized(S.fromProfile, locale)}
+                    </span>
+                  )}
+                  {savedMeta.earlierRuns > 0 && (
+                    <button onClick={() => setOnlyNew(v => !v)} className={onlyNew ? 'chip-active' : 'chip'}>
+                      {localized(S.onlyNew, locale)}
+                      <span className={`tnum ${onlyNew ? 'text-accent-ink/70' : 'text-ink-faint'}`}>{newCount}</span>
+                    </button>
+                  )}
+                  {savedMeta.earlierRuns > 0 && (
+                    <button onClick={() => setOnlyContactNew(v => !v)} className={onlyContactNew ? 'chip-active' : 'chip'} title={localized(S.contactNewTip, locale)}>
+                      {localized(S.onlyContactNew, locale)}
+                      <span className={`tnum ${onlyContactNew ? 'text-accent-ink/70' : 'text-ink-faint'}`}>{contactNewCount}</span>
+                    </button>
+                  )}
+                  <button onClick={rerunSearch} disabled={rerunning || jobRunning} className="btn-outline btn-sm gap-1.5">
+                    <RefreshCw size={14} />{rerunning ? localized(S.rerunning, locale) : localized(S.rerun, locale)}
+                  </button>
+                </div>
+              )}
+              {searchId && !isDemo && !savedMeta?.rootName && showSave && (
+                <form onSubmit={e => { e.preventDefault(); void saveSearch(); }} className="mt-3 flex items-center gap-2 flex-wrap">
+                  <input className="input h-9 w-full sm:w-56" placeholder={localized(S.saveNamePh, locale)}
+                         value={saveName} onChange={e => setSaveName(e.target.value)} maxLength={80} />
+                  <button type="submit" className="btn-primary btn-sm" disabled={savingSearch || !saveName.trim()}>
+                    {localized(S.saveConfirm, locale)}
+                  </button>
+                  <button type="button" onClick={() => setShowSave(false)} className="text-xs text-ink-muted hover:text-ink">
+                    {localized(S.cancel, locale)}
+                  </button>
+                </form>
+              )}
+
+              {/* Podmínky — zavřené, dokud o ně uživatel nestojí. Vysvětlivka je v bublině chipu. */}
+              {showFilters && (
+                <div className="mt-4 rounded-xl border border-line p-3 sm:p-4 space-y-3">
+                  {presetsOn && presetIds.some(id => active.has(id)) && (
+                    <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-muted">
+                      <span>{localized(S.presetNote, locale)}</span>
+                      <button
+                        onClick={() => {
+                          dirtyRef.current = true;
+                          setPresetsOn(false);
+                          setActive(prev => new Set(Array.from(prev).filter(id => !presetIds.includes(id))));
+                        }}
+                        className="text-accent hover:underline underline-offset-2">
+                        {localized(S.presetClear, locale)}
+                      </button>
+                    </p>
+                  )}
+                  {GROUP_ORDER.map(group => {
+                    // Bez tokenu Meta se její filtry nenabízejí (stejně jako ve skládačce), ať nic neslibují.
+                    const items = LEAD_FILTERS.filter(f => f.group === group && (metaAds || f.source !== 'Meta'));
+                    if (items.length === 0) return null;
+                    return (
+                      <div key={group} className="flex flex-wrap items-center gap-2">
+                        {/* Na 375 px popisek zabere celý řádek a chipy jdou pod něj. */}
+                        <span className="flex w-full sm:w-28 shrink-0 items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
+                          <span className={`icon-tile icon-tile--${group} h-7 w-7`}>{GROUP_ICON[group]}</span>
+                          {localized(GROUP_LABELS[group], locale)}
+                        </span>
+                        {items.map(f => {
+                          const on = active.has(f.id);
+                          const n  = countFor(f.id);
+                          return (
+                            <button
+                              key={f.id}
+                              onClick={() => toggle(f.id)}
+                              aria-pressed={on}
+                              disabled={!on && n === 0}
+                              title={f.hint ? localized(f.hint, locale) : undefined}
+                              className={on ? 'chip-active' : 'chip'}
+                            >
+                              {localized(f.label, locale)}
+                              <span className={`tnum ${on ? 'text-accent-ink/70' : 'text-ink-faint'}`}>{n}</span>
+                              {/* Štítek na chipu, který zapnul profil. */}
+                              {on && presetsOn && presetIds.includes(f.id) && (
+                                <span className="ml-0.5 rounded border border-accent-ink/40 px-1 text-[10px] font-semibold uppercase tracking-wider text-accent-ink/80">
+                                  {localized(S.presetTag, locale)}
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
                   {active.size > 0 && (
                     <button onClick={() => { dirtyRef.current = true; setActive(new Set()); setPresetsOn(false); }}
                       className="flex items-center gap-1 text-xs text-ink-muted hover:text-ink transition-colors">
                       <X size={12} />{isCs ? 'Zrušit filtry' : 'Clear filters'}
                     </button>
                   )}
-                  {/* Uložené hledání: jméno, „co je nové od minule" a nový běh. Neuložené: uložit. */}
-                  {searchId && !isDemo && (savedMeta?.rootName ? (
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="badge text-ink" title={localized(S.savedAs, locale)}>
-                        <Bookmark size={10} />{savedMeta.rootName}
-                      </span>
-                      {savedMeta.origin === 'profile' && (
-                        <span className="text-xs text-ink-faint" title={localized(S.fromProfileTip, locale)}>
-                          {localized(S.fromProfile, locale)}
-                        </span>
-                      )}
-                      {savedMeta.earlierRuns > 0 && (
-                        <button onClick={() => setOnlyNew(v => !v)} className={onlyNew ? 'chip-active' : 'chip'}>
-                          {localized(S.onlyNew, locale)}
-                          <span className={`tnum ${onlyNew ? 'text-accent-ink/70' : 'text-ink-faint'}`}>{newCount}</span>
-                        </button>
-                      )}
-                      {savedMeta.earlierRuns > 0 && (
-                        <button onClick={() => setOnlyContactNew(v => !v)} className={onlyContactNew ? 'chip-active' : 'chip'} title={localized(S.contactNewTip, locale)}>
-                          {localized(S.onlyContactNew, locale)}
-                          <span className={`tnum ${onlyContactNew ? 'text-accent-ink/70' : 'text-ink-faint'}`}>{contactNewCount}</span>
-                        </button>
-                      )}
-                      <button onClick={rerunSearch} disabled={rerunning || jobRunning} className="btn-outline btn-sm gap-1.5">
-                        <RefreshCw size={14} />{rerunning ? localized(S.rerunning, locale) : localized(S.rerun, locale)}
-                      </button>
-                    </div>
-                  ) : showSave ? (
-                    <form onSubmit={e => { e.preventDefault(); void saveSearch(); }} className="flex items-center gap-2">
-                      <input className="input h-9 w-48" placeholder={localized(S.saveNamePh, locale)}
-                             value={saveName} onChange={e => setSaveName(e.target.value)} maxLength={80} />
-                      <button type="submit" className="btn-primary btn-sm" disabled={savingSearch || !saveName.trim()}>
-                        {localized(S.saveConfirm, locale)}
-                      </button>
-                      <button type="button" onClick={() => setShowSave(false)} className="text-xs text-ink-muted hover:text-ink">
-                        {localized(S.cancel, locale)}
-                      </button>
-                    </form>
-                  ) : (
-                    <button onClick={() => setShowSave(true)} className="btn-outline btn-sm gap-1.5" title={localized(S.saveTip, locale)}>
-                      <Bookmark size={14} />{localized(S.save, locale)}
-                    </button>
-                  ))}
-                  {searchId && (
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <button
-                        onClick={() => openExport('format=csv&')}
-                        disabled={exportBusy}
-                        className="btn-outline btn-sm gap-1.5"
-                        title={jobRunning ? localized(S.exportRunning, locale) : isCs ? 'Exportovat do CSV' : 'Export to CSV'}
-                      >
-                        <FileText size={13} />{exportBusy ? localized(S.exportBusy, locale) : isCs ? 'CSV export' : 'CSV'}
-                      </button>
-                      {isPro && (
-                        <button
-                          onClick={() => openExport('')}
-                          disabled={exportBusy}
-                          className="btn-outline btn-sm gap-1.5"
-                          title={jobRunning ? localized(S.exportRunning, locale) : isCs ? 'Exportovat do Excelu' : 'Export to Excel'}
-                        >
-                          <Table2 size={13} />{exportBusy ? localized(S.exportBusy, locale) : t('export_excel')}
-                        </button>
-                      )}
-                      {jobRunning && (
-                        <span className="text-[11px] text-ink-faint basis-full">{localized(S.exportRunning, locale)}</span>
-                      )}
-                      {/* Soubor přímo pro CRM: jen sloupce, které importér zná, věta „proč" v poznámce. */}
-                      <div className="relative" ref={crmMenuRef}>
-                        <button type="button" onClick={() => setCrmMenu(v => !v)} aria-haspopup="menu" aria-expanded={crmMenu}
-                          className="btn-outline btn-sm gap-1.5" title={isCs ? 'Export pro CRM' : 'Export for CRM'}>
-                          <Share2 size={13} />CRM<ChevronDown size={12} />
-                        </button>
-                        {crmMenu && (
-                          <div role="menu" className="absolute left-0 sm:left-auto sm:right-0 top-full mt-1 z-20 w-56 rounded-lg border border-line-strong bg-surface-muted py-1 shadow-pop animate-fade-in">
-                            {CRM_FORMATS.map(f => (
-                              <button key={f.id} role="menuitem" type="button"
-                                onClick={() => { setCrmMenu(false); openExport(`format=${f.id}&`); }}
-                                className="block w-full text-left px-3 py-2 text-sm hover:bg-ink/[0.06]">
-                                {f.label}
-                                <span className="block text-[11px] text-ink-faint">{isCs ? 'CSV k importu bez mapování sloupců' : 'CSV ready to import without mapping'}</span>
-                              </button>
-                            ))}
-                            <Link href={`/${locale}/profile#integrace`} className="block px-3 py-2 text-[11px] text-ink-faint hover:text-ink border-t border-line mt-1">
-                              {isCs ? 'Make / Zapier webhook nastavíte v profilu' : 'Set up the Make / Zapier webhook in your profile'}
-                            </Link>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
                 </div>
-              </div>
-
-              {presetsOn && presetIds.some(id => active.has(id)) && (
-                <p className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-muted">
-                  <span>{localized(S.presetNote, locale)}</span>
-                  <button
-                    onClick={() => {
-                      dirtyRef.current = true;
-                      setPresetsOn(false);
-                      setActive(prev => new Set(Array.from(prev).filter(id => !presetIds.includes(id))));
-                    }}
-                    className="text-accent hover:underline underline-offset-2">
-                    {localized(S.presetClear, locale)}
-                  </button>
-                </p>
               )}
-
-              <div className="space-y-2.5">
-                {GROUP_ORDER.map(group => {
-                  // Bez tokenu Meta se její filtry nenabízejí (stejně jako ve skládačce), ať nic neslibují.
-                  const items = LEAD_FILTERS.filter(f => f.group === group && (metaAds || f.source !== 'Meta'));
-                  if (items.length === 0) return null;
-                  return (
-                    <div key={group} className="flex flex-wrap items-center gap-2">
-                      {/* Barevná ikonka skupiny: kdo · co se stalo · jak na tom je · jak oslovit. */}
-                      {/* Na 375 px popisek zabere celý řádek a chipy jdou pod něj — jinak zbyl vedle něj jeden chip na řádek. */}
-                      <span className="flex w-full sm:w-28 shrink-0 items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
-                        <span className={`icon-tile icon-tile--${group} h-7 w-7`}>{GROUP_ICON[group]}</span>
-                        {localized(GROUP_LABELS[group], locale)}
-                      </span>
-                      {items.map(f => {
-                        const on = active.has(f.id);
-                        const n  = countFor(f.id);
-                        return (
-                          <button
-                            key={f.id}
-                            onClick={() => toggle(f.id)}
-                            aria-pressed={on}
-                            disabled={!on && n === 0}
-                            title={f.hint ? localized(f.hint, locale) : undefined}
-                            className={on ? 'chip-active' : 'chip'}
-                          >
-                            {localized(f.label, locale)}
-                            <span className={`tnum ${on ? 'text-accent-ink/70' : 'text-ink-faint'}`}>{n}</span>
-                            {/* Štítek na chipu, který zapnul profil. Odstín sám by na akcentu nešel
-                                rozeznat; slovo řekne, odkud se filtr vzal. */}
-                            {on && presetsOn && presetIds.includes(f.id) && (
-                              <span className="ml-0.5 rounded border border-accent-ink/40 px-1 text-[10px] font-semibold uppercase tracking-wider text-accent-ink/80">
-                                {localized(S.presetTag, locale)}
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })}
-                      {/* Vysvětlivky ke skupině pod jejími chipy. Bublina myši nestačí: na telefonu
-                          se nikdy neukáže a zrovna u webu je rozdíl mezi „nemá" a „nevíme" to
-                          hlavní, co má uživatel pochopit dřív, než na filtr klikne. */}
-                      {items.some(f => f.hint) && (
-                        <ul className="w-full space-y-0.5 pl-16 text-[11px] leading-snug text-ink-faint">
-                          {/* Filtry se stejnou vysvětlivkou (dvě okna „nová firma") dostanou jeden řádek —
-                              tatáž věta dvakrát pod sebou vypadá jako chyba. */}
-                          {Array.from(items.filter(f => f.hint).reduce((acc, f) => {
-                            const text = localized(f.hint!, locale);
-                            acc.set(text, [...(acc.get(text) ?? []), localized(f.label, locale)]);
-                            return acc;
-                          }, new Map<string, string[]>())).map(([text, labels]) => (
-                            <li key={text}>
-                              <span className="text-ink-muted">{labels.join(', ')}</span>
-                              {' — '}
-                              {text}
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
             </div>
 
             {view === 'map' && (
@@ -2566,230 +2624,219 @@ export default function SearchPage() {
                 a 3px accent edge on the ones worth calling first. */}
             <div className={`border-t border-line ${view === 'map' ? 'hidden' : ''}`}>
               {filtered.map((b, i) => {
-                const good = b.leadScore >= GOOD_LEAD;
                 const { reason, scoreTitle } = rowSummary(b, profile.targetFilters, locale);
+                const open = openRows.has(b.id);
+                const audit = isDemo ? null : websiteAudit(b, locale);
+                // Jedna krátká řádka „proč": u starého webu to, co jsme na něm naměřili.
+                const why = b.websiteIsOld && audit ? audit.reasons.slice(0, 2).join(' · ') : '';
+                const place = obecFromAddress(b.address) || b.address || '';
+                const kind = stayKind(b);
                 return (
-                  <div
-                    key={b.id}
-                    // Firmy nad prahem mají kromě hrany i jemný gradient zleva — v seznamu pěti set
-                    // řádků je to to jediné, čím oko najde ty, kterým se má volat první.
-                    className={`row stagger flex items-start gap-4 py-5 pl-4 pr-1 border-l-[3px] ${good ? 'bg-gradient-to-r from-accent/[0.05] to-transparent' : ''}`}
-                    style={{
-                      '--i': Math.min(i, 20),
-                      borderLeftColor: good ? 'rgb(var(--accent))' : 'transparent',
-                    } as React.CSSProperties}
-                  >
-                    <LeadScore value={b.leadScore} title={scoreTitle} />
-
-                    <div className="flex-1 min-w-0">
-                      {/* Name + source */}
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="text-base md:text-lg font-bold text-ink leading-tight tracking-tight">{b.name}</h3>
-                            <SourceBadge source={b.source} common={commonSource} locale={locale} />
-                          </div>
-                          {b.address && (
-                            <p className="text-sm text-ink-muted mt-1 flex items-center gap-1.5">
-                              <MapPin size={13} className="shrink-0 text-ink-faint" />{b.address}
-                            </p>
-                          )}
-                        </div>
-                        {/* Only rows found before Vlna 2 carry a directory link. */}
-                        {b.googleMapsUrl && isHistoricalSource(b.source) && (
-                          <a href={b.googleMapsUrl} target="_blank" rel="noopener noreferrer"
-                             className="shrink-0 btn-ghost btn-sm p-1.5" title={localized(S.origSource, locale)} aria-label={localized(S.origSource, locale)}>
-                            <ExternalLink size={13} />
-                          </a>
-                        )}
-                      </div>
-
-                      {/* Badges */}
-                      <div className="flex flex-wrap gap-2 mt-3 items-center">
-                        <WebsiteStatusBadge b={b} locale={locale} />
-                        {(() => {
-                          const kind = stayKind(b);
-                          return kind ? (
+                  /*
+                    Řádek říká čtyři věci a nic víc: kdo to je, jak je na tom s webem, kde sídlí
+                    a jak se mu dovolat. Odznaky, IČO, živnosti, důkazy a skóre jsou pod „Detail"
+                    — dřív stály všechny naráz na každém z pěti set řádků.
+                  */
+                  <div key={b.id} className="row stagger py-4 sm:py-5 px-1" style={{ '--i': Math.min(i, 20) } as React.CSSProperties}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h3 className="text-base md:text-lg font-bold text-ink leading-tight tracking-tight break-words">{b.name}</h3>
+                        <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-sm text-ink-muted">
+                          <WebsiteStatusBadge b={b} locale={locale} />
+                          {kind && (
                             <span className="badge" title={localized(kind.from === 'nace' ? S.stayNaceTip : S.stayTip, locale)}>
                               <BedDouble size={10} />{stayKindLabel(kind)}
                             </span>
-                          ) : null;
-                        })()}
-                        {(() => {
-                          // Obrat a stálost z rejstříků — to, co u penzionu nahrazuje recenze, které nemáme.
-                          const facts = substanceFacts(b, locale, false);
-                          return facts.length ? <span className="badge text-ink-faint" title="ARES · RES">{facts.join(' · ')}</span> : null;
-                        })()}
-                        {/* Nárok: cizí sráží pořadí a říká jen „jinde" — bez toho kým, kdy a kolikrát.
-                            Vlastní pořadí nemění. Stejná třída `badge`, žádná nová barva. */}
-                        {/* Zaměstnanci ze statistického registru — tři stavy. `000` je „počet neuveden",
-                            nikdy nula; NULL znamená, že jsme se neptali (starší řádek), a nepíše se nic. */}
-                        {b.employeeCategory != null && (
-                          <span className="badge text-ink-faint" title="RES · ARES">
-                            {employeeLabel(b.employeeCategory, locale)}
-                          </span>
-                        )}
-                        {b.inInsolvency === true && (
-                          <span className="badge-red" title="ARES">{localized(S.insolvency, locale)}</span>
-                        )}
-                        {b.activePremises != null && (
-                          <span className="badge text-ink-faint" title={localized(S.premisesTip, locale)}>
-                            {premisesLabel(b.activePremises, locale)}
-                          </span>
-                        )}
-                        {b.isNew && (
-                          <span className="badge-warm" title={localized(S.newTip, locale)}>
-                            <Sparkles size={10} />{localized(S.newBadge, locale)}
-                          </span>
-                        )}
-                        {b.contactNew && (
-                          <span className="badge-warm" title={localized(S.contactNewTip, locale)}>
-                            <Phone size={10} />{localized(S.contactNewBadge, locale)}
-                          </span>
-                        )}
-                        {b.claim === 'other' && (
-                          <span className="badge text-ink-faint" title={localized(S.claimOtherTip, locale)}>
-                            <Users size={10} />{localized(S.claimOther, locale)}
-                          </span>
-                        )}
-                        {b.claim === 'mine' && (
-                          <span className="badge text-ink-faint" title={localized(S.claimMineTip, locale)}>
-                            <Check size={10} />{localized(S.claimMine, locale)}
-                          </span>
-                        )}
-                        <SocialLinks b={b} locale={locale} />
-                        {b.ico && (
-                          <span className="badge" title={localized(S.icoTip, locale)}>IČO {b.ico}</span>
-                        )}
-                        {/* Meta Knihovna reklam: platí za reklamu. Odkaz vede na veřejnou stránku
-                            inzerenta v Knihovně, kde si uživatel reklamy prohlédne sám. */}
-                        {b.adsPageId && (
-                          <a href={`https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=CZ&view_all_page_id=${encodeURIComponent(b.adsPageId)}`}
-                             target="_blank" rel="noopener noreferrer" className="badge-warm"
-                             title={localized(b.adsLinkDomain ? S.adsTipWeb : S.adsTipNoWeb, locale).replace('{p}', b.adsPageName ?? '').replace('{n}', String(b.adsCount ?? 0)).replace('{d}', b.adsLinkDomain ?? '') + ' ' + localized(S.adsLibrary, locale)}>
-                            <Megaphone size={10} />{localized(S.adsBadge, locale)}{!b.adsLinkDomain && ` · ${localized(S.adsNoWebBadge, locale)}`}
-                          </a>
-                        )}
-                        {/* Google Ads Transparency Center nemá API — jen odkaz podle domény, odpověď si uživatel přečte sám. */}
-                        {!isDemo && (b.website || b.adsLinkDomain) && (
-                          <a href={googleAdsTransparencyUrl(b.adsLinkDomain ?? hostOfUrl(b.website ?? ''))}
-                             target="_blank" rel="noopener noreferrer" className="badge text-ink-faint hover:text-ink"
-                             title={localized(S.googleAdsTip, locale)}>
-                            <ExternalLink size={10} />{localized(S.googleAds, locale)}
-                          </a>
-                        )}
-
-                        {/* Kde jsem s touhle firmou. Select, ne pět chipů — pět tlačítek na
-                            každém z pěti set řádků by z výsledků udělalo houštinu, a na mapě,
-                            kde je na výběr místo, chipy zůstávají.
-                            Barvu stavu nese puntík, text zůstává světlý: barvy z `lead-tags.ts`
-                            jsou laděné na body mapy, ne na 11px písmo, a jako text by na tmavém
-                            poli 4,5 : 1 splnit nemusely. Puntíku stačí 3 : 1. */}
-                        {!isDemo && (
-                          <span className="relative inline-flex items-center">
-                            <span
-                              aria-hidden
-                              className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 h-1.5 w-1.5 rounded-full"
-                              style={{ backgroundColor: statusDef(statusOf(b) ?? 'new')?.color }}
-                            />
-                            <select
-                              value={statusOf(b) ?? 'new'}
-                              onChange={e => setLeadStatus(b.id, e.target.value as LeadStatus)}
-                              aria-label={localized({ cs: 'Stav', sk: 'Stav', en: 'Status' }, locale)}
-                              /* Nejčastější akce na výsledkové stránce (po telefonátu překliknout
-                                 na „Osloveno") byla vysoká 23 px, takže se palcem trefovala až
-                                 na několikátý pokus. Na mobilu 36 px, na desktopu beze změny. */
-                              className="text-[11px] text-ink border border-field rounded-lg pl-4 pr-1.5 py-1.5 min-h-[36px] sm:py-0.5 sm:min-h-0 bg-surface-muted cursor-pointer hover:border-ink transition-colors"
-                            >
-                              {LEAD_STATUSES.map(st => (
-                                <option key={st.id} value={st.id}>{localized(st.label, locale)}</option>
-                              ))}
-                            </select>
-                          </span>
-                        )}
-                        {b.vatUnreliable && (
-                          <span className="badge-red" title={localized(S.vatBadTip, locale)}>
-                            {localized(S.vatBad, locale)}
-                          </span>
-                        )}
+                          )}
+                          {place && (
+                            <span className="inline-flex items-center gap-1">
+                              <MapPin size={13} className="shrink-0 text-ink-faint" />{place}
+                            </span>
+                          )}
+                        </div>
                       </div>
-
-                      {isDemo
-                        ? <LockedContacts locale={locale} />
-                        : <ContactStrategy b={b} locale={locale} />}
-
-                      {/* Věta „proč oslovit" pro úzké obrazovky. Pravý sloupec se pod 1024 px
-                          schovává, takže na telefonu by ji jinak nikdo nikdy neviděl — a je to
-                          ta jediná věta, kvůli které má řádek smysl číst. */}
-                      <p className="lg:hidden text-sm text-ink-muted leading-relaxed mt-3">{reason}</p>
-                      {/* Čím se zapnuté filtry u téhle firmy opírají — „vznik 14. 9. 2026 · ARES". Filtr,
-                          který důkaz nemá, tu nic netvrdí. */}
-                      {(() => {
-                        const proofs = LEAD_FILTERS
-                          .filter(f => active.has(f.id) && f.evidence)
-                          .map(f => f.evidence!(b, locale))
-                          .filter((x): x is string => Boolean(x));
-                        // Kdy se kontakt našel (přenáší se mezi běhy) a kterou větví firma prošla.
-                        if (!isDemo && (b.phone || b.email) && b.contactFoundAt) {
-                          proofs.push(localized(S.contactFound, locale).replace('{d}', formatDate(b.contactFoundAt, locale)));
-                        }
-                        if (b.matchedBy === 'nace') proofs.push(localized(S.matchedNace, locale));
-                        else if (b.matchedBy === 'name') proofs.push(localized(S.matchedName, locale));
-                        else if (b.matchedBy === 'osm') proofs.push(localized(S.matchedOsm, locale));
-                        return proofs.length > 0 ? (
-                          <p className="text-xs text-ink-faint leading-relaxed mt-2">
-                            <span className="text-ink-muted">{localized(S.provenBy, locale)}</span> {Array.from(new Set(proofs)).join(' · ')}
-                          </p>
-                        ) : null;
-                      })()}
-
-                      {/* Živnosti z RŽP a poslední změna v rejstříku — do 15. 9. 2026 se ukládaly a nikde neukazovaly. */}
-                      {(() => {
-                        // Předmět živnosti umí být odstavec („Silniční motorová doprava - nákladní vnitrostátní…");
-                        // do řádku jde zkrácený, celý je v bublině.
-                        const subjects = (b.trades ?? []).map(t => t.subject).filter((x): x is string => Boolean(x));
-                        const short = (x: string) => (x.length > 80 ? `${x.slice(0, 77).trimEnd()}…` : x);
-                        const changed = b.registryUpdatedAt ? formatDate(b.registryUpdatedAt, locale) : '';
-                        if (subjects.length === 0 && !changed) return null;
-                        return (
-                          <p className="text-xs text-ink-faint leading-relaxed mt-1" title={subjects.join(' · ')}>
-                            {subjects.length > 0 && (
-                              <><span className="text-ink-muted">{localized(S.tradesLabel, locale)}</span> {subjects.slice(0, 3).map(short).join(' · ')}
-                              {subjects.length > 3 && ` ${localized(S.tradesMore, locale).replace('{n}', String(subjects.length - 3))}`}</>
-                            )}
-                            {subjects.length > 0 && changed && ' · '}
-                            {changed && localized(S.registryChanged, locale).replace('{d}', changed)}
-                          </p>
-                        );
-                      })()}
-
-                      {/* Audit webu jednou větou — argument do nabídky. Dřív jen v bublině myši
-                          nad odznakem; na telefonu ho nikdo neviděl. Viz lib/website-audit.ts. */}
-                      {!isDemo && (() => {
-                        const audit = websiteAudit(b, locale);
-                        return audit ? (
-                          <p className={`text-[11px] leading-relaxed mt-1 ${audit.verdict === 'dated' ? 'text-warm' : 'text-ink-faint'}`}>
-                            <Globe size={10} className="inline -mt-0.5 mr-1" />{audit.sentence}
-                          </p>
-                        ) : null;
-                      })()}
-
-                      {/* Důkaz k příznaku webu se dosud předával jen jako `title`, tedy bublina
-                          myši — na telefonu ho nikdo nikdy neviděl. Přitom je to jediné, co
-                          odlišuje doložené „web nemá" od domněnky, a kvůli tomu se celá detekce
-                          přepisovala. Na úzkých obrazovkách proto stojí v textu. */}
-                      {b.websiteEvidence && (
-                        <p className="lg:hidden text-xs text-ink-faint leading-relaxed mt-1">{b.websiteEvidence}</p>
+                      {/* Kde jsem s touhle firmou. Barvu stavu nese puntík, text zůstává světlý:
+                          barvy z `lead-tags.ts` jsou laděné na body mapy, ne na 11px písmo. */}
+                      {!isDemo && (
+                        <span className="relative inline-flex items-center shrink-0">
+                          <span
+                            aria-hidden
+                            className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 h-1.5 w-1.5 rounded-full"
+                            style={{ backgroundColor: statusDef(statusOf(b) ?? 'new')?.color }}
+                          />
+                          <select
+                            value={statusOf(b) ?? 'new'}
+                            onChange={e => setLeadStatus(b.id, e.target.value as LeadStatus)}
+                            aria-label={localized({ cs: 'Stav', sk: 'Stav', en: 'Status' }, locale)}
+                            className="text-[11px] text-ink border border-field rounded-lg pl-4 pr-1.5 py-1.5 min-h-[36px] sm:py-0.5 sm:min-h-0 bg-surface-muted cursor-pointer hover:border-ink transition-colors"
+                          >
+                            {LEAD_STATUSES.map(st => (
+                              <option key={st.id} value={st.id}>{localized(st.label, locale)}</option>
+                            ))}
+                          </select>
+                        </span>
                       )}
                     </div>
 
-                    {/* Why this score (desktop) */}
-                    {(
-                      <div className="hidden lg:block shrink-0 w-56 min-w-0 text-right">
-                        <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint mb-1">
-                          {isCs ? 'Proč' : 'Why'}
-                        </p>
+                    {why && <p className="mt-2 text-sm text-ink-muted leading-snug">{why}</p>}
+
+                    <div className="mt-3">
+                      {isDemo
+                        ? <LockedContacts locale={locale} />
+                        : <ContactStrategy b={b} locale={locale} part="main" />}
+                    </div>
+
+                    <button type="button" onClick={() => toggleRow(b.id)} aria-expanded={open}
+                      className="mt-2 inline-flex items-center gap-1 text-xs text-ink-muted hover:text-ink min-h-[36px] sm:min-h-[28px]">
+                      {localized(S.detail, locale)}
+                      <ChevronDown size={12} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {open && (
+                      <div className="mt-1 rounded-xl border border-line bg-ink/[0.03] p-3 sm:p-4 space-y-3">
                         <p className="text-sm text-ink-muted leading-relaxed">{reason}</p>
+
+                        {b.address && (
+                          <p className="text-xs text-ink-muted flex items-start gap-1.5">
+                            <MapPin size={12} className="shrink-0 mt-0.5 text-ink-faint" />
+                            <span>{b.address} <SourceBadge source={b.source} common={commonSource} locale={locale} /></span>
+                          </p>
+                        )}
+
+                        <div className="flex flex-wrap gap-2 items-center">
+                          <span className="badge" title={scoreTitle}>{localized(S.score, locale)} {b.leadScore}/100</span>
+                          {b.ico && (
+                            <span className="badge" title={localized(S.icoTip, locale)}>IČO {b.ico}</span>
+                          )}
+                          {(() => {
+                            // Obrat a stálost z rejstříků — to, co u penzionu nahrazuje recenze, které nemáme.
+                            const facts = substanceFacts(b, locale, false);
+                            return facts.length ? <span className="badge text-ink-faint" title="ARES · RES">{facts.join(' · ')}</span> : null;
+                          })()}
+                          {/* Zaměstnanci ze statistického registru — `000` je „počet neuveden",
+                              nikdy nula; NULL znamená, že jsme se neptali, a nepíše se nic. */}
+                          {b.employeeCategory != null && (
+                            <span className="badge text-ink-faint" title="RES · ARES">
+                              {employeeLabel(b.employeeCategory, locale)}
+                            </span>
+                          )}
+                          {b.activePremises != null && (
+                            <span className="badge text-ink-faint" title={localized(S.premisesTip, locale)}>
+                              {premisesLabel(b.activePremises, locale)}
+                            </span>
+                          )}
+                          {b.inInsolvency === true && (
+                            <span className="badge-red" title="ARES">{localized(S.insolvency, locale)}</span>
+                          )}
+                          {b.vatUnreliable && (
+                            <span className="badge-red" title={localized(S.vatBadTip, locale)}>
+                              {localized(S.vatBad, locale)}
+                            </span>
+                          )}
+                          {b.isNew && (
+                            <span className="badge-warm" title={localized(S.newTip, locale)}>
+                              <Sparkles size={10} />{localized(S.newBadge, locale)}
+                            </span>
+                          )}
+                          {b.contactNew && (
+                            <span className="badge-warm" title={localized(S.contactNewTip, locale)}>
+                              <Phone size={10} />{localized(S.contactNewBadge, locale)}
+                            </span>
+                          )}
+                          {/* Nárok: cizí sráží pořadí a říká jen „jinde" — bez toho kým, kdy a kolikrát. */}
+                          {b.claim === 'other' && (
+                            <span className="badge text-ink-faint" title={localized(S.claimOtherTip, locale)}>
+                              <Users size={10} />{localized(S.claimOther, locale)}
+                            </span>
+                          )}
+                          {b.claim === 'mine' && (
+                            <span className="badge text-ink-faint" title={localized(S.claimMineTip, locale)}>
+                              <Check size={10} />{localized(S.claimMine, locale)}
+                            </span>
+                          )}
+                          <SocialLinks b={b} locale={locale} />
+                          {/* Meta Knihovna reklam: platí za reklamu. Odkaz vede na veřejnou stránku
+                              inzerenta v Knihovně, kde si uživatel reklamy prohlédne sám. */}
+                          {b.adsPageId && (
+                            <a href={`https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=CZ&view_all_page_id=${encodeURIComponent(b.adsPageId)}`}
+                               target="_blank" rel="noopener noreferrer" className="badge-warm"
+                               title={localized(b.adsLinkDomain ? S.adsTipWeb : S.adsTipNoWeb, locale).replace('{p}', b.adsPageName ?? '').replace('{n}', String(b.adsCount ?? 0)).replace('{d}', b.adsLinkDomain ?? '') + ' ' + localized(S.adsLibrary, locale)}>
+                              <Megaphone size={10} />{localized(S.adsBadge, locale)}{!b.adsLinkDomain && ` · ${localized(S.adsNoWebBadge, locale)}`}
+                            </a>
+                          )}
+                          {/* Google Ads Transparency Center nemá API — jen odkaz podle domény, odpověď si uživatel přečte sám. */}
+                          {!isDemo && (b.website || b.adsLinkDomain) && (
+                            <a href={googleAdsTransparencyUrl(b.adsLinkDomain ?? hostOfUrl(b.website ?? ''))}
+                               target="_blank" rel="noopener noreferrer" className="badge text-ink-faint hover:text-ink"
+                               title={localized(S.googleAdsTip, locale)}>
+                              <ExternalLink size={10} />{localized(S.googleAds, locale)}
+                            </a>
+                          )}
+                          {/* Only rows found before Vlna 2 carry a directory link. */}
+                          {b.googleMapsUrl && isHistoricalSource(b.source) && (
+                            <a href={b.googleMapsUrl} target="_blank" rel="noopener noreferrer" className="badge text-ink-faint hover:text-ink">
+                              <ExternalLink size={10} />{localized(S.origSource, locale)}
+                            </a>
+                          )}
+                        </div>
+
+                        {!isDemo && (
+                          <div>
+                            <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint mb-1.5">{localized(S.moreContacts, locale)}</p>
+                            <ContactStrategy b={b} locale={locale} part="rest" />
+                          </div>
+                        )}
+
+                        {/* Audit webu jednou větou — argument do nabídky. Viz lib/website-audit.ts. */}
+                        {audit && (
+                          <p className={`text-xs leading-relaxed ${audit.verdict === 'dated' ? 'text-warm' : 'text-ink-faint'}`}>
+                            <Globe size={10} className="inline -mt-0.5 mr-1" />{audit.sentence}
+                          </p>
+                        )}
+                        {/* Důkaz k příznaku webu: odlišuje doložené „web nemá" od domněnky. */}
+                        {b.websiteEvidence && (
+                          <p className="text-xs text-ink-faint leading-relaxed">{b.websiteEvidence}</p>
+                        )}
+
+                        {/* Čím se zapnuté filtry u téhle firmy opírají — „vznik 14. 9. 2026 · ARES". Filtr,
+                            který důkaz nemá, tu nic netvrdí. */}
+                        {(() => {
+                          const proofs = LEAD_FILTERS
+                            .filter(f => active.has(f.id) && f.evidence)
+                            .map(f => f.evidence!(b, locale))
+                            .filter((x): x is string => Boolean(x));
+                          // Kdy se kontakt našel (přenáší se mezi běhy) a kterou větví firma prošla.
+                          if (!isDemo && (b.phone || b.email) && b.contactFoundAt) {
+                            proofs.push(localized(S.contactFound, locale).replace('{d}', formatDate(b.contactFoundAt, locale)));
+                          }
+                          if (b.matchedBy === 'nace') proofs.push(localized(S.matchedNace, locale));
+                          else if (b.matchedBy === 'name') proofs.push(localized(S.matchedName, locale));
+                          else if (b.matchedBy === 'osm') proofs.push(localized(S.matchedOsm, locale));
+                          return proofs.length > 0 ? (
+                            <p className="text-xs text-ink-faint leading-relaxed">
+                              <span className="text-ink-muted">{localized(S.provenBy, locale)}</span> {Array.from(new Set(proofs)).join(' · ')}
+                            </p>
+                          ) : null;
+                        })()}
+
+                        {/* Živnosti z RŽP a poslední změna v rejstříku. */}
+                        {(() => {
+                          // Předmět živnosti umí být odstavec; do řádku jde zkrácený, celý je v bublině.
+                          const subjects = (b.trades ?? []).map(t => t.subject).filter((x): x is string => Boolean(x));
+                          const short = (x: string) => (x.length > 80 ? `${x.slice(0, 77).trimEnd()}…` : x);
+                          const changed = b.registryUpdatedAt ? formatDate(b.registryUpdatedAt, locale) : '';
+                          if (subjects.length === 0 && !changed) return null;
+                          return (
+                            <p className="text-xs text-ink-faint leading-relaxed" title={subjects.join(' · ')}>
+                              {subjects.length > 0 && (
+                                <><span className="text-ink-muted">{localized(S.tradesLabel, locale)}</span> {subjects.slice(0, 3).map(short).join(' · ')}
+                                {subjects.length > 3 && ` ${localized(S.tradesMore, locale).replace('{n}', String(subjects.length - 3))}`}</>
+                              )}
+                              {subjects.length > 0 && changed && ' · '}
+                              {changed && localized(S.registryChanged, locale).replace('{d}', changed)}
+                            </p>
+                          );
+                        })()}
                       </div>
                     )}
                   </div>
@@ -2803,6 +2850,21 @@ export default function SearchPage() {
                     neprošla filtrem" znamenají pro uživatele něco úplně jiného, a rada „zkus
                     jiný region" je u toho druhého případu falešná stopa — region byl v pořádku.
                   */}
+                  {/* Prázdný pohled přepínače: říct to krátce a ukázat, kde zbytek hledání je. */}
+                  {results.length > 0 && activeTab && activeTab.id !== 'all' && otherFilters.length === 0 ? (
+                    <>
+                      <p className="mb-2 text-ink-muted">{localized(S.tabEmpty, locale)}</p>
+                      <p className="mb-4 text-sm">{localized(jobRunning ? S.tabEmptyRunning : S.tabEmptyElse, locale)}</p>
+                      <div className="flex flex-wrap justify-center gap-2">
+                        {WEB_TABS.filter(tab => tab.id !== activeTab.id && tabCount(tab) > 0).map(tab => (
+                          <button key={tab.id} type="button" className="btn-outline btn-sm" onClick={() => setTab(tab)}>
+                            {localized(tab.label, locale)} · {tabCount(tab)}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                  <>
                   <p className="mb-4">
                     {results.length > 0
                       ? localized(S.emptyByFilter, locale).replace('{n}', String(results.length))
@@ -2839,6 +2901,8 @@ export default function SearchPage() {
                     <button onClick={() => setActive(new Set())} className="btn-outline btn-sm mx-auto">
                       {isCs ? 'Zrušit filtry' : 'Clear filters'}
                     </button>
+                  )}
+                  </>
                   )}
                 </div>
               )}

@@ -43,6 +43,8 @@ export interface WebsiteAudit {
   score: number | null;
   /** Hotová věta pro řádek výsledku. */
   sentence: string;
+  /** Jen změřené výhrady k webu („bez HTTPS", „copyright 2011"), krátce — na řádek vedle stavu. */
+  reasons: string[];
 }
 
 export interface AuditInput extends FilterableLead {
@@ -63,6 +65,7 @@ export function websiteAudit(b: AuditInput, locale: string): WebsiteAudit | null
     const text = t(hit.text).replace('{y}', year ?? '');
     if (!items.includes(text)) items.push(text);
   }
+  const measured = [...items];
   if (!b.contactUrl) items.push(t(T.noContact));
   if (b.socialsChecked) {
     const socials = [b.hasFacebook && 'Facebook', b.hasInstagram && 'Instagram', b.hasLinkedIn && 'LinkedIn'].filter(Boolean) as string[];
@@ -74,5 +77,5 @@ export function websiteAudit(b: AuditInput, locale: string): WebsiteAudit | null
   const verdict: WebsiteAudit['verdict'] = b.websiteIsOld ? 'dated' : reasons.length > 0 || !b.contactUrl ? 'weak' : 'ok';
   const head = t(verdict === 'dated' ? T.dated : verdict === 'weak' ? T.weak : T.ok);
   const sentence = `${head}${score !== null ? ` (${score}/100)` : ''}${items.length ? `: ${items.join(', ')}.` : '.'}`;
-  return { verdict, score, sentence };
+  return { verdict, score, sentence, reasons: measured };
 }

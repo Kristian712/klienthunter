@@ -34,14 +34,25 @@ export interface Scenario {
    * a wellness"; ostatní sekce obor nechávají na uživateli.
    */
   industries?: string[];
+  /**
+   * Obory, které sekce nabídne, když uživatel žádný nevybral. Bez oboru se totiž hledá jen
+   * v indexu nově založených firem — 11. 10. 2026 dostal majitel pro „Bez webu" v Královéhradeckém
+   * kraji 406 živnostníků zapsaných před pár týdny, bez provozovny a bez kontaktu. Web se prodává
+   * podnikům, které někde stojí: proto obory s provozovnami, které zná i OpenStreetMap (telefon).
+   * Na rozdíl od `industries` se nevnucují — vlastní výběr uživatele zůstává.
+   */
+  defaultIndustries?: string[];
 }
+
+/** Obory s provozovnou, kde se web prodává nejlíp a kde OpenStreetMap nese nejvíc kontaktů. */
+export const LOCAL_TRADES = ['restaurant', 'hair salon', 'car repair', 'beauty salon'];
 
 export const SCENARIOS: Scenario[] = [
   {
     id: 'all',
     icon: 'search',
     forWhom: { cs: 'kdokoli', sk: 'ktokoľvek', en: 'anyone' },
-    label: { cs: 'Všechny firmy v oboru', sk: 'Všetky firmy v odbore', en: 'Every firm in the trade' },
+    label: { cs: 'Všechny firmy', sk: 'Všetky firmy', en: 'All firms' },
     action: { cs: 'Najít firmy', sk: 'Nájsť firmy', en: 'Find firms' },
     hint: {
       cs: 'Nic neodfiltruje. Pořadí určuje skóre podle kritérií z vašeho účtu.',
@@ -80,6 +91,7 @@ export const SCENARIOS: Scenario[] = [
     // veřejný kontakt (v Plzni žádná), sekce by byla prázdná. Kontakt se dohledá z odkazů v řádku;
     // firmy s kontaktem jdou v pořadí první.
     filters: ['no_website'],
+    defaultIndustries: LOCAL_TRADES,
   },
   {
     /**
@@ -122,14 +134,20 @@ export const SCENARIOS: Scenario[] = [
     id: 'old_web',
     icon: 'shield',
     forWhom: { cs: 'tvůrci webů', sk: 'tvorcovia webov', en: 'web developers' },
-    label: { cs: 'Firmy se zastaralým webem', sk: 'Firmy so zastaraným webom', en: 'Firms with a dated website' },
-    action: { cs: 'Najít firmy se zastaralým webem', sk: 'Nájsť firmy so zastaraným webom', en: 'Find firms with a dated website' },
+    label: { cs: 'Starý web', sk: 'Starý web', en: 'Outdated website' },
+    action: { cs: 'Najít firmy se starým webem', sk: 'Nájsť firmy so starým webom', en: 'Find firms with an outdated website' },
+    /**
+     * Nejspolehlivější seznam v aplikaci: web jsme stáhli a změřili (bez HTTPS, bez mobilní
+     * verze, kód a copyright staré roky) a kontakt je přímo z něj. Od 12. 10. 2026 jedna ze tří
+     * hlavních voleb; dřív jen weby bez HTTPS.
+     */
     hint: {
-      cs: 'Firmy s ověřeným webem, který běží bez HTTPS — prohlížeč u něj návštěvníkovi píše „Nezabezpečeno".',
-      sk: 'Firmy s overeným webom, ktorý beží bez HTTPS — prehliadač pri ňom návštevníkovi píše „Nezabezpečené".',
-      en: 'Firms with a verified website served without HTTPS — the browser tells their visitors it is “not secure”.',
+      cs: 'Firmy, jejichž web jsme načetli a propadl: bez HTTPS, bez mobilní verze nebo roky neaktualizovaný. Kontakt je přímo z jejich stránek.',
+      sk: 'Firmy, ktorých web sme načítali a prepadol: bez HTTPS, bez mobilnej verzie alebo roky neaktualizovaný. Kontakt je priamo z ich stránok.',
+      en: 'Firms whose website we loaded and it failed: no HTTPS, no mobile version, or untouched for years. The contact comes from their own pages.',
     },
-    filters: ['insecure_website'],
+    filters: ['old_website'],
+    defaultIndustries: LOCAL_TRADES,
   },
   {
     id: 'ads_no_web',
@@ -195,6 +213,9 @@ export const SCENARIOS: Scenario[] = [
 ];
 
 /** Sekce na přehledu a v hlavičce hledání — čtyři vstupy, které pokryjí většinu profesí. */
+/** Tři hlavní volby nad hledáním; ostatní sekce jsou pod „Další možnosti" (majitel 12. 10. 2026: „nechci složitosti"). */
+export const PRIMARY_SCENARIOS = ['no_web', 'old_web', 'all'] as const;
+
 export const FEATURED_SCENARIOS = ['reach_weak_web', 'social_weak_web', 'stay', 'new', 'reach'] as const;
 
 const BY_ID = new Map(SCENARIOS.map(s => [s.id, s]));
@@ -212,7 +233,7 @@ export function scenarioLabel(id: string | null | undefined, locale: string): st
  * formulářem a uživatel ho může kdykoli změnit.
  */
 export const SCENARIO_BY_PROFESSION: Record<string, string> = {
-  web: 'reach_weak_web',
+  web: 'no_web',
   marketing: 'old_web',
   finance: 'new',
   legal: 'all',
