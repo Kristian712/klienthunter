@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { prisma } from './db';
 import type { SearchQuota } from './website-discovery';
 
@@ -12,8 +13,7 @@ import type { SearchQuota } from './website-discovery';
  *  • Každý dotaz je řádek ve `WebSearchCall`. Počítá se klouzavé okno **31 dní**: Brave neříká,
  *    jestli kredit obnovuje k začátku kalendářního měsíce, nebo k datu založení účtu, a žádné
  *    fakturační období není delší než 31 dní. Strop tedy platí pro jakékoli zarovnání.
- *  • Rezervace je jedna transakce pod zámkem (`pg_advisory_xact_lock`), takže ani dvacet firem
- *    ověřovaných najednou v několika instancích Vercelu strop nepřečerpá.
+ *  • Rezervace je jeden příkaz INSERT … WHERE count < strop (viz `reserveWebSearch`).
  *  • Brave účtuje jen úspěšné dotazy. Když vyhledávač neodpoví, rezervace se vrací.
  *  • Výchozí strop je pod kreditem (Brave 900 z 1 000, Linkup 3 500 z 4 000): ze stejného klíče
  *    jdou i dotazy z vývoje, které produkční databáze nevidí. `WEB_SEARCH_MONTHLY_LIMIT` ho umí
@@ -34,8 +34,8 @@ const CREDIT_QUERIES = LINKUP ? 4_000 : 1_000;
 const DEFAULT_LIMIT = LINKUP ? 3_500 : 900;
 export const QUOTA_WINDOW_DAYS = 31;
 const DAY_MS = 24 * 60 * 60 * 1000;
-/** Libovolné pevné číslo zámku, sdílené všemi instancemi. */
-const LOCK_KEY = 815203;
+/** Kolik rezervací za sebou smí selhat na chybě databáze, než se vyhledávač pro běh vypne. */
+const MAX_RESERVE_ERRORS = 8;
 
 export function monthlyWebSearchLimit(): number {
   const raw = process.env.WEB_SEARCH_MONTHLY_LIMIT;
@@ -44,31 +44,46 @@ export function monthlyWebSearchLimit(): number {
   return Math.min(Math.floor(n), CREDIT_QUERIES);
 }
 
+/** Výsledek rezervace: lístek, vyčerpaný strop, nebo chyba databáze (to není totéž). */
+export type Reservation = { id: string } | 'limit' | 'error';
+
 /**
- * Zarezervuje jeden dotaz v měsíčním stropu. Vrací id rezervace, nebo `null`, když se ptát nesmí.
- * Nikdy nevyhodí výjimku: chyba databáze znamená „bez vyhledávače", ne spadlé hledání.
+ * Zarezervuje jeden dotaz v měsíčním stropu. Nikdy nevyhodí výjimku.
+ *
+ * Jeden příkaz, žádná transakce se zámkem. Dřív tu byla interaktivní transakce s
+ * `pg_advisory_xact_lock`; když dvacet firem ověřovaných naráz chtělo lístek, jedna z nich
+ * narazila na timeout — a volající to četl jako „měsíční strop je vyčerpaný" a vypnul vyhledávač
+ * do konce hledání. 11. 10. 2026 tak hledání v Královéhradeckém kraji položilo 8 dotazů z 200,
+ * 417 firem zůstalo „neověřeno" a sekce Bez webu byla prázdná.
+ *
+ * Bez zámku může souběh strop přelézt o pár dotazů (nejvýš o počet souběžných firem) — strop je
+ * schválně pod bezplatným kreditem, takže to nic nestojí.
  */
-export async function reserveWebSearch(): Promise<string | null> {
+export async function reserveWebSearch(): Promise<Reservation> {
   const limit = monthlyWebSearchLimit();
-  if (limit === 0) return null;
+  if (limit === 0) return 'limit';
+  const id = randomUUID();
   try {
-    return await prisma.$transaction(
-      async tx => {
-        await tx.$queryRawUnsafe(`SELECT 1 AS ok FROM pg_advisory_xact_lock(${LOCK_KEY})`);
-        const now = Date.now();
-        // Řádky, které z okna dávno vypadly, nikdo nepotřebuje. Index na `at` z toho dělá levný dotaz.
-        await tx.webSearchCall.deleteMany({ where: { at: { lt: new Date(now - (QUOTA_WINDOW_DAYS + 10) * DAY_MS) } } });
-        const used = await tx.webSearchCall.count({ where: { at: { gte: new Date(now - QUOTA_WINDOW_DAYS * DAY_MS) } } });
-        if (used >= limit) return null;
-        const row = await tx.webSearchCall.create({ data: {}, select: { id: true } });
-        return row.id;
-      },
-      { timeout: 10_000 },
-    );
+    const rows = await prisma.$queryRaw<Array<{ id: string }>>`
+      INSERT INTO "WebSearchCall" ("id", "at")
+      SELECT ${id}, now()
+      WHERE (
+        SELECT count(*) FROM "WebSearchCall"
+        WHERE "at" >= now() - (${QUOTA_WINDOW_DAYS} * interval '1 day')
+      ) < ${limit}
+      RETURNING "id"`;
+    return rows.length > 0 ? { id } : 'limit';
   } catch (err) {
-    console.error('web-search-quota: rezervace selhala, hledá se bez vyhledávače:', err);
-    return null;
+    console.error('web-search-quota: rezervace selhala:', err instanceof Error ? err.message : err);
+    return 'error';
   }
+}
+
+/** Řádky dávno mimo okno nikdo nepotřebuje. Volá se jednou na hledání, ne u každého dotazu. */
+export async function pruneWebSearchCalls(): Promise<void> {
+  await prisma.webSearchCall
+    .deleteMany({ where: { at: { lt: new Date(Date.now() - (QUOTA_WINDOW_DAYS + 10) * DAY_MS) } } })
+    .catch(() => undefined);
 }
 
 /** Vyhledávač neodpověděl — Brave takový dotaz neúčtuje, rezervace se vrací do stropu. */
@@ -95,18 +110,32 @@ export interface CountingSearchQuota extends SearchQuota {
  *
  * Vlastní strop se ubírá synchronně, dřív než se na cokoli čeká — dvacet firem ověřovaných
  * najednou by jinak všechny viděly „ještě zbývá" a strop hledání přečerpaly. Jakmile měsíční strop
- * jednou řekne ne, tahle kvóta se do konce běhu už na databázi neptá.
+ * jednou řekne ne, tahle kvóta se do konce běhu už na databázi neptá. Chyba databáze strop není:
+ * vypne vyhledávač až po `MAX_RESERVE_ERRORS` selháních za sebou.
  */
 export function createSearchQuota(perSearchBudget: number): CountingSearchQuota {
   let left = Math.max(0, Math.floor(perSearchBudget));
   let used = 0;
   let exhausted = false;
+  let errors = 0;
+  void pruneWebSearchCalls();
   return {
     async reserve() {
       if (exhausted || left <= 0) return null;
       left--;
-      const ticket = await reserveWebSearch();
-      if (!ticket) {
+      let ticket = await reserveWebSearch();
+      // Chyba databáze není vyčerpaný strop: jeden pokus navíc, a když nevyjde, přijde o
+      // vyhledávač jen tahle firma — ne celé hledání.
+      if (ticket === 'error') ticket = await reserveWebSearch();
+      if (ticket === 'error') {
+        left++;
+        if (++errors >= MAX_RESERVE_ERRORS && !exhausted) {
+          exhausted = true;
+          console.error('web-search-quota: rezervace opakovaně selhává, hledání pokračuje bez vyhledávače');
+        }
+        return null;
+      }
+      if (ticket === 'limit') {
         left++;
         if (!exhausted) {
           exhausted = true;
@@ -114,8 +143,9 @@ export function createSearchQuota(perSearchBudget: number): CountingSearchQuota 
         }
         return null;
       }
+      errors = 0;
       used++;
-      return ticket;
+      return ticket.id;
     },
     async release(ticket) {
       left++;

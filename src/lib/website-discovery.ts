@@ -885,10 +885,14 @@ export async function discoverWebsite(
    * (ruční kontrola 1. 10. 2026). Podle jména se jejich web nenajde, podle adresy ano — a protože
    * jméno tu nesedí, projde jen stránka s tvrdým faktem: IČO, telefon nebo adresa z registru.
    * Když tenhle dotaz neodpoví, „web nemá" se neříká (searchAnswered = false).
+   *
+   * Firmu, kterou vyhledávač podle jména vůbec nezná, druhý dotaz nestojí: verdikt „web nemá"
+   * u ní nepadne tak jako tak a dotazů je na hledání jen dvě stě — raději je dostane další firma
+   * (12. 10. 2026).
    */
   const ulice = firm.address?.split(',')[0]?.trim();
   const { street, number, city: obecAdresy } = addressParts(firm.address);
-  if (searchAnswered && street && number && ulice && opts.searchQuota && Date.now() < opts.deadlineAt) {
+  if (searchAnswered && !unknownToEngine && street && number && ulice && opts.searchQuota && Date.now() < opts.deadlineAt) {
     const listek2 = await opts.searchQuota.reserve();
     if (!listek2) {
       // Strop došel uprostřed — bez druhého dotazu jistota není.
