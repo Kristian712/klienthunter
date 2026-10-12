@@ -294,6 +294,13 @@ export function domainCandidates(
   }
   // „Hotel u námořníka" → hotelunamornika.eu (1. 10. 2026).
   if (tld === 'cz' && uSlug && uSlug.length >= 8) domains.push(`${uSlug}.eu`, `${uSlug}.com`);
+  /**
+   * Název, který je sám doménou („Am-Besi.eu s.r.o."): ta doména je první hypotéza, ne až
+   * `ambesieu.cz`. Rozklad názvu na slova z ní tečku ztratil a přesnou adresu jsme nikdy
+   * nezkusili (ruční kontrola 12. 10. 2026).
+   */
+  const literal = /(?:^|\s)([a-z0-9][a-z0-9-]{1,40}\.(?:cz|sk|eu|com|net|org))(?=\s|,|$)/i.exec(name)?.[1]?.toLowerCase();
+  if (literal && !domains.includes(literal)) domains.unshift(literal);
   return domains;
 }
 
@@ -345,6 +352,16 @@ const PARKED = /(je na prodej|na predaj|for sale|parkovan[aáéy]|zaregistrujte 
 function domainLabel(url: string): string {
   try {
     return new URL(url).hostname.replace(/^www\./, '').split('.')[0].replace(/-/g, '');
+  } catch {
+    return '';
+  }
+}
+
+/** Jméno registrované domény bez ohledu na subdoménu: `cz.medik8.com` → `medik8`. */
+function registrableLabel(url: string): string {
+  try {
+    const parts = new URL(url).hostname.split('.');
+    return (parts[parts.length - 2] ?? '').replace(/-/g, '');
   } catch {
     return '';
   }
@@ -489,8 +506,13 @@ export function pageNamesFirm(html: string, firm: FirmFacts, url: string): boole
   if (PARKED.test(text)) return false;
   const identifying = identifyingTokens(firm.name);
   if (identifying.length === 0 || !identifying.every(t => hasWord(text, t))) return false;
-  const label = domainLabel(url);
-  return identifying.some(t => label.includes(t));
+  /**
+   * I registrovaná doména pod subdoménou: `medik8.cz` přesměruje na `cz.medik8.com` a první
+   * část adresy je pak „cz". Salon Medik8 v Hradci tak 12. 10. 2026 vyšel jako „web nemá",
+   * přestože značka web má. Tohle pravidlo říká jen „pravděpodobně má web" — víc ne.
+   */
+  const labels = [domainLabel(url), registrableLabel(url)];
+  return identifying.some(t => labels.some(label => label.includes(t)));
 }
 
 export function pageEvidence(
