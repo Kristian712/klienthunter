@@ -537,9 +537,6 @@ const WEB_TABS: WebTab[] = [
 /** Podmínky o stavu webu — přepínač je nahrazuje, ostatní zapnuté filtry nechává. */
 const WEB_STATE_FILTERS = ['no_web_found', 'no_website', 'web_unknown', 'has_website', 'weak_web', 'old_website', 'insecure_website', 'no_web_has_fb', 'social_only_web'];
 
-/** Podmínky, které nechají jen firmy bez nalezeného webu — a tím skoro jistě i bez kontaktu. */
-const WEB_ABSENT_FILTERS = ['no_web_found', 'no_website', 'web_unknown', 'no_web_has_fb'];
-
 const S = {
   // I tady mluvíme o tom, co jsme našli my, ne o tom, co firma má: sítě čteme jen z odkazů na
   // jejím webu a firma může mít Facebook, na který ze svých stránek neodkazuje.
@@ -646,12 +643,9 @@ const S = {
   reachableTip: { cs: 'U kolika z vypsaných firem máme telefon, e-mail, profil na síti nebo kontaktní stránku. Ostatní jde jen dohledat ručně.',
                   sk: 'Pri koľkých z vypísaných firiem máme telefón, e-mail, profil na sieti alebo kontaktnú stránku. Ostatné sa dajú len dohľadať ručne.',
                   en: 'How many of the listed firms we have a phone, e-mail, social profile or contact page for. The rest you can only look up by hand.' },
-  noneReachable: { cs: 'Na žádnou z těchto firem nemáme kontakt. Firmy bez webu ho obvykle nemají — kontakty sbíráme z jejich stránek.',
-                   sk: 'Na žiadnu z týchto firiem nemáme kontakt. Firmy bez webu ho obvykle nemajú — kontakty zbierame z ich stránok.',
-                   en: 'We have no contact for any of these firms. Firms without a website usually have none — we read contacts off their pages.' },
-  showWithWeb: { cs: 'Zrušit podmínku „bez webu" a ukázat i firmy s webem',
-                 sk: 'Zrušiť podmienku „bez webu" a ukázať aj firmy s webom',
-                 en: 'Drop the “no website” condition and show firms with one' },
+  noneReachable: { cs: 'Kontakt na tyhle firmy nemáme — čteme ho z webu firmy. U každé je odkaz na dohledání.',
+                   sk: 'Kontakt na tieto firmy nemáme — čítame ho z webu firmy. Pri každej je odkaz na dohľadanie.',
+                   en: 'We have no contact for these firms — we read it off the firm’s website. Each row links to a lookup.' },
   sortLabel:  { cs: 'Řadit', sk: 'Zoradiť', en: 'Sort' },
   sortReach:  { cs: 'Nejdřív ty, co jde oslovit', sk: 'Najprv tie, čo sa dá osloviť', en: 'Reachable ones first' },
   sortScore:  { cs: 'Podle mých kritérií', sk: 'Podľa mojich kritérií', en: 'By my criteria' },
@@ -2605,23 +2599,16 @@ export default function SearchPage() {
               Seznam, na který se nedá zavolat, je k ničemu — a přesně to dělá podmínka „web jsme
               nenašli": kontakty čteme z webu firmy, takže firma bez webu ho obvykle nemá
               (změřeno 18. 9. 2026: ze 404 firem bez webu 0 s kontaktem). Než aby uživatel projel
-              čtyři sta řádků a zjistil to sám, řekne se to nahoře a nabídne se cesta ven.
+              čtyři sta řádků a zjistil to sám, řekne se to nahoře; cestu ven dává přepínač.
             */}
             {view === 'list' && filtered.length > 0 && !filtered.some(b => hasReachChannel(b)) && (
               <div role="note" className="mb-5 rounded-xl border border-field bg-ink/[0.04] px-4 py-3">
                 <p className="text-sm text-ink leading-relaxed">{localized(S.noneReachable, locale)}</p>
-                {WEB_ABSENT_FILTERS.some(id => active.has(id)) && (
-                  <button type="button" className="btn-outline btn-sm mt-3"
-                    onClick={() => { dirtyRef.current = true; setActive(prev => new Set(Array.from(prev).filter(id => !WEB_ABSENT_FILTERS.includes(id)))); setPresetsOn(false); }}>
-                    {localized(S.showWithWeb, locale)}
-                  </button>
-                )}
               </div>
             )}
 
             {/* ── Results ──────────────────────────────────────────────────────────
-                A row, not a card: one hairline between neighbours, the score on the left, and
-                a 3px accent edge on the ones worth calling first. */}
+                A row, not a card: one hairline between neighbours. */}
             <div className={`border-t border-line ${view === 'map' ? 'hidden' : ''}`}>
               {filtered.map((b, i) => {
                 const { reason, scoreTitle } = rowSummary(b, profile.targetFilters, locale);
